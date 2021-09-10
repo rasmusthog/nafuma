@@ -2,6 +2,10 @@ import pandas as pd
 import numpy as np
 import os
 
+def rbkerbest():
+    print("ROSENBORG!<3")
+
+
 def split_xanes_scan(filename, destination=None):
 
     with open(filename, 'r') as f:
