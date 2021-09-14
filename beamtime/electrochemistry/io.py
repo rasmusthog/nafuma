@@ -1,4 +1,6 @@
 import pandas as pd
+import numpy as np
+import matplotlib.pyplot as plt
 
 
 def read_battsmall(path):
@@ -16,36 +18,10 @@ def read_battsmall(path):
 	return df
 
 
-def clean_battsmall_data(df, t='ms', C='mAh/g', I='mA', U='V'):
-	''' Takes BATTSMALL-data in the form of a DataFrame and cleans the data up and converts units into desired units.
-	Also adds a column indicating whether or not it is charge or discharge.
 
-	Input:
-	df (required): A pandas DataFrame containing BATTSMALL-data, as obtained from read_battsmall().
-	t (optional): Unit for time data. Defaults to ms.
-	C (optional): Unit for specific capacity. Defaults to mAh/g.
-	I (optional): Unit for current. Defaults mA.
-	U (optional): Unit for voltage. Defaults to V.
+def unit_conversion(df, units):
 
-	Output:
-	df: A cleaned up DataFrame with desired units and additional column about charge/discharge.
-	'''
-
-	df = unit_conversion(df=df, t=t, C=C, I=I, U=U)
-
-	return df
-
-
-
-def test_print():
-	print('IT WORKS!')
-
-
-def unit_conversion(df, t, C, I, U):
-
-	print('YAHOO!')
-
-	C, m = C.split('/')
+	C, m = units['C'].split('/')
 
 	# Get the units used in the data set
 	t_prev = df.columns[0].split()[-1].strip('[]')
@@ -53,7 +29,6 @@ def unit_conversion(df, t, C, I, U):
 	I_prev = df.columns[2].split()[-1].strip('[]')
 	C_prev, m_prev = df.columns[4].split()[-1].strip('[]').split('/')
 
-	print(t_prev)
 
 	# Define matrix for unit conversion for time
 	t_units_df = {'h': [1, 60, 3600, 3600000], 'min': [1/60, 1, 60, 60000], 's': [1/3600, 1/60, 1, 1000], 'ms': [1/3600000, 1/60000, 1/1000, 1]}
@@ -84,18 +59,114 @@ def unit_conversion(df, t, C, I, U):
 
 
 	#print(df["TT [{}]".format(t_prev)])
-	df["TT [{}]".format(t_prev)] = df["TT [{}]".format(t_prev)] * t_units_df[t_prev].loc[t]
-	df["U [{}]".format(U_prev)] = df["U [{}]".format(U_prev)] * U_units_df[U_prev].loc[U]
-	df["I [{}]".format(I_prev)] = df["I [{}]".format(I_prev)] * I_units_df[I_prev].loc[I]
-	df["C [{}/{}]".format(C_prev, m_prev)] = df["C [{}/{}]".format(C_prev, m_prev)] * (C_units_df[C_prev].loc[C] / m_units_df[m_prev].loc[m])
+	df["TT [{}]".format(t_prev)] = df["TT [{}]".format(t_prev)] * t_units_df[t_prev].loc[units['t']]
+	df["U [{}]".format(U_prev)] = df["U [{}]".format(U_prev)] * U_units_df[U_prev].loc[units['U']]
+	df["I [{}]".format(I_prev)] = df["I [{}]".format(I_prev)] * I_units_df[I_prev].loc[units['I']]
+	df["C [{}/{}]".format(C_prev, m_prev)] = df["C [{}/{}]".format(C_prev, m_prev)] * (C_units_df[C_prev].loc[units['C']] / m_units_df[m_prev].loc[units['m']])
 
-	df.columns = ['TT [{}]'.format(t), 'U [{}]'.format(U), 'I [{}]'.format(I), 'Z1', 'C [{}/{}]'.format(C, m), 'Comment']
+	df.columns = ['TT', 'U', 'I', 'Z1', 'C', 'Comment']
 
 
 
 	return df
 
+#def process_battsmall_data(df, t='ms', C='mAh/g', I='mA', U='V'):
+
+def process_battsmall_data(df, units=None):
+	''' Takes BATTSMALL-data in the form of a DataFrame and cleans the data up and converts units into desired units.
+	Splits up into individual charge and discharge DataFrames per cycle, and outputs a list where each element is a tuple with the Chg and DChg-data. E.g. cycles[10][0] gives the charge data for the 11th cycle.
+
+	For this to work, the cycling program must be set to use the counter.
+
+	Input:
+	df (required): A pandas DataFrame containing BATTSMALL-data, as obtained from read_battsmall().
+	t (optional): Unit for time data. Defaults to ms.
+	C (optional): Unit for specific capacity. Defaults to mAh/g.
+	I (optional): Unit for current. Defaults mA.
+	U (optional): Unit for voltage. Defaults to V.
+
+	Output:
+	cycles: A list with 
+	'''
+
+	required_units = ['t', 'I', 'U', 'C']
+	default_units = {'t': 'h', 'I': 'mA', 'U': 'V', 'C': 'mAh/g'}
+
+	if not units:
+		units = default_units
+
+	if units:
+		for unit in required_units:
+			if unit not in units.values():
+				units[unit] = default_units[unit]
+			
+
+	# Convert all units to the desired units.
+	df = unit_conversion(df=df, units=units)
+
+	# Replace NaN with empty string in the Comment-column and then remove all steps where the program changes - this is due to inconsistent values for current and 
+	df[["Comment"]] = df[["Comment"]].fillna(value={'Comment': ''})
+	df = df[df["Comment"].str.contains("program")==False]
+
+	# Creates masks for 
+	chg_mask = df['I'] >= 0
+	dchg_mask = df['I'] < 0
+
+	# Initiate cycles list
+	cycles = []
+
+	# Loop through all the cycling steps, change the current and capacities in the 
+	for i in range(df["Z1"].max()):
+		sub_df = df.loc[df['Z1'] == i].copy()
+		sub_df.loc[dchg_mask, 'I']  *= -1
+		sub_df.loc[dchg_mask, 'C'] *= -1
+
+		chg_df = sub_df.loc[chg_mask]
+		dchg_df = sub_df.loc[dchg_mask]
+
+
+		cycles.append((chg_df, dchg_df))
+
+
+	return cycles
+
+
+
+def plot_gc(cycles, which_cycles='all', chg=True, dchg=True, colours=None, x='C', y='U'):
+
+	fig, ax = prepare_gc_plot()
+
+
+	if which_cycles == 'all':
+		which_cycles = [i for i, c in enumerate(cycles)]
+
+	if not colours:
+		chg_colour = (40/255, 70/255, 75/255) # Dark Slate Gray #28464B
+		dchg_colour = (239/255, 160/255, 11/255) # Marigold #EFA00B
 	
+	
+
+	for i, cycle in cycles:
+		if i in which_cycles:
+			if chg:
+				cycle[0].plot(ax=ax)
+
+
+
+
+	
+
+
+
+
+
+
+def prepare_gc_plot(figsize=(14,7), dpi=None):
+
+	fig, ax = plt.subplots(figsize=figsize, dpi=dpi)
+	
+
+	return fig, ax
 
 
 
