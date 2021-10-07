@@ -1,10 +1,11 @@
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
+import os
 
 
-def read_battsmall(path):
-	''' Reads BATTSMALL-data into a DataFrame.
+def read_batsmall(path):
+	''' Reads BATSMALL-data into a DataFrame.
 
 	Input:
 	path (required): string with path to datafile
@@ -21,47 +22,46 @@ def read_battsmall(path):
 
 
 def read_neware(path, summary=False, active_material_weight=None, molecular_weight=None):
-    ''' Reads electrochemistry data, currently only from the Neware battery cycler. Will convert to .csv if the filetype is .xlsx,
-    which is the file format the Neware provides for the backup data. In this case it matters if summary is False or not. If file
-    type is .csv, it will just open the datafile and it does not matter if summary is False or not.'''
-    
+	''' Reads electrochemistry data, currently only from the Neware battery cycler. Will convert to .csv if the filetype is .xlsx,
+	which is the file format the Neware provides for the backup data. In this case it matters if summary is False or not. If file
+	type is .csv, it will just open the datafile and it does not matter if summary is False or not.'''
+	from xlsx2csv import Xlsx2csv
 
-    # Convert from .xlsx to .csv to make readtime faster
-    if filename.split('.')[-1] == 'xlsx':
-        csv_details = ''.join(filename.split('.')[:-1]) + '_details.csv'
-        csv_summary = ''.join(filename.split('.')[:-1]) + '_summary.csv'
+	# Convert from .xlsx to .csv to make readtime faster
+	if path.split('.')[-1] == 'xlsx':
+		csv_details = ''.join(path.split('.')[:-1]) + '_details.csv'
+		csv_summary = ''.join(path.split('.')[:-1]) + '_summary.csv'
 
-        Xlsx2csv(filename, outputencoding="utf-8").convert(csv_summary, sheetid=3)
-        Xlsx2csv(filename, outputencoding="utf-8").convert(csv_details, sheetid=4)
-    
-        if summary:
-            df = pd.read_csv(csv_summary)
-        else:
-            df = pd.read_csv(csv_details)
+		if not os.path.isfile(csv_summary):
+			Xlsx2csv(path, outputencoding="utf-8").convert(csv_summary, sheetid=3)
 
-    elif filename.split('.')[-1] == 'csv':
+		if not os.path.isfile(csv_details):
+			Xlsx2csv(path, outputencoding="utf-8").convert(csv_details, sheetid=4)
 
-        df = pd.read_csv(filename)
-    
-    
-    return df
+		if summary:
+			df = pd.read_csv(csv_summary)
+		else:
+			df = pd.read_csv(csv_details)
 
+	elif path.split('.')[-1] == 'csv':
+		df = pd.read_csv(path)
 
 
-
+	return df
 
 
 
-#def process_battsmall_data(df, t='ms', C='mAh/g', I='mA', U='V'):
 
-def process_battsmall_data(df, units=None, splice_cycles=None, molecular_weight=None):
-	''' Takes BATTSMALL-data in the form of a DataFrame and cleans the data up and converts units into desired units.
+
+
+def process_batsmall_data(df, units=None, splice_cycles=None, molecular_weight=None):
+	''' Takes BATSMALL-data in the form of a DataFrame and cleans the data up and converts units into desired units.
 	Splits up into individual charge and discharge DataFrames per cycle, and outputs a list where each element is a tuple with the Chg and DChg-data. E.g. cycles[10][0] gives the charge data for the 11th cycle.
 
 	For this to work, the cycling program must be set to use the counter.
 
 	Input:
-	df (required): A pandas DataFrame containing BATTSMALL-data, as obtained from read_battsmall().
+	df (required): A pandas DataFrame containing BATSMALL-data, as obtained from read_batsmall().
 	t (optional): Unit for time data. Defaults to ms.
 	C (optional): Unit for specific capacity. Defaults to mAh/g.
 	I (optional): Unit for current. Defaults mA.
@@ -71,32 +71,13 @@ def process_battsmall_data(df, units=None, splice_cycles=None, molecular_weight=
 	cycles: A list with 
 	'''
 
-	#########################
-	#### UNIT CONVERSION ####
-	#########################
 
-	# Complete the list of units - if not all are passed, then default value will be used
-	required_units = ['t', 'I', 'U', 'C']
-	default_units = {'t': 'h', 'I': 'mA', 'U': 'V', 'C': 'mAh/g'}
+	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
+	new_units = set_units(units=units)
+	old_units = get_old_units(df, kind='batsmall')
+	df = unit_conversion(df=df, new_units=new_units, old_units=old_units, kind='batsmall')
 
-	if not units:
-		units = default_units
-
-	if units:
-		for unit in required_units:
-			if unit not in units.values():
-				units[unit] = default_units[unit]
-		
-	
-	# Get the units used in the data set
-	t_prev = df.columns[0].split()[-1].strip('[]')
-	U_prev = df.columns[1].split()[-1].strip('[]')
-	I_prev = df.columns[2].split()[-1].strip('[]')
-	C_prev, m_prev = df.columns[4].split()[-1].strip('[]').split('/')
-	prev_units = {'t': t_prev, 'I': I_prev, 'U': U_prev, 'C': C_prev}
-
-	# Convert all units to the desired units.
-	df = unit_conversion(df=df, units=units)
+	df.columns = ['TT', 'U', 'I', 'Z1', 'C', 'Comment']
 
 	# Replace NaN with empty string in the Comment-column and then remove all steps where the program changes - this is due to inconsistent values for current  
 	df[["Comment"]] = df[["Comment"]].fillna(value={'Comment': ''})
@@ -138,93 +119,98 @@ def process_neware_data(df, units=None, splice_cycles=None, active_material_weig
 	#### UNIT CONVERSION ####
 	#########################
 	
+	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
+	new_units = set_units(units=units)
+	old_units = get_old_units(df, kind='neware')
+	df = unit_conversion(df=df, new_units=new_units, old_units=old_units, kind='neware')
+
+
+	# if active_material_weight:
+	# 	df["SpecificCapacity(mAh/g)"] = df["Capacity(mAh)"] / (active_material_weight / 1000)
+
+	# if molecular_weight:
+	# 	faradays_constant = 96485.3365 # [F] = C mol^-1 = As mol^-1
+	# 	seconds_per_hour = 3600 # s h^-1
+	# 	f = faradays_constant / seconds_per_hour * 1000.0 # [f] = mAh mol^-1
+
+	# 	df["IonsExtracted"] = (df["SpecificCapacity(mAh/g)"]*molecular_weight)/f
+
+
+	return df
+
+
+def unit_conversion(df, new_units, old_units, kind):
+	from . import unit_tables
+
+	if kind == 'batsmall':
+
+		df["TT [{}]".format(old_units["time"])] = df["TT [{}]".format(old_units["time"])] * unit_tables.time()[old_units["time"]].loc[new_units['time']]
+		df["U [{}]".format(old_units["voltage"])] = df["U [{}]".format(old_units["voltage"])] * unit_tables.voltage()[old_units["voltage"]].loc[new_units['voltage']]
+		df["I [{}]".format(old_units["current"])] = df["I [{}]".format(old_units["current"])] * unit_tables.current()[old_units["current"]].loc[new_units['current']]
+		df["C [{}/{}]".format(old_units["capacity"], old_units["mass"])] = df["C [{}/{}]".format(old_units["capacity"], old_units["mass"])] * (unit_tables.capacity()[old_units["capacity"]].loc[new_units["capacity"]] / unit_tables.mass()[old_units["mass"]].loc[new_units["mass"]])
+
+
+	if kind == 'neware':
+		df['Current({})'.format(old_units['current'])] = df['Current({})'.format(old_units['current'])] * unit_tables.current()[old_units['current']].loc[new_units['current']]
+		df['Voltage({})'.format(old_units['voltage'])] = df['Voltage({})'.format(old_units['voltage'])] * unit_tables.voltage()[old_units['voltage']].loc[new_units['voltage']]
+		df['Capacity({})'.format(old_units['capacity'])] = df['Capacity({})'.format(old_units['capacity'])] * unit_tables.capacity()[old_units['capacity']].loc[new_units['capacity']]
+		df['Energy({})'.format(old_units['energy'])] = df['Energy({})'.format(old_units['energy'])] * unit_tables.energy()[old_units['energy']].loc[new_units['energy']]
+
+		df['RelativeTime({})'.format(new_units['time'])] = df.apply(lambda row : convert_time_string(row['Relative Time(h:min:s.ms)'], unit=new_units['time']), axis=1)
+
+	return df
+
+
+def set_units(units=None):
+	
 	# Complete the list of units - if not all are passed, then default value will be used
-	required_units = ['t', 'I', 'U', 'C']
-	default_units = {'t': 'h', 'I': 'mA', 'U': 'V', 'C': 'mAh/g'}
+	required_units = ['time', 'current', 'voltage', 'capacity', 'mass', 'energy']
+	default_units = {'time': 'h', 'current': 'mA', 'voltage': 'V', 'capacity': 'mAh', 'mass': 'g', 'energy': 'mWh'}
 
 	if not units:
 		units = default_units
 
 	if units:
 		for unit in required_units:
-			if unit not in units.values():
+			if unit not in units.keys():
 				units[unit] = default_units[unit]
 
+
+	return units
+
+
+
+def get_old_units(df, kind):
 	
+	if kind=='batsmall':
+		time = df.columns[0].split()[-1].strip('[]')
+		voltage = df.columns[1].split()[-1].strip('[]')
+		current = df.columns[2].split()[-1].strip('[]')
+		capacity, mass = df.columns[4].split()[-1].strip('[]').split('/')
+		old_units = {'time': time, 'current': current, 'voltage': voltage, 'capacity': capacity, 'mass': mass}
 
-	# Get the units used in the data set
-	t_prev = 's' # default in 
-	U_prev = df.columns[1].split()[-1].strip('[]')
-	I_prev = df.columns[2].split()[-1].strip('[]')
-	C_prev, m_prev = df.columns[4].split()[-1].strip('[]').split('/')
-	prev_units = {'t': t_prev, 'I': I_prev, 'U': U_prev, 'C': C_prev}
+	if kind=='neware':
+		
+		for column in df.columns:
+			if 'Voltage' in column:
+				voltage = column.split('(')[-1].strip(')')
+			elif 'Current' in column:
+				current = column.split('(')[-1].strip(')')
+			elif 'Capacity' in column:
+				capacity = column.split('(')[-1].strip(')')
+			elif 'Energy' in column:
+				energy = column.split('(')[-1].strip(')')
 
-	# Convert all units to the desired units.
-	df = unit_conversion(df=df, units=units)
-
-
-
-	if active_material_weight:
-		df["SpecificCapacity(mAh/g)"] = df["Capacity(mAh)"] / (active_material_weight / 1000)
-
-	if molecular_weight:
-		faradays_constant = 96485.3365 # [F] = C mol^-1 = As mol^-1
-		seconds_per_hour = 3600 # s h^-1
-		f = faradays_constant / seconds_per_hour * 1000.0 # [f] = mAh mol^-1
-
-		df["IonsExtracted"] = (df["SpecificCapacity(mAh/g)"]*molecular_weight)/f
+		old_units = {'voltage': voltage, 'current': current, 'capacity': capacity, 'energy': energy}
 
 
-def unit_conversion(df, units, prev_units, kind):
-
-	C, m = units['C'].split('/')
-	C_prev, m_prev = prev_units['C'].split('/')
-
-
-	# Define matrix for unit conversion for time
-	t_units_df = {'h': [1, 60, 3600, 3600000], 'min': [1/60, 1, 60, 60000], 's': [1/3600, 1/60, 1, 1000], 'ms': [1/3600000, 1/60000, 1/1000, 1]}
-	t_units_df = pd.DataFrame(t_units_df)
-	t_units_df.index = ['h', 'min', 's', 'ms']
-
-	# Define matrix for unit conversion for current
-	I_units_df = {'A': [1, 1000, 1000000], 'mA': [1/1000, 1, 1000], 'uA': [1/1000000, 1/1000, 1]}
-	I_units_df = pd.DataFrame(I_units_df)
-	I_units_df.index = ['A', 'mA', 'uA']
-
-	# Define matrix for unit conversion for voltage
-	U_units_df = {'V': [1, 1000, 1000000], 'mV': [1/1000, 1, 1000], 'uV': [1/1000000, 1/1000, 1]}
-	U_units_df = pd.DataFrame(U_units_df)
-	U_units_df.index = ['V', 'mV', 'uV']
-
-	# Define matrix for unit conversion for capacity
-	C_units_df = {'Ah': [1, 1000, 1000000], 'mAh': [1/1000, 1, 1000], 'uAh': [1/1000000, 1/1000, 1]}
-	C_units_df = pd.DataFrame(C_units_df)
-	C_units_df.index = ['Ah', 'mAh', 'uAh']
-
-	# Define matrix for unit conversion for capacity
-	m_units_df = {'kg': [1, 1000, 1000000, 1000000000], 'g': [1/1000, 1, 1000, 1000000], 'mg': [1/1000000, 1/1000, 1, 1000], 'ug': [1/1000000000, 1/1000000, 1/1000, 1]}
-	m_units_df = pd.DataFrame(m_units_df)
-	m_units_df.index = ['kg', 'g', 'mg', 'ug']
-
-	#print(df["TT [{}]".format(t_prev)])
-	df["TT [{}]".format(t_prev)] = df["TT [{}]".format(t_prev)] * t_units_df[t_prev].loc[units['t']]
-	df["U [{}]".format(U_prev)] = df["U [{}]".format(U_prev)] * U_units_df[U_prev].loc[units['U']]
-	df["I [{}]".format(I_prev)] = df["I [{}]".format(I_prev)] * I_units_df[I_prev].loc[units['I']]
-	df["C [{}/{}]".format(C_prev, m_prev)] = df["C [{}/{}]".format(C_prev, m_prev)] * (C_units_df[C_prev].loc[C] / m_units_df[m_prev].loc[m])
-
-	df.columns = ['TT', 'U', 'I', 'Z1', 'C', 'Comment']
-
-
-
-	return df
-
-
+	return old_units
 
 def convert_time_string(time_string, unit='ms'):
 	''' Convert time string from Neware-data with the format hh:mm:ss.xx to any given unit'''
 
 	h, m, s = time_string.split(':')  
-	ms = int(s)*1000 + int(m)*1000*60 + int(h)*1000*60*60
+	ms = float(s)*1000 + int(m)*1000*60 + int(h)*1000*60*60
 
 	factors = {'ms': 1, 's': 1/1000, 'min': 1/(1000*60), 'h': 1/(1000*60*60)}
 
