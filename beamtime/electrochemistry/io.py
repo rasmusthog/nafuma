@@ -77,26 +77,24 @@ def process_batsmall_data(df, units=None, splice_cycles=None, molecular_weight=N
 	old_units = get_old_units(df, kind='batsmall')
 	df = unit_conversion(df=df, new_units=new_units, old_units=old_units, kind='batsmall')
 
-	df.columns = ['TT', 'U', 'I', 'Z1', 'C', 'Comment']
-
 	# Replace NaN with empty string in the Comment-column and then remove all steps where the program changes - this is due to inconsistent values for current  
-	df[["Comment"]] = df[["Comment"]].fillna(value={'Comment': ''})
-	df = df[df["Comment"].str.contains("program")==False]
+	df[["comment"]] = df[["comment"]].fillna(value={'comment': ''})
+	df = df[df["comment"].str.contains("program")==False]
 
 	# Creates masks for charge and discharge curves
-	chg_mask = df['I'] >= 0
-	dchg_mask = df['I'] < 0
+	chg_mask = df['current'] >= 0
+	dchg_mask = df['current'] < 0
 
 	# Initiate cycles list
 	cycles = []
 
 	# Loop through all the cycling steps, change the current and capacities in the 
-	for i in range(df["Z1"].max()):
+	for i in range(df["count"].max()):
 
-		sub_df = df.loc[df['Z1'] == i].copy()
+		sub_df = df.loc[df['count'] == i].copy()
 
-		sub_df.loc[dchg_mask, 'I']  *= -1
-		sub_df.loc[dchg_mask, 'C'] *= -1
+		sub_df.loc[dchg_mask, 'current']  *= -1
+		sub_df.loc[dchg_mask, 'capacity'] *= -1
 
 		chg_df = sub_df.loc[chg_mask]
 		dchg_df = sub_df.loc[dchg_mask]
@@ -113,27 +111,79 @@ def process_batsmall_data(df, units=None, splice_cycles=None, molecular_weight=N
 	return cycles
 
 
-def process_neware_data(df, units=None, splice_cycles=None, active_material_weight=None, molecular_weight=None):
+def process_neware_data(df, units=None, splice_cycles=None, active_material_weight=None, molecular_weight=None, reverse_discharge=False):
 
-	#########################
-	#### UNIT CONVERSION ####
-	#########################
+	""" Takes data from NEWARE in a DataFrame as read by read_neware() and converts units, adds columns and splits into cycles.
+	
+	Input:
+	df: pandas DataFrame containing NEWARE data as read by read_neware()
+	units: dictionary containing the desired units. keywords: capacity, current, voltage, mass, energy, time
+	splice_cycles: tuple containing index of cycles that should be spliced. Specifically designed to add two charge steps during the formation cycle with two different max voltages
+	active_materiale_weight: weight of the active material (in mg) used in the cell. 
+	molecular_weight: the molar mass (in g mol^-1) of the active material, to calculate the number of ions extracted. Assumes one electron per Li+/Na+-ion """
 	
 	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
 	new_units = set_units(units=units)
-	old_units = get_old_units(df, kind='neware')
+	old_units = get_old_units(df=df, kind='neware')
+	
+	df = add_columns_neware(df=df, active_material_weight=active_material_weight, molecular_weight=molecular_weight, old_units=old_units)
+
 	df = unit_conversion(df=df, new_units=new_units, old_units=old_units, kind='neware')
 
 
-	# if active_material_weight:
-	# 	df["SpecificCapacity(mAh/g)"] = df["Capacity(mAh)"] / (active_material_weight / 1000)
+	# Creates masks for charge and discharge curves
+	chg_mask = df['status'] == 'CC Chg'
+	dchg_mask = df['status'] == 'CC DChg'
 
-	# if molecular_weight:
-	# 	faradays_constant = 96485.3365 # [F] = C mol^-1 = As mol^-1
-	# 	seconds_per_hour = 3600 # s h^-1
-	# 	f = faradays_constant / seconds_per_hour * 1000.0 # [f] = mAh mol^-1
+	# Initiate cycles list
+	cycles = []
 
-	# 	df["IonsExtracted"] = (df["SpecificCapacity(mAh/g)"]*molecular_weight)/f
+	# Loop through all the cycling steps, change the current and capacities in the 
+	for i in range(df["cycle"].max()):
+
+		sub_df = df.loc[df['cycle'] == i].copy()
+
+		#sub_df.loc[dchg_mask, 'current']  *= -1
+		#sub_df.loc[dchg_mask, 'capacity'] *= -1
+
+		chg_df = sub_df.loc[chg_mask]
+		dchg_df = sub_df.loc[dchg_mask]
+
+		# Continue to next iteration if the charge and discharge DataFrames are empty (i.e. no current)
+		if chg_df.empty and dchg_df.empty:
+			continue
+
+		if reverse_discharge:
+			max_capacity = dchg_df['capacity'].max() 
+			dchg_df['capacity'] = np.abs(dchg_df['capacity'] - max_capacity)
+
+			if 'specific_capacity' in df.columns:
+				max_capacity = dchg_df['specific_capacity'].max() 
+				dchg_df['specific_capacity'] = np.abs(dchg_df['specific_capacity'] - max_capacity)
+
+				if 'ions' in df.columns:
+					max_capacity = dchg_df['ions'].max() 
+					dchg_df['ions'] = np.abs(dchg_df['ions'] - max_capacity)
+
+		cycles.append((chg_df, dchg_df))
+
+
+
+	return cycles
+
+
+def add_columns_neware(df, active_material_weight, molecular_weight, old_units):
+
+
+	if active_material_weight:
+		df["SpecificCapacity({}/mg)".format(old_units["capacity"])] = df["Capacity({})".format(old_units['capacity'])] / (active_material_weight)
+
+		if molecular_weight:
+			faradays_constant = 96485.3365 # [F] = C mol^-1 = As mol^-1
+			seconds_per_hour = 3600 # s h^-1
+			f = faradays_constant / seconds_per_hour * 1000.0 # [f] = mAh mol^-1
+
+			df["IonsExtracted"] = (df["SpecificCapacity({}/mg)".format(old_units['capacity'])]*molecular_weight)*1000/f
 
 
 	return df
@@ -149,14 +199,34 @@ def unit_conversion(df, new_units, old_units, kind):
 		df["I [{}]".format(old_units["current"])] = df["I [{}]".format(old_units["current"])] * unit_tables.current()[old_units["current"]].loc[new_units['current']]
 		df["C [{}/{}]".format(old_units["capacity"], old_units["mass"])] = df["C [{}/{}]".format(old_units["capacity"], old_units["mass"])] * (unit_tables.capacity()[old_units["capacity"]].loc[new_units["capacity"]] / unit_tables.mass()[old_units["mass"]].loc[new_units["mass"]])
 
+		df.columns = ['time', 'voltage', 'current', 'count', 'specific_capacity', 'comment']
+
 
 	if kind == 'neware':
 		df['Current({})'.format(old_units['current'])] = df['Current({})'.format(old_units['current'])] * unit_tables.current()[old_units['current']].loc[new_units['current']]
 		df['Voltage({})'.format(old_units['voltage'])] = df['Voltage({})'.format(old_units['voltage'])] * unit_tables.voltage()[old_units['voltage']].loc[new_units['voltage']]
 		df['Capacity({})'.format(old_units['capacity'])] = df['Capacity({})'.format(old_units['capacity'])] * unit_tables.capacity()[old_units['capacity']].loc[new_units['capacity']]
 		df['Energy({})'.format(old_units['energy'])] = df['Energy({})'.format(old_units['energy'])] * unit_tables.energy()[old_units['energy']].loc[new_units['energy']]
+		df['CycleTime({})'.format(new_units['time'])] = df.apply(lambda row : convert_time_string(row['Relative Time(h:min:s.ms)'], unit=new_units['time']), axis=1)
+		df['RunTime({})'.format(new_units['time'])] = df.apply(lambda row : convert_datetime_string(row['Real Time(h:min:s.ms)'], reference=df['Real Time(h:min:s.ms)'].iloc[0], unit=new_units['time']), axis=1)
+		columns = ['status', 'jump', 'cycle', 'steps', 'current', 'voltage', 'capacity', 'energy']
 
-		df['RelativeTime({})'.format(new_units['time'])] = df.apply(lambda row : convert_time_string(row['Relative Time(h:min:s.ms)'], unit=new_units['time']), axis=1)
+		if 'SpecificCapacity({}/mg)'.format(old_units['capacity']) in df.columns:
+			df['SpecificCapacity({}/mg)'.format(old_units['capacity'])] = df['SpecificCapacity({}/mg)'.format(old_units['capacity'])] * unit_tables.capacity()[old_units['capacity']].loc[new_units['capacity']] / unit_tables.mass()['mg'].loc[new_units["mass"]]
+			columns.append('specific_capacity')
+
+			if 'IonsExtracted' in df.columns:
+				columns.append('ions')
+
+
+
+		columns.append('cycle_time')
+		columns.append('run_time')
+
+
+		df.drop(['Record number', 'Relative Time(h:min:s.ms)', 'Real Time(h:min:s.ms)'], axis=1, inplace=True)
+
+		df.columns = columns
 
 	return df
 
@@ -226,25 +296,26 @@ def convert_datetime_string(datetime_string, reference, unit='s'):
 	from datetime import datetime
 
 	# Parse the 
-	cur_date, cur_time = datetime_string.split()
-	cur_y, cur_mo, cur_d = cur_date.split('-')
-	cur_h, cur_m, cur_s = cur_time.split(':')
-	cur_date = datetime(int(cur_y), int(cur_mo), int(cur_d), int(cur_h), int(cur_m), int(cur_s))
+	current_date, current_time = datetime_string.split()
+	current_year, current_month, current_day = current_date.split('-')
+	current_hour, current_minute, current_second = current_time.split(':')
+	current_date = datetime(int(current_year), int(current_month), int(current_day), int(current_hour), int(current_minute), int(current_second))
 
-	ref_date, ref_time = reference.split()
-	ref_y, ref_mo, ref_d = ref_date.split('-')
-	ref_h, ref_m, ref_s = ref_time.split(':')
-	ref_date = datetime(int(ref_y), int(ref_mo), int(ref_d), int(ref_h), int(ref_m), int(ref_s))
+	reference_date, reference_time = reference.split()
+	reference_year, reference_month, reference_day = reference_date.split('-')
+	reference_hour, reference_minute, reference_second = reference_time.split(':')
+	reference_date = datetime(int(reference_year), int(reference_month), int(reference_day), int(reference_hour), int(reference_minute), int(reference_second))
 
-	days = cur_date - ref_date
+	days = current_date - reference_date
 
-	s = days.seconds
+
+	s = days.days*24*60*60 + days.seconds
 
 	factors = {'ms': 1000, 's': 1, 'min': 1/(60), 'h': 1/(60*60)}
 
-	t = s * factors[unit]
+	time = s * factors[unit]
 
-	return t
+	return time
 
 def splice_cycles(first, second):
 
