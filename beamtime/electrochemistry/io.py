@@ -21,7 +21,7 @@ def read_batsmall(path):
 
 
 
-def read_neware(path, summary=False, active_material_weight=None, molecular_weight=None):
+def read_neware(path, summary=False):
 	''' Reads electrochemistry data, currently only from the Neware battery cycler. Will convert to .csv if the filetype is .xlsx,
 	which is the file format the Neware provides for the backup data. In this case it matters if summary is False or not. If file
 	type is .csv, it will just open the datafile and it does not matter if summary is False or not.'''
@@ -48,6 +48,29 @@ def read_neware(path, summary=False, active_material_weight=None, molecular_weig
 
 
 	return df
+
+
+
+def read_biologic(path):
+	''' Reads Bio-Logic-data into a DataFrame.
+	
+	Input:
+	path (required): string with path to datafile
+
+	Output:
+	df: pandas DataFrame containing the data as-is, but without additional NaN-columns.'''
+
+	with open(path, 'r') as f:
+		lines = f.readlines()
+
+	header_lines = int(lines[1].split()[-1]) - 1
+	
+
+	df = pd.read_csv(path, sep='\t', skiprows=header_lines)
+	df.dropna(inplace=True, axis=1)
+
+	return df
+
 
 
 
@@ -94,7 +117,7 @@ def process_batsmall_data(df, units=None, splice_cycles=None, molecular_weight=N
 		sub_df = df.loc[df['count'] == i].copy()
 
 		sub_df.loc[dchg_mask, 'current']  *= -1
-		sub_df.loc[dchg_mask, 'capacity'] *= -1
+		sub_df.loc[dchg_mask, 'specific_capacity'] *= -1
 
 		chg_df = sub_df.loc[chg_mask]
 		dchg_df = sub_df.loc[dchg_mask]
@@ -126,7 +149,7 @@ def process_neware_data(df, units=None, splice_cycles=None, active_material_weig
 	new_units = set_units(units=units)
 	old_units = get_old_units(df=df, kind='neware')
 	
-	df = add_columns_neware(df=df, active_material_weight=active_material_weight, molecular_weight=molecular_weight, old_units=old_units)
+	df = add_columns(df=df, active_material_weight=active_material_weight, molecular_weight=molecular_weight, old_units=old_units, kind='neware')
 
 	df = unit_conversion(df=df, new_units=new_units, old_units=old_units, kind='neware')
 
@@ -172,19 +195,91 @@ def process_neware_data(df, units=None, splice_cycles=None, active_material_weig
 	return cycles
 
 
-def add_columns_neware(df, active_material_weight, molecular_weight, old_units):
+def process_biologic_data(df, units=None, splice_cycles=None, active_material_weight=None, molecular_weight=None, reverse_discharge=False):
+
+	# Pick out necessary columns
+	df = df[['Ns changes', 'Ns', 'time/s', 'Ewe/V', 'Energy charge/W.h', 'Energy discharge/W.h', '<I>/mA',  'Capacity/mA.h', 'cycle number']].copy()
+
+	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
+	new_units = set_units(units=units)
+	old_units = get_old_units(df=df, kind='biologic')
+	
+	df = add_columns(df=df, active_material_weight=active_material_weight, molecular_weight=molecular_weight, old_units=old_units, kind='biologic')
+
+	df = unit_conversion(df=df, new_units=new_units, old_units=old_units, kind='biologic')
 
 
-	if active_material_weight:
-		df["SpecificCapacity({}/mg)".format(old_units["capacity"])] = df["Capacity({})".format(old_units['capacity'])] / (active_material_weight)
+	# Creates masks for charge and discharge curves
+	chg_mask = (df['status'] == 1) & (df['status_change'] != 1)
+	dchg_mask = (df['status'] == 2) & (df['status_change'] != 1)
 
-		if molecular_weight:
-			faradays_constant = 96485.3365 # [F] = C mol^-1 = As mol^-1
-			seconds_per_hour = 3600 # s h^-1
-			f = faradays_constant / seconds_per_hour * 1000.0 # [f] = mAh mol^-1
 
-			df["IonsExtracted"] = (df["SpecificCapacity({}/mg)".format(old_units['capacity'])]*molecular_weight)*1000/f
 
+	# Initiate cycles list
+	cycles = []
+
+	# Loop through all the cycling steps, change the current and capacities in the 
+	for i in range(int(df["cycle"].max())):
+
+		sub_df = df.loc[df['cycle'] == i].copy()
+
+		#sub_df.loc[dchg_mask, 'current']  *= -1
+		#sub_df.loc[dchg_mask, 'capacity'] *= -1
+
+		chg_df = sub_df.loc[chg_mask]
+		dchg_df = sub_df.loc[dchg_mask]
+
+		# Continue to next iteration if the charge and discharge DataFrames are empty (i.e. no current)
+		if chg_df.empty and dchg_df.empty:
+			continue
+
+		if reverse_discharge:
+			max_capacity = dchg_df['capacity'].max() 
+			dchg_df['capacity'] = np.abs(dchg_df['capacity'] - max_capacity)
+
+			if 'specific_capacity' in df.columns:
+				max_capacity = dchg_df['specific_capacity'].max() 
+				dchg_df['specific_capacity'] = np.abs(dchg_df['specific_capacity'] - max_capacity)
+
+				if 'ions' in df.columns:
+					max_capacity = dchg_df['ions'].max() 
+					dchg_df['ions'] = np.abs(dchg_df['ions'] - max_capacity)
+
+		cycles.append((chg_df, dchg_df))
+
+
+
+	return cycles
+
+
+def add_columns(df, active_material_weight, molecular_weight, old_units, kind):
+
+	if kind == 'neware':
+		if active_material_weight:
+			df["SpecificCapacity({}/mg)".format(old_units["capacity"])] = df["Capacity({})".format(old_units['capacity'])] / (active_material_weight)
+
+			if molecular_weight:
+				faradays_constant = 96485.3365 # [F] = C mol^-1 = As mol^-1
+				seconds_per_hour = 3600 # s h^-1
+				f = faradays_constant / seconds_per_hour * 1000.0 # [f] = mAh mol^-1
+
+				df["IonsExtracted"] = (df["SpecificCapacity({}/mg)".format(old_units['capacity'])]*molecular_weight)*1000/f
+
+
+	if kind == 'biologic':
+		if active_material_weight:
+
+			capacity = old_units['capacity'].split('h')[0] + '.h'
+
+
+			df["SpecificCapacity({}/mg)".format(old_units["capacity"])] = df["Capacity/{}".format(capacity)] / (active_material_weight)
+
+			if molecular_weight:
+				faradays_constant = 96485.3365 # [F] = C mol^-1 = As mol^-1
+				seconds_per_hour = 3600 # s h^-1
+				f = faradays_constant / seconds_per_hour * 1000.0 # [f] = mAh mol^-1
+
+				df["IonsExtracted"] = (df["SpecificCapacity({}/mg)".format(old_units['capacity'])]*molecular_weight)*1000/f
 
 	return df
 
@@ -225,6 +320,25 @@ def unit_conversion(df, new_units, old_units, kind):
 
 
 		df.drop(['Record number', 'Relative Time(h:min:s.ms)', 'Real Time(h:min:s.ms)'], axis=1, inplace=True)
+
+		df.columns = columns
+
+	if kind == 'biologic':
+		df['time/{}'.format(old_units['time'])] = df["time/{}".format(old_units["time"])] * unit_tables.time()[old_units["time"]].loc[new_units['time']]
+		df["Ewe/{}".format(old_units["voltage"])] = df["Ewe/{}".format(old_units["voltage"])] * unit_tables.voltage()[old_units["voltage"]].loc[new_units['voltage']]
+		df["<I>/{}".format(old_units["current"])] = df["<I>/{}".format(old_units["current"])] * unit_tables.current()[old_units["current"]].loc[new_units['current']]
+		
+		capacity = old_units['capacity'].split('h')[0] + '.h'
+		df["Capacity/{}".format(capacity)] = df["Capacity/{}".format(capacity)] * (unit_tables.capacity()[old_units["capacity"]].loc[new_units["capacity"]])
+
+		columns = ['status_change', 'status', 'time', 'voltage', 'energy_charge', 'energy_discharge', 'current', 'capacity', 'cycle']
+
+		if 'SpecificCapacity({}/mg)'.format(old_units['capacity']) in df.columns:
+			df['SpecificCapacity({}/mg)'.format(old_units['capacity'])] = df['SpecificCapacity({}/mg)'.format(old_units['capacity'])] * unit_tables.capacity()[old_units['capacity']].loc[new_units['capacity']] / unit_tables.mass()['mg'].loc[new_units["mass"]]
+			columns.append('specific_capacity')
+
+			if 'IonsExtracted' in df.columns:
+				columns.append('ions')
 
 		df.columns = columns
 
@@ -272,6 +386,24 @@ def get_old_units(df, kind):
 				energy = column.split('(')[-1].strip(')')
 
 		old_units = {'voltage': voltage, 'current': current, 'capacity': capacity, 'energy': energy}
+
+
+	if kind=='biologic':
+
+		for column in df.columns:
+			if 'time' in column:
+				time = column.split('/')[-1]
+			elif 'Ewe' in column:
+				voltage = column.split('/')[-1]
+			elif 'Capacity' in column:
+				capacity = column.split('/')[-1].replace('.', '')
+			elif 'Energy' in column:
+				energy = column.split('/')[-1].replace('.', '')
+			elif '<I>' in column:
+				current = column.split('/')[-1]
+
+		old_units = {'voltage': voltage, 'current': current, 'capacity': capacity, 'energy': energy, 'time': time}
+	
 
 
 	return old_units
