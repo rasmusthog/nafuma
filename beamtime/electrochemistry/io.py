@@ -4,6 +4,22 @@ import matplotlib.pyplot as plt
 import os
 
 
+def read_data(path, kind, options=None):
+
+	if kind == 'neware':
+		df = read_neware(path)
+		cycles = process_neware_data(df, options=options)
+
+	elif kind == 'batsmall':
+		df = read_batsmall(path)
+		cycles = process_batsmall_data(df=df, options=options)
+
+	elif kind == 'biologic':
+		df = read_biologic(path)
+		cycles = process_biologic_data(df=df, options=options)
+
+	return cycles
+
 def read_batsmall(path):
 	''' Reads BATSMALL-data into a DataFrame.
 
@@ -77,7 +93,7 @@ def read_biologic(path):
 
 
 
-def process_batsmall_data(df, units=None, splice_cycles=None, molecular_weight=None):
+def process_batsmall_data(df, options=None):
 	''' Takes BATSMALL-data in the form of a DataFrame and cleans the data up and converts units into desired units.
 	Splits up into individual charge and discharge DataFrames per cycle, and outputs a list where each element is a tuple with the Chg and DChg-data. E.g. cycles[10][0] gives the charge data for the 11th cycle.
 
@@ -94,11 +110,23 @@ def process_batsmall_data(df, units=None, splice_cycles=None, molecular_weight=N
 	cycles: A list with 
 	'''
 
+	required_options = ['splice_cycles', 'molecular_weight', 'reverse_discharge', 'units']
+	default_options = {'splice_cycles': None, 'molecular_weight': None, 'reverse_discharge': False, 'units': None}
+
+	if not options:
+		options = default_options
+	else:
+		for option in required_options:
+			if option not in options.keys():
+				options[option] = default_options[option]
+
 
 	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
-	new_units = set_units(units=units)
+	new_units = set_units(units=options['units'])
 	old_units = get_old_units(df, kind='batsmall')
 	df = unit_conversion(df=df, new_units=new_units, old_units=old_units, kind='batsmall')
+
+	options['units'] = new_units
 
 	# Replace NaN with empty string in the Comment-column and then remove all steps where the program changes - this is due to inconsistent values for current  
 	df[["comment"]] = df[["comment"]].fillna(value={'comment': ''})
@@ -126,6 +154,18 @@ def process_batsmall_data(df, units=None, splice_cycles=None, molecular_weight=N
 		if chg_df.empty and dchg_df.empty:
 			continue
 
+		if options['reverse_discharge']:
+			max_capacity = dchg_df['capacity'].max() 
+			dchg_df['capacity'] = np.abs(dchg_df['capacity'] - max_capacity)
+
+			if 'specific_capacity' in df.columns:
+				max_capacity = dchg_df['specific_capacity'].max() 
+				dchg_df['specific_capacity'] = np.abs(dchg_df['specific_capacity'] - max_capacity)
+
+				if 'ions' in df.columns:
+					max_capacity = dchg_df['ions'].max() 
+					dchg_df['ions'] = np.abs(dchg_df['ions'] - max_capacity)
+
 		cycles.append((chg_df, dchg_df))
 
 
@@ -134,7 +174,7 @@ def process_batsmall_data(df, units=None, splice_cycles=None, molecular_weight=N
 	return cycles
 
 
-def process_neware_data(df, units=None, splice_cycles=None, active_material_weight=None, molecular_weight=None, reverse_discharge=False):
+def process_neware_data(df, options=None):
 
 	""" Takes data from NEWARE in a DataFrame as read by read_neware() and converts units, adds columns and splits into cycles.
 	
@@ -145,13 +185,26 @@ def process_neware_data(df, units=None, splice_cycles=None, active_material_weig
 	active_materiale_weight: weight of the active material (in mg) used in the cell. 
 	molecular_weight: the molar mass (in g mol^-1) of the active material, to calculate the number of ions extracted. Assumes one electron per Li+/Na+-ion """
 	
+	required_options = ['units', 'active_material_weight', 'molecular_weight', 'reverse_discharge', 'splice_cycles']
+	default_options = {'units': None, 'active_material_weight': None, 'molecular_weight': None, 'reverse_discharge': False, 'splice_cycles': None}
+
+	if not options:
+		options = default_options
+	else:
+		for option in required_options:
+			if option not in options.keys():
+				options[option] = default_options[option]
+
+
 	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
-	new_units = set_units(units=units)
+	new_units = set_units(units=options['units'])
 	old_units = get_old_units(df=df, kind='neware')
 	
-	df = add_columns(df=df, active_material_weight=active_material_weight, molecular_weight=molecular_weight, old_units=old_units, kind='neware')
+	df = add_columns(df=df, active_material_weight=options['active_material_weight'], molecular_weight=options['molecular_weight'], old_units=old_units, kind='neware')
 
 	df = unit_conversion(df=df, new_units=new_units, old_units=old_units, kind='neware')
+
+	options['units'] = new_units
 
 
 	# Creates masks for charge and discharge curves
@@ -176,7 +229,7 @@ def process_neware_data(df, units=None, splice_cycles=None, active_material_weig
 		if chg_df.empty and dchg_df.empty:
 			continue
 
-		if reverse_discharge:
+		if options['reverse_discharge']:
 			max_capacity = dchg_df['capacity'].max() 
 			dchg_df['capacity'] = np.abs(dchg_df['capacity'] - max_capacity)
 
@@ -195,18 +248,30 @@ def process_neware_data(df, units=None, splice_cycles=None, active_material_weig
 	return cycles
 
 
-def process_biologic_data(df, units=None, splice_cycles=None, active_material_weight=None, molecular_weight=None, reverse_discharge=False):
+def process_biologic_data(df, options=None):
+
+	required_options = ['units', 'active_material_weight', 'molecular_weight', 'reverse_discharge', 'splice_cycles']
+	default_options = {'units': None, 'active_material_weight': None, 'molecular_weight': None, 'reverse_discharge': False, 'splice_cycles': None}
+
+	if not options:
+		options = default_options
+	else:
+		for option in required_options:
+			if option not in options.keys():
+				options[option] = default_options[option]
 
 	# Pick out necessary columns
 	df = df[['Ns changes', 'Ns', 'time/s', 'Ewe/V', 'Energy charge/W.h', 'Energy discharge/W.h', '<I>/mA',  'Capacity/mA.h', 'cycle number']].copy()
 
 	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
-	new_units = set_units(units=units)
+	new_units = set_units(units=options['units'])
 	old_units = get_old_units(df=df, kind='biologic')
 	
-	df = add_columns(df=df, active_material_weight=active_material_weight, molecular_weight=molecular_weight, old_units=old_units, kind='biologic')
+	df = add_columns(df=df, active_material_weight=options['active_material_weight'], molecular_weight=options['molecular_weight'], old_units=old_units, kind='biologic')
 
 	df = unit_conversion(df=df, new_units=new_units, old_units=old_units, kind='biologic')
+
+	options['units'] = new_units
 
 
 	# Creates masks for charge and discharge curves
@@ -233,7 +298,7 @@ def process_biologic_data(df, units=None, splice_cycles=None, active_material_we
 		if chg_df.empty and dchg_df.empty:
 			continue
 
-		if reverse_discharge:
+		if options['reverse_discharge']:
 			max_capacity = dchg_df['capacity'].max() 
 			dchg_df['capacity'] = np.abs(dchg_df['capacity'] - max_capacity)
 
@@ -348,8 +413,8 @@ def unit_conversion(df, new_units, old_units, kind):
 def set_units(units=None):
 	
 	# Complete the list of units - if not all are passed, then default value will be used
-	required_units = ['time', 'current', 'voltage', 'capacity', 'mass', 'energy']
-	default_units = {'time': 'h', 'current': 'mA', 'voltage': 'V', 'capacity': 'mAh', 'mass': 'g', 'energy': 'mWh'}
+	required_units = ['time', 'current', 'voltage', 'capacity', 'mass', 'energy', 'specific_capacity']
+	default_units = {'time': 'h', 'current': 'mA', 'voltage': 'V', 'capacity': 'mAh', 'mass': 'g', 'energy': 'mWh', 'specific_capacity': None}
 
 	if not units:
 		units = default_units
@@ -358,6 +423,8 @@ def set_units(units=None):
 		for unit in required_units:
 			if unit not in units.keys():
 				units[unit] = default_units[unit]
+
+	units['specific_capacity'] = r'{} {}'.format(units['capacity'], units['mass']) + '$^{-1}$'
 
 
 	return units
