@@ -16,8 +16,8 @@ def plot_gc(path, kind, options=None):
 
 
 	# Update options
-	required_options = ['x_vals', 'y_vals', 'which_cycles', 'chg', 'dchg', 'colours', 'gradient']
-	default_options = {'x_vals': 'capacity', 'y_vals': 'voltage', 'which_cycles': 'all', 'chg': True, 'dchg': True, 'colours': None, 'gradient': False}
+	required_options = ['x_vals', 'y_vals', 'which_cycles', 'chg', 'dchg', 'colours', 'differentiate_charge_discharge', 'gradient']
+	default_options = {'x_vals': 'capacity', 'y_vals': 'voltage', 'which_cycles': 'all', 'chg': True, 'dchg': True, 'colours': None, 'differentiate_charge_discharge': True, 'gradient': False}
 
 	options = update_options(options=options, required_options=required_options, default_options=default_options)
 
@@ -25,10 +25,6 @@ def plot_gc(path, kind, options=None):
 	update_cycles_list(cycles=cycles, options=options)
 
 	colours = generate_colours(cycles=cycles, options=options)
-
-	print(len(options['which_cycles']))
-	print(len(colours))
-
 
 
 	for i, cycle in enumerate(cycles):
@@ -144,10 +140,10 @@ def prettify_gc_plot(fig, ax, options=None):
 	required_options = [
 	'columns', 
 	'xticks', 'yticks', 
-	'show_major_ticks',
-	'show_minor_ticks',
+	'show_major_ticks', 'show_minor_ticks',
 	'xlim', 'ylim',
 	'hide_x_axis', 'hide_y_axis', 
+	'positions',
 	'x_vals', 'y_vals', 
 	'xlabel', 'ylabel', 
 	'units', 'sizes',
@@ -158,18 +154,13 @@ def prettify_gc_plot(fig, ax, options=None):
 	# Define the default options
 	default_options = {
 		'columns': 1,
-		'xticks': None,
-		'yticks': None,
-		'show_major_ticks': [True, True, True, True],
-		'show_minor_ticks': [True, True, True, True],
-		'xlim': None,
-		'ylim': None,
-		'hide_x_axis': False,
-		'hide_y_axis': False,
-		'x_vals': 'specific_capacity',
-		'y_vals': 'voltage',
-		'xlabel': None,
-		'ylabel': None,
+		'xticks': None, 'yticks': None,
+		'show_major_ticks': [True, True, True, True], 'show_minor_ticks': [True, True, True, True],
+		'xlim': None,'ylim': None,
+		'hide_x_axis': False, 'hide_y_axis': False,
+		'positions': {'xaxis': 'bottom', 'yaxis': 'left'},
+		'x_vals': 'specific_capacity', 'y_vals': 'voltage',
+		'xlabel': None, 'ylabel': None,
 		'units': None,
 		'sizes': None,
 		'title': None 	
@@ -222,8 +213,6 @@ def prettify_gc_plot(fig, ax, options=None):
 
 
 	if not options['xlabel']:
-		print(options['x_vals'])
-		print(options['units'])
 		options['xlabel'] = prettify_labels(options['x_vals']) + ' [{}]'.format(options['units'][options['x_vals']])
 	
 	else:
@@ -250,12 +239,20 @@ def prettify_gc_plot(fig, ax, options=None):
 
 	# DEFINE AND SET TICK DISTANCES
 
+	from . import unit_tables
+
+	# Define default ticks and scale to desired units
 	default_ticks = {
-		'specific_capacity': [100, 50], 
-		'capacity': [0.1, 0.05],
-		'voltage': [0.5, 0.25]
+		'specific_capacity': [100 * (unit_tables.capacity()['mAh'].loc[options['units']['capacity']] / unit_tables.mass()['g'].loc[options['units']['mass']]), 50 * (unit_tables.capacity()['mAh'].loc[options['units']['capacity']] / unit_tables.mass()['g'].loc[options['units']['mass']])], 
+		'capacity': [0.1 * (unit_tables.capacity()['mAh'].loc[options['units']['capacity']]), 0.05 * (unit_tables.capacity()['mAh'].loc[options['units']['capacity']])],
+		'voltage': [0.5 * (unit_tables.voltage()['V'].loc[options['units']['voltage']]), 0.25 * (unit_tables.voltage()['V'].loc[options['units']['voltage']])],
+		'time': [10 * (unit_tables.time()['h'].loc[options['units']['time']]), 5 * (unit_tables.time()['h'].loc[options['units']['time']])]
 		}
 
+
+	if options['positions']['yaxis'] == 'right':
+		ax.yaxis.set_label_position("right")
+		ax.yaxis.tick_right()
 
 
 	# Set default tick distances for x-axis if not specified
@@ -290,10 +287,22 @@ def prettify_gc_plot(fig, ax, options=None):
 	ax.yaxis.set_minor_locator(MultipleLocator(minor_ytick))
 
 
+
+
 	# SET FONTSIZE OF TICK LABELS
 
 	plt.xticks(fontsize=options['sizes']['tick_labels'])
 	plt.yticks(fontsize=options['sizes']['tick_labels'])
+
+	##################################################################
+	########################## AXES LIMITS ###########################
+	##################################################################
+
+	if options['xlim']:
+		plt.xlim(options['xlim'])
+
+	if options['ylim']:
+		plt.ylim(options['ylim'])
 
 	##################################################################
 	############################# TITLE ##############################
@@ -319,6 +328,7 @@ def prettify_labels(label):
 		'voltage': 'Voltage',
 		'current': 'Current',
 		'energy': 'Energy',
+		'time': 'Time'
 	}
 
 	return labels_dict[label]
@@ -340,6 +350,9 @@ def generate_colours(cycles, options):
 	else:
 		charge_colour = (40/255, 70/255, 75/255) # Dark Slate Gray #28464B, coolors.co
 		discharge_colour = (239/255, 160/255, 11/255) # Marigold #EFA00B, coolors.co
+
+		if not options['differentiate_charge_discharge']:
+			discharge_colour = charge_colour
 
 
 

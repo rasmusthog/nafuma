@@ -381,7 +381,7 @@ def unit_conversion(df, new_units, old_units, kind):
 
 
 		columns.append('cycle_time')
-		columns.append('run_time')
+		columns.append('time')
 
 
 		df.drop(['Record number', 'Relative Time(h:min:s.ms)', 'Real Time(h:min:s.ms)'], axis=1, inplace=True)
