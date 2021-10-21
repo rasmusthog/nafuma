@@ -5,9 +5,20 @@ import os
 def rbkerbest():
     print("ROSENBORG!<3")
 
+#def split_xanes_scan(filename, destination=None):
 
-def split_xanes_scan(filename, destination=None):
+ #   with open(filename, 'r') as f:
 
+
+##Better to make a new function that loops through the files, and performing the split_xanes_scan on
+
+
+def split_xanes_scan(root, destination=None, replace=False):
+    #root is the path to the beamtime-folder
+    #destination should be the path to the processed data
+    
+    #insert a for-loop to go through all the folders.dat-files in the folder root\xanes\raw
+    
     with open(filename, 'r') as f:
         lines = f.readlines()
         
