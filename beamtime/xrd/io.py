@@ -5,9 +5,6 @@ import os
 import shutil
 
 import zipfile
-import io
-import sys
-import glob
 import xml.etree.ElementTree as ET
 
 
@@ -108,14 +105,22 @@ def open_1d_data(path, options=None):
     
 
 
+def generate_image_list(path, options=None):
+    ''' Generates a list of paths to pass to the average_images() function'''
+
+    required_options = ['scans_per_image']
+    default_options = {
+        'scans_per_image': 5
+    }
+
+
 def average_images(images):
     ''' Takes a list of path to image files, reads them and averages them before returning the average image'''
-
 
     image_arrays = []
 
     for image in images:
-        image_array = xrd.io.get_image_array(os.path.join(root, image))
+        image_array = xrd.io.get_image_array(image)
         image_arrays.append(image_array)
     
     
@@ -178,12 +183,12 @@ def read_brml(path, options=None):
     with zipfile.ZipFile(path, 'r') as brml:
         for info in brml.infolist():
             if "RawData" in info.filename:
-                brml.extract(info.filename, temp)
+                brml.extract(info.filename, options['extract_folder'])
 
 
 
     # Parse the RawData0.xml file
-    path = os.path.join(options['extract_folder'], 'RawData0.xml')
+    path = os.path.join(options['extract_folder'], 'Experiment0/RawData0.xml')
 
     tree = ET.parse(path)
     root = tree.getroot()
