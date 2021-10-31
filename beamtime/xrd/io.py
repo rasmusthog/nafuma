@@ -16,6 +16,13 @@ def get_image_array(path):
     return image_array
 
 
+def get_image_headers(path):
+
+    image = fabio.open(path)
+
+    return image.header
+
+
 def integrate_1d(calibrant, bins, path=None, image=None, options=None):
     ''' Integrates an image file to a 1D diffractogram. 
 
@@ -198,13 +205,25 @@ def read_brml(path, options=None):
     diffractogram = []
 
     for chain in root.findall('./DataRoutes/DataRoute'):
-        if chain.get('Description') == 'Originally measured data.':
-            for data in chain.findall('Datum'):
-                data = data.text.split(',')
-                twotheta, intensity = float(data[2]), float(data[3])
-                
-                if twotheta > 0:
-                    diffractogram.append({'2th': twotheta, 'I': intensity})
+
+        for scantype in chain.findall('ScanInformation/ScanMode'):
+            if scantype.text == 'StillScan':
+
+                if chain.get('Description') == 'Originally measured data.':
+                    for data in chain.findall('Datum'):
+                        data = data.text.split(',')
+                        data = [float(i) for i in data]
+                        twotheta, intensity = float(data[2]), float(data[3])
+
+        
+            else:
+                if chain.get('Description') == 'Originally measured data.':
+                    for data in chain.findall('Datum'):
+                        data = data.text.split(',')
+                        twotheta, intensity = float(data[2]), float(data[3])
+                        
+                        if twotheta > 0:
+                            diffractogram.append({'2th': twotheta, 'I': intensity})
 
     diffractogram = pd.DataFrame(diffractogram)
 
