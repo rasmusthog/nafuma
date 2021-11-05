@@ -111,7 +111,7 @@ def process_batsmall_data(df, options=None):
 	'''
 
 	required_options = ['splice_cycles', 'molecular_weight', 'reverse_discharge', 'units']
-	default_options = {'splice_cycles': None, 'molecular_weight': None, 'reverse_discharge': False, 'units': None}
+	default_options = {'splice_cycles': False, 'molecular_weight': None, 'reverse_discharge': False, 'units': None}
 
 	if not options:
 		options = default_options
@@ -128,6 +128,10 @@ def process_batsmall_data(df, options=None):
 
 	options['units'] = new_units
 
+
+	if options['splice_cycles']:
+		df = splice_cycles(df=df, kind='batsmall')
+
 	# Replace NaN with empty string in the Comment-column and then remove all steps where the program changes - this is due to inconsistent values for current  
 	df[["comment"]] = df[["comment"]].fillna(value={'comment': ''})
 	df = df[df["comment"].str.contains("program")==False]
@@ -142,7 +146,7 @@ def process_batsmall_data(df, options=None):
 	# Loop through all the cycling steps, change the current and capacities in the 
 	for i in range(df["count"].max()):
 
-		sub_df = df.loc[df['count'] == i].copy()
+		sub_df = df.loc[df['count'] == i+1].copy()
 
 		sub_df.loc[dchg_mask, 'current']  *= -1
 		sub_df.loc[dchg_mask, 'specific_capacity'] *= -1
@@ -172,6 +176,61 @@ def process_batsmall_data(df, options=None):
 
 
 	return cycles
+
+
+def splice_cycles(df, kind):
+
+	if kind == 'batsmall':
+
+		# Creates masks for charge and discharge curves
+		chg_mask = df['current'] >= 0
+		dchg_mask = df['current'] < 0
+
+		# Get the number of cycles in the dataset
+		max_count = df["count"].max()
+
+	# Loop through all the cycling steps, change the current and capacities in the 
+		for i in range(df["count"].max()):
+			sub_df = df.loc[df['count'] == i+1]
+			sub_df_chg = sub_df.loc[chg_mask]
+			#sub_df_dchg = sub_df.loc[dchg_mask]
+
+			# get indices where the program changed
+			chg_indices = sub_df_chg[sub_df_chg["comment"].str.contains("program")==True].index.to_list()
+			
+			# Delete first item if first cycle after rest (this will just be the start of the cycling)
+			if i+1 == 1:
+				del chg_indices[0]
+			
+	
+			if chg_indices:
+				last_chg =  chg_indices.pop()
+			
+
+			#dchg_indices = sub_df_dchg[sub_df_dchg["comment"].str.contains("program")==True].index.to_list()
+			#if dchg_indices:
+			#	del dchg_indices[0]
+
+
+			
+			if chg_indices:
+				for i in chg_indices:
+					add = df['specific_capacity'].iloc[i-1]
+					df['specific_capacity'].iloc[i:last_chg] = df['specific_capacity'].iloc[i:last_chg] + add
+
+			#if dchg_indices:
+		#		for i in dchg_indices:
+			#		add = df['specific_capacity'].iloc[i-1]
+			#		df['specific_capacity'].iloc[i:last_dchg] = df['specific_capacity'].iloc[i:last_dchg] + add
+
+
+
+
+	return df
+
+
+
+
 
 
 def process_neware_data(df, options=None):
@@ -217,7 +276,7 @@ def process_neware_data(df, options=None):
 	# Loop through all the cycling steps, change the current and capacities in the 
 	for i in range(df["cycle"].max()):
 
-		sub_df = df.loc[df['cycle'] == i].copy()
+		sub_df = df.loc[df['cycle'] == i+1].copy()
 
 		#sub_df.loc[dchg_mask, 'current']  *= -1
 		#sub_df.loc[dchg_mask, 'capacity'] *= -1
@@ -515,21 +574,6 @@ def convert_datetime_string(datetime_string, reference, unit='s'):
 	time = s * factors[unit]
 
 	return time
-
-def splice_cycles(first, second):
-
-	first_chg = first[0]
-	first_dchg = first[1]
-	first
-
-	second_chg = second[0]
-	second_dchg = second[1]
-
-	chg_df = first[0].append(second[0])
-
-	return True
-
-
 
 
 

@@ -315,7 +315,8 @@ def prettify_gc_plot(fig, ax, options=None):
 	############################# LEGEND #############################
 	##################################################################
 
-	ax.get_legend().remove()
+	if ax.get_legend():
+		ax.get_legend().remove()
 
 	return fig, ax
 
