@@ -275,8 +275,8 @@ def prettify_gc_plot(fig, ax, options=None):
 
 	# Otherwise apply user input
 	else:
-		major_xtick = options['yticks'][0]
-		minor_xtick = options['yticks'][1]
+		major_ytick = options['yticks'][0]
+		minor_ytick = options['yticks'][1]
 
 
 	# Apply values

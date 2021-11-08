@@ -90,25 +90,7 @@ def integrate_1d(calibrant, bins, path=None, image=None, options=None):
         return open_1d_data(filename)
     
 
-def open_1d_data(path, options=None):
 
-    with open(path, 'r') as f:
-        position = 0
-    
-        current_line = f.readline()
-        
-        while current_line[0] == '#':
-            position = f.tell()
-            current_line = f.readline()
-            
-        f.seek(position)
-
-        df = pd.read_csv(f, header=None, delim_whitespace=True)
-
-    df.columns = ['2th', 'I']
-
-
-    return df
     
 
 
@@ -165,7 +147,7 @@ def view_integrator(calibrant):
 def read_brml(path, options=None):
 
 
-    required_options = ['extract_folder']
+    required_options = ['extract_folder', 'save_folder']
     default_options = {
         'extract_folder': 'temp',
         'save_folder': None
@@ -240,9 +222,43 @@ def read_brml(path, options=None):
     return diffractogram
     
 
+def read_diffractogram(path, options=None):
 
+    
 
+    with open(path, 'r') as f:
+        position = 0
+    
+        current_line = f.readline()
+        
+        while current_line[0] == '#':
+            position = f.tell()
+            current_line = f.readline()
             
+        f.seek(position)
+
+        diffractogram = pd.read_csv(f, header=None, delim_whitespace=True)
+
+    diffractogram.columns = ['2th', 'I']
+
+
+    return diffractogram
+
+
+def read_data(path, kind, options=None):
+
+    if kind == 'beamline':
+        diffractogram = read_diffractogram(path, options=options)
+
+    elif kind == 'recx':
+        diffractogram = read_brml(path, options=options)
+
+    elif kind == 'image':
+        diffractogram = get_image_array(path)
+
+
+    return diffractogram
+                
 
 
 
