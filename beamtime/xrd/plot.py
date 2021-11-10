@@ -303,10 +303,64 @@ def prettify_labels(label):
 
 	return labels_dict[label]
 
-#def plot_diffractograms():
+def plot_diffractograms(paths, kind, options=None):
 
 
+    fig, ax = prepare_diffractogram_plot(options=options)
 
+    diffractograms = []
+
+    for path in paths:
+        diffractogram = xrd.io.read_data(path=path, kind=kind, options=options)
+        diffractograms.append(diffractogram)
+
+
+    required_options = ['type', 'xvals', 'yvals', 'x_offset', 'y_offset', 'normalise', 'normalise_around', 'reverse_order']
+    default_options = {
+        'type': 'stacked',
+        'xvals': '2th',
+        'yvals': 'I',
+        'x_offset': 0,
+        'y_offset': 0.2,
+        'normalise': True,
+        'normalise_around': None,
+        'reverse_order': False
+    }
+
+
+    # If reverse_order is enabled, reverse the order
+    if options['reverse_order']:
+        diffractograms = reverse_diffractograms(diffractograms)
+
+
+    # If normalise is enbaled, normalise all the diffractograms
+    if options['normalise']:
+        if not options['normalise_around']:
+            for diffractogram in diffractograms:
+                diffractogram["I"] = diffractogram["I"]/diffractogram["I"].max()
+            else:
+                diffractogram["I"] = diffractogram["I"]/diffractogram["I"].loc[(diffractogram['2th'] > options['normalise_around'][0]) & (diffractogram['2th'] < options['normalise_around'][1])].max()
+
+    
+    if options['type'] == 'stacked':
+        for diffractogram in diffractograms:
+            diffractogram.plot(x=options['xvals'], y=options['yvals'], ax=ax)
+
+
+    fig, ax = prettify_diffractogram_plot(fig=fig, ax=ax, options=options)
+
+
+    return diffractogram, fig, ax
+
+
+def reverse_diffractograms(diffractograms):
+
+    rev_diffractograms = []
+
+    for i in len(diffractograms):
+        rev_diffractograms.append(diffractograms.pop())
+
+    return rev_diffractograms
 
 #def plot_heatmap():
 
