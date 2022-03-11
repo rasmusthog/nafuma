@@ -1,4 +1,5 @@
 import beamtime.auxillary as aux
+
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,AutoMinorLocator)
 from mpl_toolkits.axes_grid.inset_locator import (inset_axes, InsetPosition, mark_inset)
@@ -10,20 +11,23 @@ from cycler import cycler
 import itertools
 
 
+import numpy as np
+
+
 
 def prepare_plot(options={}):
-    ''' Prepares plot based on contents of options['rc_params'] and options['format_params'].
+    ''' A general function to prepare a plot based on contents of options['rc_params'] and options['format_params'].
     
-    rc_params is a dictionary with keyval-pairs corresponding to rcParams in matplotlib
+    rc_params is a dictionary with keyval-pairs corresponding to rcParams in matplotlib, to give the user full control over this. Please consult the matplotlib-documentation
     
-    format_params will determine the size and aspect ratios of '''
+    format_params will determine the size, aspect ratio, resolution etc. of the figure. Should be modified to conform with any requirements from a journal.'''
 
     rc_params = options['rc_params']
     format_params = options['format_params']
     
-    required_options = ['single_column_width', 'double_column_width', 'column_type', 'width_ratio', 'aspect_ratio', 'compress_width', 'compress_height', 'upscaling_factor', 'dpi']
+    required_format_params = ['single_column_width', 'double_column_width', 'column_type', 'width_ratio', 'aspect_ratio', 'compress_width', 'compress_height', 'upscaling_factor', 'dpi']
 
-    default_options = {
+    default_format_params = {
     'single_column_width': 8.3,
     'double_column_width': 17.1,
     'column_type': 'single',
@@ -35,7 +39,7 @@ def prepare_plot(options={}):
     'dpi': 600, 
     }
     
-    options = aux.update_options(format_params, required_options, default_options)
+    format_params = aux.update_options(format_params, required_format_params, default_format_params)
 
 
     # Reset run commands
@@ -44,54 +48,50 @@ def prepare_plot(options={}):
     # Update run commands if any is passed (will pass an empty dictionary if not passed)
     update_rc_params(rc_params)
     
-    width = determine_width(options)
-    height = determine_height(options, width)
-    width, height = scale_figure(options=options, width=width, height=height)
+    width = determine_width(format_params=format_params)
+    height = determine_height(format_params=format_params, width=width)
+    width, height = scale_figure(format_params=format_params, width=width, height=height)
     
-    fig, ax = plt.subplots(figsize=(width, height), dpi=options['dpi'])
+    fig, ax = plt.subplots(figsize=(width, height), dpi=format_params['dpi'])
     
     return fig, ax
 
 
-def prettify_plot(fig, ax, plot_data, options):
+def adjust_plot(fig, ax, options):
+    ''' A general function to adjust plot according to contents of the options-dictionary '''
     
-    required_options = ['plot_kind', 
-    'hide_x_labels', 'hide_y_labels',  
-    'rotation_x_ticks', 'rotation_y_ticks', 
+    required_options = [
+    'plot_kind', 
+    'hide_x_labels', 'hide_y_labels',
+    'hide_x_ticklabels', 'hide_y_ticklabels',
+    'hide_x_ticks', 'hide_y_ticks',
+    'x_tick_locators', 'y_tick_locators',  
+    'rotation_x_ticks', 'rotation_y_ticks',
+    'xticks', 'yticks', 
     'xlim', 'ylim', 
-    'x_tick_locators', 'y_tick_locators', 
-    'xticks', 'hide_x_ticks', 'hide_y_ticks', 'hide_x_ticklabels', 'hide_y_ticklabels',
-                        'colours', 'palettes',  'title', 'legend', 'legend_position', 'subplots_adjust', 'text', 'legend_ncol']
+    'title', 
+    'legend', 'legend_position', 'legend_ncol',
+    'subplots_adjust',
+    'text']
 
     default_options = {
         'plot_kind': None, # defaults to None, but should be utilised when requiring special formatting for a particular plot 
-        'hide_x_labels': False, # Whether x labels should be hidden
-        'hide_x_ticklabels': False,
-        'hide_x_ticks': False,
-        'rotation_x_ticks': 0,
-        'hide_y_labels': False, # whether y labels should be hidden
-        'hide_y_ticklabels': False,
-        'hide_y_ticks': False,
-        'rotation_y_ticks': 0,
-        'xlim': None,
-        'ylim': None,
-        'x_tick_locators': [.5, .25], # Major and minor tick locators
-        'y_tick_locators': [.5, .25],
-        'xticks': None,
-        'labels': None,
-        'colours': None,
-        'palettes': [('qualitative', 'Dark2_8'), ('qualitative', 'Paired_12')],
-        'title': None,
-        'legend': False,
-        'legend_position': ['lower center', (0.5, -0.1)], # the position of the legend passed as arguments to loc and bbox_to_anchor respectively 
-        'legend_ncol': 1,
-        'subplots_adjust': [0.1, 0.1, 0.9, 0.9],
-        'text': None
+        'hide_x_labels': False, 'hide_y_labels': False, # Whether the main labels on the x- and/or y-axes should be hidden
+        'hide_x_ticklabels': False, 'hide_y_ticklabels': False, # Whether ticklabels on the x- and/or y-axes should be hidden
+        'hide_x_ticks': False, 'hide_y_ticks': False, # Whether the ticks on the x- and/or y-axes should be hidden
+        'x_tick_locators': None, 'y_tick_locators': None, # The major and minor tick locators for the x- and y-axes
+        'rotation_x_ticks': 0, 'rotation_y_ticks': 0, # Degrees the x- and/or y-ticklabels should be rotated
+        'xticks': None, 'yticks': None, # Custom definition of the xticks and yticks. This is not properly implemented now.  
+        'xlim': None, 'ylim': None, # Limits to the x- and y-axes
+        'title': None, # Title of the plot
+        'legend': False, 'legend_position': ['lower center', (0.5, -0.1)], 'legend_ncol': 1, # Toggles on/off legend. Specifices legend position and the number of columns the legend should appear as.
+        'subplots_adjust': [0.1, 0.1, 0.9, 0.9], # Adjustment of the Axes-object within the Figure-object. Fraction of the Figure-object the left, bottom, right and top edges of the Axes-object will start.
+        'text': None # Text to show in the plot. Should be a list where the first element is the string, and the second is a tuple with x- and y-coordinates. Could also be a list of lists to show more strings of text.
     }
 
 
 
-    options = update_options(options=options, required_options=required_options, default_options=default_options)
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
     # Set labels on x- and y-axes
     if not options['hide_y_labels']:
@@ -106,18 +106,22 @@ def prettify_plot(fig, ax, plot_data, options):
 
 
     # Set multiple locators
-    ax.yaxis.set_major_locator(MultipleLocator(options['y_tick_locators'][0]))
-    ax.yaxis.set_minor_locator(MultipleLocator(options['y_tick_locators'][1]))
+    if options['y_tick_locators']:
+        ax.yaxis.set_major_locator(MultipleLocator(options['y_tick_locators'][0]))
+        ax.yaxis.set_minor_locator(MultipleLocator(options['y_tick_locators'][1]))
 
-    ax.xaxis.set_major_locator(MultipleLocator(options['x_tick_locators'][0]))
-    ax.xaxis.set_minor_locator(MultipleLocator(options['x_tick_locators'][1]))
+    if options['x_tick_locators']:
+        ax.xaxis.set_major_locator(MultipleLocator(options['x_tick_locators'][0]))
+        ax.xaxis.set_minor_locator(MultipleLocator(options['x_tick_locators'][1]))
 
+    
+    # THIS NEEDS REWORK FOR IT TO FUNCTION PROPERLY!
     if options['xticks']:
         ax.set_xticks(np.arange(plot_data['start'], plot_data['end']+1))
         ax.set_xticklabels(options['xticks'])
-    else:
-        ax.set_xticks(np.arange(plot_data['start'], plot_data['end']+1))
-        ax.set_xticklabels([x/2 for x in np.arange(plot_data['start'], plot_data['end']+1)])
+    # else:
+    #     ax.set_xticks(np.arange(plot_data['start'], plot_data['end']+1))
+    #     ax.set_xticklabels([x/2 for x in np.arange(plot_data['start'], plot_data['end']+1)])
         
     # Hide x- and y- ticklabels
     if options['hide_y_ticklabels']:
@@ -202,7 +206,14 @@ def prettify_plot(fig, ax, plot_data, options):
 
     # Add custom text
     if options['text']:
-        plt.text(x=options['text'][1][0], y=options['text'][1][1], s=options['text'][0])
+
+        # If only a single element, put it into a list so the below for-loop works.
+        if isinstance(options['text'][0], str):
+            options['text'] = [options['text']]
+
+        # Plot all passed texts
+        for text in options['text']:
+            plt.text(x=text[1][0], y=text[1][1], s=text[0])
     
     return fig, ax
 
@@ -210,28 +221,40 @@ def prettify_plot(fig, ax, plot_data, options):
 
 
 def ipywidgets_update(func, plot_data, options={}, **kwargs):
+    ''' A general ipywidgets update function that can be passed to ipywidgets.interactive. To use this, you can run:
 
+    import ipywidgets as widgets
+    import beamtime.plotting as btp
+
+    w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(my_func), plot_data=widgets.fixed(plot_data), options=widgets.fixed(options), key1=widget1, key2=widget2, key3=widget3)
+
+    where key1, key2, key3 etc. are the values in the options-dictionary you want widget control of, and widget1, widget2, widget3 etc. are widgets to control these values, e.g. widgets.IntSlider(value=1, min=0, max=10)
+    '''
+
+    # Update the options-dictionary with the values from the widgets
     for key in kwargs:
         options[key] = kwargs[key]
 
+    # Call the function with the plot_data and options-dictionaries
     func(plot_data=plot_data, options=options)
 
 
 
 
-def determine_width(options):
+def determine_width(format_params):
+    ''' '''
     
     conversion_cm_inch = 0.3937008 # cm to inch
     
-    if options['column_type'] == 'single':
-        column_width = options['single_column_width']
-    elif options['column_type'] == 'double':
-        column_width = options['double_column_width']
+    if format_params['column_type'] == 'single':
+        column_width = format_params['single_column_width']
+    elif format_params['column_type'] == 'double':
+        column_width = format_params['double_column_width']
         
     column_width *= conversion_cm_inch
     
     
-    width_ratio = [float(num) for num in options['width_ratio'].split(':')]
+    width_ratio = [float(num) for num in format_params['width_ratio'].split(':')]
 
     
     width = column_width * width_ratio[0]/width_ratio[1]
@@ -240,18 +263,18 @@ def determine_width(options):
     return width
 
 
-def determine_height(options, width):
+def determine_height(format_params, width):
     
-    aspect_ratio = [float(num) for num in options['aspect_ratio'].split(':')]
+    aspect_ratio = [float(num) for num in format_params['aspect_ratio'].split(':')]
     
     height = width/(aspect_ratio[0] / aspect_ratio[1])
     
     return height
 
 
-def scale_figure(options, width, height):
-    width = width * options['upscaling_factor'] * options['compress_width']
-    height = height * options['upscaling_factor'] * options['compress_height']
+def scale_figure(format_params, width, height):
+    width = width * format_params['upscaling_factor'] * format_params['compress_width']
+    height = height * format_params['upscaling_factor'] * format_params['compress_height']
 
     return width, height
 

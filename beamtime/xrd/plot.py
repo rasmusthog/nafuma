@@ -7,38 +7,48 @@ import math
 
 import beamtime.xrd as xrd
 
+import beamtime.auxillary as aux
+import beamtime.plotting as btp
 
 
-
-def plot_diffractogram(path, kind, options=None):
-
-    # Prepare plot, and read and process data
-    fig, ax = prepare_diffractogram_plot(options=options)
-    diffractogram = xrd.io.read_data(path=path, kind=kind, options=options)
-
+def plot_diffractogram(plot_data, options={}):
+    ''' Plots a diffractogram.
+    
+    Input:
+    plot_data (dict): Must include path = string to diffractogram data, and plot_kind = (recx, beamline, image)'''
 
     # Update options
-    required_options = ['x_vals', 'y_vals', 'scatter']
-
-
+    required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'scatter', 'plot_kind', 'rc_params', 'format_params']
 
     default_options = {
         'x_vals': '2th', 
-        'y_vals': 'I', 
-        'scatter': False
+        'y_vals': 'I',
+        'ylabel': 'Intensity', 'xlabel': '2theta', 
+        'xunit': 'deg', 'yunit': 'a.u.',
+        'scatter': False,
+        'plot_kind': None,
+        'rc_params': {},
+        'format_params': {}
         }
 
-    options = update_options(options=options, required_options=required_options, default_options=default_options)
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+
+    # Prepare plot, and read and process data
+    fig, ax = btp.prepare_plot(options=options)
+    diffractogram = xrd.io.read_data(path=plot_data['path'], kind=plot_data['plot_kind'], options=options)
 
     if options['scatter']:
-        diffractogram.plot(x=options['x_vals'], y=options['y_vals'], ax=ax, kind='scatter')
+        ax.scatter(x= diffractogram[options['x_vals']], y = diffractogram[options['y_vals']])
+        
+        #diffractogram.plot(x=options['x_vals'], y=options['y_vals'], ax=ax, kind='scatter')
     
     else:
         diffractogram.plot(x=options['x_vals'], y=options['y_vals'], ax=ax)
 
 
 
-    fig, ax = prettify_diffractogram_plot(fig=fig, ax=ax, options=options)
+    fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
 
 
     return diffractogram, fig, ax
