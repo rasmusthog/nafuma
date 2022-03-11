@@ -53,13 +53,18 @@ def prepare_plot(options={}):
     return fig, ax
 
 
-def prettify__plot(fig, ax, plot_data, options):
+def prettify_plot(fig, ax, plot_data, options):
     
-    required_options = ['plot_kind', 'hide_x_labels', 'hide_y_labels',  'rotation_x_ticks', 'rotation_y_ticks', 'xlabel', 'ylabel', 'yunit', 'xlim', 'ylim', 'x_tick_locators', 'y_tick_locators', 'xticks', 'hide_x_ticks', 'hide_y_ticks', 'hide_x_ticklabels', 'hide_y_ticklabels',
+    required_options = ['plot_kind', 
+    'hide_x_labels', 'hide_y_labels',  
+    'rotation_x_ticks', 'rotation_y_ticks', 
+    'xlim', 'ylim', 
+    'x_tick_locators', 'y_tick_locators', 
+    'xticks', 'hide_x_ticks', 'hide_y_ticks', 'hide_x_ticklabels', 'hide_y_ticklabels',
                         'colours', 'palettes',  'title', 'legend', 'legend_position', 'subplots_adjust', 'text', 'legend_ncol']
 
     default_options = {
-        'plot_kind': None, # defaults to None, but should be utilised when 
+        'plot_kind': None, # defaults to None, but should be utilised when requiring special formatting for a particular plot 
         'hide_x_labels': False, # Whether x labels should be hidden
         'hide_x_ticklabels': False,
         'hide_x_ticks': False,
@@ -68,9 +73,6 @@ def prettify__plot(fig, ax, plot_data, options):
         'hide_y_ticklabels': False,
         'hide_y_ticks': False,
         'rotation_y_ticks': 0,
-        'xlabel': r'$x$ in Na$_{5-x}$FeO$_{4-\delta}$',
-        'ylabel': 'Formation energy',
-        'yunit': r'eV', # The unit of the y-values in the curve and bar plots
         'xlim': None,
         'ylim': None,
         'x_tick_locators': [.5, .25], # Major and minor tick locators
