@@ -25,7 +25,9 @@ def prepare_plot(options={}):
     rc_params = options['rc_params']
     format_params = options['format_params']
     
-    required_format_params = ['single_column_width', 'double_column_width', 'column_type', 'width_ratio', 'aspect_ratio', 'compress_width', 'compress_height', 'upscaling_factor', 'dpi']
+    required_format_params = ['single_column_width', 'double_column_width', 'column_type', 'width_ratio', 'aspect_ratio', 
+    'width', 'height', 'compress_width', 'compress_height', 'upscaling_factor', 'dpi',
+    'nrows', 'ncols', 'grid_ratio_height', 'grid_ratio_width']
 
     default_format_params = {
     'single_column_width': 8.3,
@@ -33,10 +35,16 @@ def prepare_plot(options={}):
     'column_type': 'single',
     'width_ratio': '1:1',
     'aspect_ratio': '1:1',
+    'width': None,
+    'height': None,
     'compress_width': 1,
     'compress_height': 1,
     'upscaling_factor': 1.0,
-    'dpi': 600, 
+    'dpi': 600,
+    'nrows': 1,
+    'ncols': 1,
+    'grid_ratio_height': None,
+    'grid_ratio_width': None
     }
     
     format_params = aux.update_options(format_params, required_format_params, default_format_params)
@@ -48,13 +56,72 @@ def prepare_plot(options={}):
     # Update run commands if any is passed (will pass an empty dictionary if not passed)
     update_rc_params(rc_params)
     
-    width = determine_width(format_params=format_params)
-    height = determine_height(format_params=format_params, width=width)
+    if not format_params['width']:
+        width = determine_width(format_params=format_params)
+    
+    if not format_params['height']:
+        height = determine_height(format_params=format_params, width=width)
+
     width, height = scale_figure(format_params=format_params, width=width, height=height)
     
-    fig, ax = plt.subplots(figsize=(width, height), dpi=format_params['dpi'])
+    if format_params['nrows'] == 1 and format_params['ncols'] == 1:
+        fig, ax = plt.subplots(figsize=(width, height), dpi=format_params['dpi'])
+        
+        return fig, ax
+
+    else:
+        if not format_params['grid_ratio_height']:
+            format_params['grid_ratio_height'] = [1 for i in range(format_params['nrows'])]
+
+        if not format_params['grid_ratio_width']:
+            format_params['grid-ratio_width'] = [1 for i in range(format_params['ncols'])]
+
+        fig, axes = plt.subplots(nrows=format_params['nrows'], ncols=format_params['ncols'], figsize=(width,height), 
+        gridspec_kw={'height_ratios': format_params['grid_ratio_height'], 'width_ratios': format_params['grid_ratio_width']}, 
+        facecolor='w', dpi=format_params['dpi'])
+
+        return fig, axes
+
+def prepare_plots(options={}):
+
+    rc_params = options['rc_params']
+    format_params = options['format_params']
     
-    return fig, ax
+    required_options = ['single_column_width', 'double_column_width', 'column_type', 'width_ratio', 'aspect_ratio', 'compress_width', 'compress_height', 'upscaling_factor', 'dpi']
+
+    default_options = {
+    'single_column_width': 8.3,
+    'double_column_width': 17.1,
+    'column_type': 'single',
+    'width_ratio': '1:1',
+    'aspect_ratio': '1:1',
+    'compress_width': 1,
+    'compress_height': 1,
+    'upscaling_factor': 1.0,
+    'dpi': 600, 
+    }
+    
+    format_params = aux.update_options(format_params, required_options, default_options)
+
+
+    # Reset run commands
+    plt.rcdefaults()
+    
+    # Update run commands if any is passed (will pass an empty dictionary if not passed)
+    update_rc_params(rc_params)
+    
+    width = determine_width(format_params)
+    height = determine_height(format_params, width)
+    width, height = scale_figure(options=format_params, width=width, height=height)
+
+
+    if options['plot_kind'] == 'relative':
+        fig, axes = plt.subplots(nrows=1, ncols=options['number_of_frames'], figsize=(width,height), facecolor='w', dpi=format_params['dpi'])
+
+    elif options['plot_kind'] == 'absolute':
+        fig, axes = plt.subplots(nrows=2, ncols=options['number_of_frames'], figsize=(width,height), gridspec_kw={'height_ratios': [1,5]}, facecolor='w', dpi=format_params['dpi'])
+    
+    return fig, axes
 
 
 def adjust_plot(fig, ax, options):

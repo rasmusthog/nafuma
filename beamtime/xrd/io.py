@@ -87,7 +87,7 @@ def integrate_1d(calibrant, bins, path=None, image=None, options=None):
     res = ai.integrate1d(image, bins, unit=options['unit'], filename=filename)
 
     if options['return']:
-        return open_1d_data(filename)
+        return read_diffractogram(filename)
     
 
 
@@ -222,7 +222,7 @@ def read_brml(path, options=None):
     return diffractogram
     
 
-def read_diffractogram(path, options=None):
+def read_diffractogram(path):
 
     
 
@@ -248,7 +248,7 @@ def read_diffractogram(path, options=None):
 def read_data(path, kind, options=None):
 
     if kind == 'beamline':
-        diffractogram = read_diffractogram(path, options=options)
+        diffractogram = read_diffractogram(path)
 
     elif kind == 'recx':
         diffractogram = read_brml(path, options=options)
