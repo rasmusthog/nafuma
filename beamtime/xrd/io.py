@@ -262,3 +262,27 @@ def read_data(path, kind, options=None):
 
 
 
+def load_reflection_table(path):
+
+    # VESTA outputs the file with a header that has a space between the parameter and units - so there is some extra code to rectify the issue
+    # that ensues from this formatting
+    reflections = pd.read_csv(path, delim_whitespace=True)
+
+    # Remove the extra column that appears from the headers issue
+    reflections.drop(reflections.columns[-1], axis=1, inplace=True)
+
+    with open(path, 'r') as f:
+        line = f.readline()
+
+        headers = line.split()
+
+        # Delete the fourth element which is '(Å)'
+        del headers[4]
+
+        # Change name of column to avoid using greek letters
+        headers[7] = '2th'
+
+    # Set the new modified headers as the headers of 
+    reflections.columns = headers
+
+    return reflections

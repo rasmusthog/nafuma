@@ -133,16 +133,21 @@ def plot_reflection_table(plot_data, ax=None, options={}):
     if not ax:
         _, ax = btp.prepare_plot(options)
 
-    reflection_table = load_reflection_table(plot_data['path'])
+    reflection_table = xrd.io.load_reflection_table(plot_data['path'])
 
     reflections, intensities  = reflection_table['2th'], reflection_table['I']
+    colours = []
 
     for ref, intensity in zip(reflections, intensities):
 
+        colour = list(options['reflections_colour'])
         rel_intensity = (intensity / intensities.max())*(1-options['min_alpha']) + options['min_alpha']
+        colour.append(rel_intensity)
+        colours.append(colour)
 
-
-        ax.axvline(x=ref, c=options['reflections_colour'], alpha=rel_intensity)
+    
+    ax.vlines(x=reflections, ymin=-1, ymax=1, colors=colours)
+    ax.set_ylim([-0.5,0.5])
         
 
 
@@ -154,30 +159,6 @@ def plot_reflection_table(plot_data, ax=None, options={}):
 
 
 
-def load_reflection_table(path):
-
-    # VESTA outputs the file with a header that has a space between the parameter and units - so there is some extra code to rectify the issue
-    # that ensues from this formatting
-    reflections = pd.read_csv(path, delim_whitespace=True)
-
-    # Remove the extra column that appears from the headers issue
-    reflections.drop(reflections.columns[-1], axis=1, inplace=True)
-
-    with open(path, 'r') as f:
-        line = f.readline()
-
-        headers = line.split()
-
-        # Delete the fourth element which is '(Å)'
-        del headers[4]
-
-        # Change name of column to avoid using greek letters
-        headers[7] = '2th'
-
-    # Set the new modified headers as the headers of 
-    reflections.columns = headers
-
-    return reflections
 
     
 
