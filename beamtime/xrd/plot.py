@@ -20,7 +20,7 @@ def plot_diffractogram(plot_data, options={}):
 
     # Update options
     required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'line', 'scatter', 
-    'reflections', 'plot_kind', 'palettes', 'interactive', 'rc_params', 'format_params']
+    'reflections_plot', 'reflections_indices', 'reflections_data', 'plot_kind', 'palettes', 'interactive', 'rc_params', 'format_params']
 
     default_options = {
         'x_vals': '2th', 
@@ -29,8 +29,9 @@ def plot_diffractogram(plot_data, options={}):
         'xunit': 'deg', 'yunit': 'a.u.',
         'line': True,
         'scatter': False,
-        'reflections': False,
-        'reflection_data': None, # Should be passed as a dictionary on the form {path: rel_path, colour: [r,g,b], min_alpha: 0-1]
+        'reflections_plot': False,
+        'reflections_indices': False,
+        'reflections_data': None, # Should be passed as a dictionary on the form {path: rel_path, reflection_indices: number of indices, plot: boolean, colour: [r,g,b], min_alpha: 0-1]
         'plot_kind': None,
         'palettes': [('qualitative', 'Dark2_8')],
         'interactive': False,
@@ -46,24 +47,46 @@ def plot_diffractogram(plot_data, options={}):
         plot_diffractogram_interactive(plot_data=plot_data, options=options)
         return
     
-    # Make adjustments to parameters if reflections data is passed
-    if options['reflections']:
-        options['format_params']['nrows'] = 2
-
-        if not 'grid_ratio_height' in options['format_params'].keys():
+    
+    if options['reflections_plot'] or options['reflections_indices']:
+        if options['reflections_plot'] and options['reflections_indices']:
+            options['format_params']['nrows'] = 3
+            options['format_params']['grid_ratio_height'] = [2,1,10]
+        
+        elif options['reflections_plot']:
+            options['format_params']['nrows'] = 2
             options['format_params']['grid_ratio_height'] = [1,10]
 
+        elif options['reflections_indices']:
+            options['format_params']['nrows'] = 2
+            options['format_params']['grid_ratio_height'] = [2,10]
+    
     else:
         options['format_params']['nrows'] = 1
+
+
 
 
     # Prepare plot, and read and process data
 
     fig, ax = btp.prepare_plot(options=options)
     
-    if options['reflections']:
-        reflection_ax = ax[0]
-        ax = ax[1]
+
+    # Assign the correct axes
+    if options['reflections_plot'] or options['reflections_indices']:
+        if options['reflections_plot'] and options['reflections_indices']:
+            indices_ax = ax[0]
+            reflection_ax = ax[1]
+            ax = ax[2]
+
+        elif options['reflections_plot']:
+            reflection_ax = ax[0]
+            ax = ax[1]
+        
+        elif options['reflections_indices']:
+            indices_ax = ax[0]
+            ax = ax[1]
+        
 
     colours = btp.generate_colours(options['palettes'])
 
@@ -80,8 +103,13 @@ def plot_diffractogram(plot_data, options={}):
 
     fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
 
-    if options['reflections'] and options['reflection_data']:
-        plot_reflection_table(plot_data=options['reflection_data'], ax=reflection_ax, options=options)
+    if options['reflections_plot'] and options['reflections_data']:
+        options['xlim'] = ax.get_xlim()
+        plot_reflection_table(plot_data=options['reflections_data'], ax=reflection_ax, options=options)
+
+    if options['reflections_indices'] and options['reflections_data']:
+        options['xlim'] = ax.get_xlim()
+        plot_reflection_indices(plot_data=options['reflections_data'], ax=indices_ax, options=options)
 
 
     return diffractogram, fig, ax
@@ -89,11 +117,12 @@ def plot_diffractogram(plot_data, options={}):
 
 def plot_diffractogram_interactive(plot_data, options):
 
-    if options['reflections']:
+    if options['reflections_data']:
         w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(plot_diffractogram), plot_data=widgets.fixed(plot_data), options=widgets.fixed(options), 
         scatter=widgets.ToggleButton(value=False), 
         line=widgets.ToggleButton(value=True), 
-        reflections=widgets.ToggleButton(value=True))
+        reflections_plot=widgets.ToggleButton(value=True),
+        reflections_indices=widgets.ToggleButton(value=False))
     
     else:
         w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(plot_diffractogram), plot_data=widgets.fixed(plot_data), options=widgets.fixed(options), 
@@ -103,7 +132,34 @@ def plot_diffractogram_interactive(plot_data, options):
     
     display(w)
 
+def plot_reflection_indices(plot_data, ax, options={}):
 
+    required_options = ['reflection_indices']
+
+    default_options = {
+        'reflection_indices': 3
+    }
+
+    plot_data = update_options(options=plot_data, required_options=required_options, default_options=default_options)
+
+
+    reflection_table = xrd.io.load_reflection_table(plot_data['path'])
+    
+    if plot_data['reflection_indices'] > 0:
+       reflection_indices = reflection_table.nlargest(options['reflection_indices'], 'I')
+
+    
+    for i in range(plot_data['reflection_indices']):
+        ax.text(s=f'({reflection_indices["h"].iloc[i]} {reflection_indices["k"].iloc[i]} {reflection_indices["l"].iloc[i]})', x=reflection_indices['2th'].iloc[i], y=0, fontsize=5, rotation=90, va='bottom', ha='center')    
+
+    
+    if options['xlim']:
+        ax.set_xlim(options['xlim'])
+    
+    ax.axis('off')
+
+
+    return
     
 def plot_reflection_table(plot_data, ax=None, options={}):
     ''' Plots a reflection table from output generated by VESTA.
@@ -111,24 +167,29 @@ def plot_reflection_table(plot_data, ax=None, options={}):
     Required contents of plot_data:
     path (str): relative path to reflection table file'''
 
-    required_options = ['reflections_colour', 'min_alpha', 'format_params', 'rc_params']
+    required_options = ['reflection_indices', 'reflections_colour', 'min_alpha', 'format_params', 'rc_params', 'label']
 
     default_options = {
+        'reflection_indices': 0, # Number of indices to print
         'reflections_colour': [0,0,0],
         'min_alpha': 0,
         'format_params': {},
-        'rc_params': {}
+        'rc_params': {},
+        'label': None
     }
 
     if 'colour' in plot_data.keys():
         options['reflections_colour'] = plot_data['colour']
     if 'min_alpha' in plot_data.keys():
         options['min_alpha'] = plot_data['min_alpha']
+    if 'reflection_indices' in plot_data.keys():
+        options['reflection_indices'] = plot_data['reflection_indices']
+    if 'label' in plot_data.keys():
+        options['label'] = plot_data['label']
 
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
-    
     
     if not ax:
         _, ax = btp.prepare_plot(options)
@@ -136,6 +197,9 @@ def plot_reflection_table(plot_data, ax=None, options={}):
     reflection_table = xrd.io.load_reflection_table(plot_data['path'])
 
     reflections, intensities  = reflection_table['2th'], reflection_table['I']
+
+
+    
     colours = []
 
     for ref, intensity in zip(reflections, intensities):
@@ -146,9 +210,10 @@ def plot_reflection_table(plot_data, ax=None, options={}):
         colours.append(colour)
 
     
+
+    
     ax.vlines(x=reflections, ymin=-1, ymax=1, colors=colours)
     ax.set_ylim([-0.5,0.5])
-        
 
 
     ax.tick_params(which='both', bottom=False, labelbottom=False, right=False, labelright=False, left=False, labelleft=False, top=False, labeltop=False)
@@ -156,6 +221,12 @@ def plot_reflection_table(plot_data, ax=None, options={}):
     if options['xlim']:
         ax.set_xlim(options['xlim'])
 
+
+    if options['label']:
+        xlim_range = ax.get_xlim()[1] - ax.get_xlim()[0]
+        ylim_avg = (ax.get_ylim()[0]+ax.get_ylim()[1])/2
+
+        ax.text(s=plot_data['label'], x=(ax.get_xlim()[0]-0.01*xlim_range), y=ylim_avg, ha = 'right', va = 'center')
 
 
 
