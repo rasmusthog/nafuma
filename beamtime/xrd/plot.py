@@ -27,14 +27,16 @@ def plot_diffractogram(plot_data, options={}):
         'y_vals': 'I',
         'ylabel': 'Intensity', 'xlabel': '2theta', 
         'xunit': 'deg', 'yunit': 'a.u.',
-        'line': True,
-        'scatter': False,
-        'reflections_plot': False,
-        'reflections_indices': False,
-        'reflections_data': None, # Should be passed as a dictionary on the form {path: rel_path, reflection_indices: number of indices, plot: boolean, colour: [r,g,b], min_alpha: 0-1]
+        'xlim': None, 'ylim': None, 
+        'line': True, # whether or not to plot diffractogram as a line plot
+        'scatter': False, # whether or not to plot individual data points
+        'reflections_plot': False, # whether to plot reflections as a plot
+        'reflections_indices': False, # whether to plot the reflection indices
+        'reflections_data': None, # Should be passed as a list of dictionaries on the form {path: rel_path, reflection_indices: number of indices, colour: [r,g,b], min_alpha: 0-1]
         'plot_kind': None,
         'palettes': [('qualitative', 'Dark2_8')],
         'interactive': False,
+        'interactive_session_active': False,
         'rc_params': {},
         'format_params': {},
         }
@@ -44,27 +46,20 @@ def plot_diffractogram(plot_data, options={}):
 
     if options['interactive']:
         options['interactive'] = False
+        options['interactive_session_active'] = True
         plot_diffractogram_interactive(plot_data=plot_data, options=options)
         return
     
     
-    if options['reflections_plot'] or options['reflections_indices']:
-        if options['reflections_plot'] and options['reflections_indices']:
-            options['format_params']['nrows'] = 3
-            options['format_params']['grid_ratio_height'] = [2,1,10]
-        
-        elif options['reflections_plot']:
-            options['format_params']['nrows'] = 2
-            options['format_params']['grid_ratio_height'] = [1,10]
+    if options['reflections_data']:
+        if not isinstance(options['reflections_data'], list):
+            options['reflections_data'] = [options['reflections_data']]
 
-        elif options['reflections_indices']:
-            options['format_params']['nrows'] = 2
-            options['format_params']['grid_ratio_height'] = [2,10]
-    
-    else:
-        options['format_params']['nrows'] = 1
+    # Determine number of subplots and height ratios between them
+    if len(options['reflections_data']) >= 1:
+        options = determine_grid_layout(options=options)
 
-
+        print(options['format_params']['nrows'])
 
 
     # Prepare plot, and read and process data
@@ -74,19 +69,17 @@ def plot_diffractogram(plot_data, options={}):
 
     # Assign the correct axes
     if options['reflections_plot'] or options['reflections_indices']:
-        if options['reflections_plot'] and options['reflections_indices']:
+        
+        if options['reflections_indices']:
             indices_ax = ax[0]
-            reflection_ax = ax[1]
-            ax = ax[2]
 
-        elif options['reflections_plot']:
-            reflection_ax = ax[0]
-            ax = ax[1]
-        
-        elif options['reflections_indices']:
-            indices_ax = ax[0]
-            ax = ax[1]
-        
+            if options['reflections_plot']:
+                ref_axes = [axx for axx in ax[range(1,len(options['reflections_data'])+1)]]
+
+        else:
+            ref_axes = [axx for axx in ax[range(0,len(options['reflections_data']))]]
+
+        ax = ax[-1]
 
     colours = btp.generate_colours(options['palettes'])
 
@@ -98,21 +91,48 @@ def plot_diffractogram(plot_data, options={}):
         diffractogram.plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=next(colours), zorder=1)
     
     if options['scatter']:
-        ax.scatter(x= diffractogram[options['x_vals']], y = diffractogram[options['y_vals']], c=[(1,1,1,0)], edgecolors=[next(colours)], linewidths=plt.rcParams['lines.markeredgewidth'], zorder=2) #, edgecolors=np.array([next(colours)]))
+        ax.scatter(x=diffractogram[options['x_vals']], y = diffractogram[options['y_vals']], c=[(1,1,1,0)], edgecolors=[next(colours)], linewidths=plt.rcParams['lines.markeredgewidth'], zorder=2) #, edgecolors=np.array([next(colours)]))
 
+
+
+    if not options['xlim']:
+        options['xlim'] = [diffractogram[options['x_vals']].min(), diffractogram[options['x_vals']].max()]
 
     fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
 
+    
+
+    # Make the reflection plots
     if options['reflections_plot'] and options['reflections_data']:
         options['xlim'] = ax.get_xlim()
-        plot_reflection_table(plot_data=options['reflections_data'], ax=reflection_ax, options=options)
+        
+        for reference, axis in zip(options['reflections_data'], ref_axes):
+            plot_reflection_table(plot_data=reference, ax=axis, options=options)
 
+    # Print the reflection indices
     if options['reflections_indices'] and options['reflections_data']:
         options['xlim'] = ax.get_xlim()
-        plot_reflection_indices(plot_data=options['reflections_data'], ax=indices_ax, options=options)
+        for reference in options['reflections_data']:
+            plot_reflection_indices(plot_data=reference, ax=indices_ax, options=options)
 
 
     return diffractogram, fig, ax
+
+
+def determine_grid_layout(options):
+
+
+    nrows = 1 if not options['reflections_indices'] else 2
+
+    if options['reflections_plot']:
+        for reference in options['reflections_data']:
+            nrows += 1
+
+    options['format_params']['nrows'] = nrows
+    options['format_params']['grid_ratio_height'] = [1 for i in range(nrows-1)]+[10]
+
+    return options
+
 
 
 def plot_diffractogram_interactive(plot_data, options):
@@ -132,31 +152,38 @@ def plot_diffractogram_interactive(plot_data, options):
     
     display(w)
 
-def plot_reflection_indices(plot_data, ax, options={}):
 
-    required_options = ['reflection_indices']
+def plot_reflection_indices(plot_data, ax, options={}):
+    ''' Print reflection indices from output generated by VESTA.
+    
+    Required contents of plot_data:
+    path (str): relative path to reflection table file'''
+
+    required_options = ['reflection_indices', 'text_colour', 'hide_indices']
 
     default_options = {
-        'reflection_indices': 3
+        'reflection_indices': 3, # Number of reflection indices to plot, from highest intensity and working its way down
+        'text_colour': 'black',
+        'hide_indices': False
     }
 
     plot_data = update_options(options=plot_data, required_options=required_options, default_options=default_options)
 
+    if not plot_data['hide_indices']:
+        reflection_table = xrd.io.load_reflection_table(plot_data['path'])
+        
+        if plot_data['reflection_indices'] > 0:
+            reflection_indices = reflection_table.nlargest(options['reflection_indices'], 'I')
 
-    reflection_table = xrd.io.load_reflection_table(plot_data['path'])
-    
-    if plot_data['reflection_indices'] > 0:
-       reflection_indices = reflection_table.nlargest(options['reflection_indices'], 'I')
+        
+        for i in range(plot_data['reflection_indices']):
+            ax.text(s=f'({reflection_indices["h"].iloc[i]} {reflection_indices["k"].iloc[i]} {reflection_indices["l"].iloc[i]})', x=reflection_indices['2th'].iloc[i], y=0, fontsize=2.5, rotation=90, va='bottom', ha='center', c=plot_data['text_colour'])    
 
-    
-    for i in range(plot_data['reflection_indices']):
-        ax.text(s=f'({reflection_indices["h"].iloc[i]} {reflection_indices["k"].iloc[i]} {reflection_indices["l"].iloc[i]})', x=reflection_indices['2th'].iloc[i], y=0, fontsize=5, rotation=90, va='bottom', ha='center')    
-
-    
-    if options['xlim']:
-        ax.set_xlim(options['xlim'])
-    
-    ax.axis('off')
+        
+        if options['xlim']:
+            ax.set_xlim(options['xlim'])
+        
+        ax.axis('off')
 
 
     return
@@ -212,7 +239,7 @@ def plot_reflection_table(plot_data, ax=None, options={}):
     
 
     
-    ax.vlines(x=reflections, ymin=-1, ymax=1, colors=colours)
+    ax.vlines(x=reflections, ymin=-1, ymax=1, colors=colours, lw=0.5)
     ax.set_ylim([-0.5,0.5])
 
 
