@@ -57,15 +57,15 @@ def prepare_plot(options={}):
     update_rc_params(rc_params)
     
     if not format_params['width']:
-        width = determine_width(format_params=format_params)
+        format_params['width'] = determine_width(format_params=format_params)
     
     if not format_params['height']:
-        height = determine_height(format_params=format_params, width=width)
+        format_params['height'] = determine_height(format_params=format_params, width=format_params['width'])
 
-    width, height = scale_figure(format_params=format_params, width=width, height=height)
+    format_params['width'], format_params['height'] = scale_figure(format_params=format_params, width=format_params['width'], height=format_params['height'])
     
     if format_params['nrows'] == 1 and format_params['ncols'] == 1:
-        fig, ax = plt.subplots(figsize=(width, height), dpi=format_params['dpi'])
+        fig, ax = plt.subplots(figsize=(format_params['width'], format_params['height']), dpi=format_params['dpi'])
         
         return fig, ax
 
@@ -76,7 +76,7 @@ def prepare_plot(options={}):
         if not format_params['grid_ratio_width']:
             format_params['grid-ratio_width'] = [1 for i in range(format_params['ncols'])]
 
-        fig, axes = plt.subplots(nrows=format_params['nrows'], ncols=format_params['ncols'], figsize=(width,height), 
+        fig, axes = plt.subplots(nrows=format_params['nrows'], ncols=format_params['ncols'], figsize=(format_params['width'],format_params['height']), 
         gridspec_kw={'height_ratios': format_params['grid_ratio_height'], 'width_ratios': format_params['grid_ratio_width']}, 
         facecolor='w', dpi=format_params['dpi'])
 
@@ -287,7 +287,7 @@ def adjust_plot(fig, ax, options):
 
 
 
-def ipywidgets_update(func, plot_data, options={}, **kwargs):
+def ipywidgets_update(func, data, options={}, **kwargs):
     ''' A general ipywidgets update function that can be passed to ipywidgets.interactive. To use this, you can run:
 
     import ipywidgets as widgets
@@ -303,7 +303,7 @@ def ipywidgets_update(func, plot_data, options={}, **kwargs):
         options[key] = kwargs[key]
 
     # Call the function with the plot_data and options-dictionaries
-    func(plot_data=plot_data, options=options)
+    func(data=data, options=options)
 
 
 
