@@ -19,7 +19,7 @@ def plot_diffractogram(plot_data, options={}):
     plot_data (dict): Must include path = string to diffractogram data, and plot_kind = (recx, beamline, image)'''
 
     # Update options
-    required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'line', 'scatter', 
+    required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'line', 'scatter', 'xlim', 'ylim',
     'reflections_plot', 'reflections_indices', 'reflections_data', 'plot_kind', 'palettes', 'interactive', 'rc_params', 'format_params']
 
     default_options = {
@@ -59,8 +59,6 @@ def plot_diffractogram(plot_data, options={}):
     if len(options['reflections_data']) >= 1:
         options = determine_grid_layout(options=options)
 
-        print(options['format_params']['nrows'])
-
 
     # Prepare plot, and read and process data
 
@@ -84,7 +82,7 @@ def plot_diffractogram(plot_data, options={}):
     colours = btp.generate_colours(options['palettes'])
 
 
-    diffractogram = xrd.io.read_data(path=plot_data['path'], kind=plot_data['plot_kind'], options=options)
+    diffractogram = xrd.io.read_data(data=plot_data)
 
 
     if options['line']:

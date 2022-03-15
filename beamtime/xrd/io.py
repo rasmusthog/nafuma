@@ -23,15 +23,14 @@ def get_image_headers(path):
     return image.header
 
 
-def integrate_1d(calibrant, bins, path=None, image=None, options=None):
+def integrate_1d(data, options={}):
     ''' Integrates an image file to a 1D diffractogram. 
 
-    Input:
-    calibrant: path to .poni-file
-    bins: Number of bins to divide image into
-    path (optional): path to image file - either this or image must be specified. If both is passed, image is prioritsed
-    image (optional): image array (Numpy) as extracted from get_image_array
-    options (optional): dictionary of options
+    Required content of data:
+    calibrant (str): path to .poni-file
+    nbins (int): Number of bins to divide image into
+    path (str) (optional): path to image file - either this or image must be specified. If both is passed, image is prioritsed
+    image (str) (optional): image array (Numpy) as extracted from get_image_array
 
     Output:
     df: DataFrame contianing 1D diffractogram if option 'return' is True
@@ -56,15 +55,15 @@ def integrate_1d(calibrant, bins, path=None, image=None, options=None):
                 options[option] = default_options[option]
     
     
-    if not image:
-        image = get_image_array(path)
+    if 'image' not in data.keys():
+        data['image'] = get_image_array(data['path'])
     
-    ai = pyFAI.load(calibrant)
+    ai = pyFAI.load(data['calibrant'])
 
 
     if not options['filename']:
-        if path:
-            filename = os.path.join(options['save_folder'], os.path.split(path)[-1].split('.')[0] + options['extension'])
+        if data['path']:
+            filename = os.path.join(options['save_folder'], os.path.split(data['path'])[-1].split('.')[0] + options['extension'])
         else:
             filename = os.path.join(options['save_folder'], 'integrated.dat')
 
@@ -84,10 +83,9 @@ def integrate_1d(calibrant, bins, path=None, image=None, options=None):
         os.makedirs(options['save_folder'])
 
 
-    res = ai.integrate1d(image, bins, unit=options['unit'], filename=filename)
+    res = ai.integrate1d(data['image'], data['nbins'], unit=options['unit'], filename=filename)
 
-    if options['return']:
-        return read_diffractogram(filename)
+    return read_diffractogram(filename)
     
 
 
@@ -245,16 +243,23 @@ def read_diffractogram(path):
     return diffractogram
 
 
-def read_data(path, kind, options=None):
+def read_data(data, options={}):
 
-    if kind == 'beamline':
-        diffractogram = read_diffractogram(path)
+    if data['plot_kind'] == 'beamline':
 
-    elif kind == 'recx':
-        diffractogram = read_brml(path, options=options)
+        beamline = ['mar3450', 'edf', 'cbf']
 
-    elif kind == 'image':
-        diffractogram = get_image_array(path)
+        if data['path'].split('.')[-1] in beamline:
+            diffractogram = integrate_1d(data=data, options=options)
+        
+        else:
+            diffractogram = read_diffractogram(data['path'])
+
+    elif data['plot_kind'] == 'recx':
+        diffractogram = read_brml(data['path'], options=options)
+
+    elif data['plot_kind'] == 'image':
+        diffractogram = get_image_array(data['path'])
 
 
     return diffractogram
