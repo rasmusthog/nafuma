@@ -252,7 +252,10 @@ def read_brml(path, options=None):
     return diffractogram
     
 
-def read_xy(data):
+def read_xy(data, options):
+
+    if 'wavelength' not in data.keys():
+            find_wavelength(data=data, file_ext='xy')
 
     with open(data['path'], 'r') as f:
         position = 0
@@ -260,7 +263,6 @@ def read_xy(data):
         current_line = f.readline()
         
         while current_line[0] == '#' or "\'":
-            find_wavelength(line=current_line, data=data)
             position = f.tell()
             current_line = f.readline()
             
@@ -286,10 +288,10 @@ def read_data(data, options={}):
         diffractogram = integrate_1d(data=data, options=options)
         
     elif file_extension == 'brml':
-        diffractogram = read_brml(path=data['path'], options=options)
+        diffractogram = read_brml(data=data, options=options)
 
     elif file_extension in['xy', 'xye']:
-        diffractogram = read_xy(data['path'])
+        diffractogram = read_xy(data=data, options=options)
 
     return diffractogram
                 
@@ -359,10 +361,29 @@ def translate_wavelengths(diffractogram, wavelength):
 
 
 
-def find_wavelength(line, data):
+def find_wavelength(data, file_ext):
 
-    # Find from EVA-exports
-    wavelength_dict = {'Cu': 1.54059, 'Mo': 0.71073}
+    # Find from EVA-exports (.xy)
+    if file_ext == 'xy':
+        wavelength_dict = {'Cu': 1.54059, 'Mo': 0.71073}
 
-    if 'Anode' in line:
-        
+        with open(data['path'], 'r') as f:
+            lines = f.readlines()
+
+            for line in lines:
+                if 'Anode' in line:
+                    anode = line.split()[8].strip('"')
+                    data['wavelength'] = wavelength_dict[anode]
+
+    
+    # Find from .poni-file
+    if file_ext in ['mar3450', 'edf', 'cbf']:
+        if 'calibrant' in data.keys():
+            with open(data['calibrant'], 'r') as f:
+                lines = f.readlines()
+
+                for line in lines:
+                    if 'Wavelength' in line:
+                        data['wavelength'] = float(line.split[-1])
+
+
