@@ -69,7 +69,8 @@ def integrate_1d(data, options={}):
 
     res = ai.integrate1d(data['image'], data['nbins'], unit=options['unit'], filename=filename)
 
-    diffractogram = read_xy(filename)
+    diff_data = {'path': filename}
+    diffractogram = read_xy(data=diff_data, options=options)
 
     if not options['save']:
         os.remove(filename)
