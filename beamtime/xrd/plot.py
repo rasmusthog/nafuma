@@ -151,7 +151,8 @@ def plot_diffractogram_interactive(data, options):
         line=widgets.ToggleButton(value=True), 
         reflections_plot=widgets.ToggleButton(value=True),
         reflections_indices=widgets.ToggleButton(value=False),
-        xlim=widgets.IntRangeSlider(value=options['xlim'], min=options['xlim'][0], max=options['xlim'][1], step=1, description='xlim', layout=widgets.Layout(width='1000px')))
+        x_vals=widgets.Dropdown(options=['2th', 'd', '1/d', 'q', 'q4', 'q4', '2th_cuka', '2th_moka'], value='2th', description='X-values'),
+        xlim=widgets.FloatRangeSlider(value=options['xlim'], min=options['xlim'][0], max=options['xlim'][1], step=1, description='xlim', layout=widgets.Layout(width='1000px')))
     
     else:
         w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(plot_diffractogram), data=widgets.fixed(data), options=widgets.fixed(options), 

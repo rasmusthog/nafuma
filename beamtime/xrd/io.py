@@ -69,8 +69,8 @@ def integrate_1d(data, options={}):
 
     res = ai.integrate1d(data['image'], data['nbins'], unit=options['unit'], filename=filename)
 
-    diff_data = {'path': filename}
-    diffractogram = read_xy(data=diff_data, options=options)
+    data['path'] = filename
+    diffractogram = read_xy(data=data, options=options)
 
     if not options['save']:
         os.remove(filename)
@@ -175,24 +175,17 @@ def view_integrator(calibrant):
 
 
 
-def read_brml(path, options=None):
+def read_brml(data, options={}):
 
 
     required_options = ['extract_folder', 'save_folder']
     default_options = {
-        'extract_folder': 'temp',
+        'extract_folder': 'tmp',
         'save_folder': None
     }
 
 
-    if not options:
-        options = default_options
-
-    else:
-        for option in required_options:
-            if option not in options.keys():
-                options[option] = default_options[option]
-
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
 
     if not os.path.isdir(options['extract_folder']):
@@ -200,7 +193,7 @@ def read_brml(path, options=None):
 
 
     # Extract the RawData0.xml file from the brml-file
-    with zipfile.ZipFile(path, 'r') as brml:
+    with zipfile.ZipFile(data['path'], 'r') as brml:
         for info in brml.infolist():
             if "RawData" in info.filename:
                 brml.extract(info.filename, options['extract_folder'])
@@ -223,20 +216,25 @@ def read_brml(path, options=None):
             if scantype.text == 'StillScan':
 
                 if chain.get('Description') == 'Originally measured data.':
-                    for data in chain.findall('Datum'):
-                        data = data.text.split(',')
-                        data = [float(i) for i in data]
-                        twotheta, intensity = float(data[2]), float(data[3])
+                    for scandata in chain.findall('Datum'):
+                        scandata = scandata.text.split(',')
+                        scandata = [float(i) for i in scandata]
+                        twotheta, intensity = float(scandata[2]), float(scandata[3])
 
         
             else:
                 if chain.get('Description') == 'Originally measured data.':
-                    for data in chain.findall('Datum'):
-                        data = data.text.split(',')
-                        twotheta, intensity = float(data[2]), float(data[3])
+                    for scandata in chain.findall('Datum'):
+                        scandata = scandata.text.split(',')
+                        twotheta, intensity = float(scandata[2]), float(scandata[3])
                         
                         if twotheta > 0:
                             diffractogram.append({'2th': twotheta, 'I': intensity})
+
+
+    if 'wavelength' not in data.keys():
+        for chain in root.findall('./FixedInformation/Instrument/PrimaryTracks/TrackInfoData/MountedOptics/InfoData/Tube/WaveLengthAlpha1'):
+            data['wavelength'] = float(chain.attrib['Value'])
 
     diffractogram = pd.DataFrame(diffractogram)
 
@@ -253,10 +251,10 @@ def read_brml(path, options=None):
     return diffractogram
     
 
-def read_xy(data, options):
+def read_xy(data, options={}):
 
     if 'wavelength' not in data.keys():
-            find_wavelength(data=data, file_ext='xy')
+            find_wavelength_from_xy(data=data)
 
     with open(data['path'], 'r') as f:
         position = 0
@@ -293,6 +291,9 @@ def read_data(data, options={}):
 
     elif file_extension in['xy', 'xye']:
         diffractogram = read_xy(data=data, options=options)
+
+
+    diffractogram = translate_wavelengths(diffractogram=diffractogram, wavelength=data['wavelength'])
 
     return diffractogram
                 
@@ -361,30 +362,23 @@ def translate_wavelengths(diffractogram, wavelength):
     diffractogram['q4'] = diffractogram['q']**4
 
 
+    return diffractogram
 
-def find_wavelength(data, file_ext):
 
-    # Find from EVA-exports (.xy)
-    if file_ext == 'xy':
-        wavelength_dict = {'Cu': 1.54059, 'Mo': 0.71073}
 
-        with open(data['path'], 'r') as f:
-            lines = f.readlines()
+def find_wavelength_from_xy(data):
 
-            for line in lines:
-                if 'Anode' in line:
-                    anode = line.split()[8].strip('"')
-                    data['wavelength'] = wavelength_dict[anode]
+ 
+    wavelength_dict = {'Cu': 1.54059, 'Mo': 0.71073}
 
-    
-    # Find from .poni-file
-    if file_ext in ['mar3450', 'edf', 'cbf']:
-        if 'calibrant' in data.keys():
-            with open(data['calibrant'], 'r') as f:
-                lines = f.readlines()
+    with open(data['path'], 'r') as f:
+        lines = f.readlines()
 
-                for line in lines:
-                    if 'Wavelength' in line:
-                        data['wavelength'] = float(line.split[-1])
+        for line in lines:
+            if 'Anode' in line:
+                anode = line.split()[8].strip('"')
+                data['wavelength'] = wavelength_dict[anode]
 
+            elif 'Wavelength' in line:
+                data['wavelength'] = float(line.split()[2])*10**10
 
