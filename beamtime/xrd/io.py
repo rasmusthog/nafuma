@@ -260,10 +260,10 @@ def read_xy(data, options):
 
     with open(data['path'], 'r') as f:
         position = 0
-    
+
         current_line = f.readline()
         
-        while current_line[0] == '#' or "\'":
+        while current_line[0] == '#' or current_line[0] == '\'':
             position = f.tell()
             current_line = f.readline()
             
