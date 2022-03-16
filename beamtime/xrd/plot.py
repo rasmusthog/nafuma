@@ -183,11 +183,14 @@ def plot_reflection_indices(data, ax, options={}):
         reflection_table = xrd.io.load_reflection_table(data['path'])
         
         if data['reflection_indices'] > 0:
-            reflection_indices = reflection_table.nlargest(options['reflection_indices'], 'I')
 
-        
-        for i in range(data['reflection_indices']):
-            ax.text(s=f'({reflection_indices["h"].iloc[i]} {reflection_indices["k"].iloc[i]} {reflection_indices["l"].iloc[i]})', x=reflection_indices['2th'].iloc[i], y=0, fontsize=2.5, rotation=90, va='bottom', ha='center', c=data['text_colour'])    
+            # Get the data['reflection_indices'] number of highest reflections within the subrange options['xlim']
+            reflection_indices = reflection_table.loc[(reflection_table[options['x_vals']] > options['xlim'][0]) & (reflection_table[options['x_vals']] < options['xlim'][1])].nlargest(options['reflection_indices'], 'I')
+
+            # Plot the indices
+            for i in range(data['reflection_indices']):
+                if reflection_indices.shape[0] > i:
+                    ax.text(s=f'({reflection_indices["h"].iloc[i]} {reflection_indices["k"].iloc[i]} {reflection_indices["l"].iloc[i]})', x=reflection_indices[options['x_vals']].iloc[i], y=0, fontsize=2.5, rotation=90, va='bottom', ha='center', c=data['text_colour'])    
 
         
         if options['xlim']:
