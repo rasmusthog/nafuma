@@ -44,12 +44,13 @@ def plot_diffractogram(data, options={}):
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
     if not 'diffractogram' in data.keys():
-        diffractogram = xrd.io.read_data(data=data)
+        diffractogram = xrd.io.read_data(data=data, options=options)
         data['diffractogram'] = diffractogram
 
     else:
         diffractogram = data['diffractogram']
 
+    # Sets the xlim if this has not bee specified
     if not options['xlim']:
         options['xlim'] = [diffractogram[options['x_vals']].min(), diffractogram[options['x_vals']].max()]
 
@@ -62,6 +63,7 @@ def plot_diffractogram(data, options={}):
         return
     
     
+    # Makes a list out of reflections_data if it only passed as a dict, as it will be looped through later
     if options['reflections_data']:
         if not isinstance(options['reflections_data'], list):
             options['reflections_data'] = [options['reflections_data']]
@@ -93,16 +95,11 @@ def plot_diffractogram(data, options={}):
     colours = btp.generate_colours(options['palettes'])
 
 
-
-
-
     if options['line']:
         diffractogram.plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=next(colours), zorder=1)
     
     if options['scatter']:
         ax.scatter(x=diffractogram[options['x_vals']], y = diffractogram[options['y_vals']], c=[(1,1,1,0)], edgecolors=[next(colours)], linewidths=plt.rcParams['lines.markeredgewidth'], zorder=2) #, edgecolors=np.array([next(colours)]))
-
-
 
 
 
@@ -113,6 +110,7 @@ def plot_diffractogram(data, options={}):
     # Make the reflection plots
     if options['reflections_plot'] and options['reflections_data']:
         options['xlim'] = ax.get_xlim()
+        options['to_wavelength'] = data['wavelength']
         
         for reference, axis in zip(options['reflections_data'], ref_axes):
             plot_reflection_table(data=reference, ax=axis, options=options)
@@ -120,8 +118,14 @@ def plot_diffractogram(data, options={}):
     # Print the reflection indices
     if options['reflections_indices'] and options['reflections_data']:
         options['xlim'] = ax.get_xlim()
+        options['to_wavelength'] = data['wavelength']
+
         for reference in options['reflections_data']:
             plot_reflection_indices(data=reference, ax=indices_ax, options=options)
+
+
+    if options['interactive_session_active']:
+        btp.update_widgets(options=options)
 
 
     return diffractogram, fig, ax
@@ -145,23 +149,51 @@ def determine_grid_layout(options):
 
 def plot_diffractogram_interactive(data, options):
 
+    options['widgets'] = {
+        'xlim': {
+            'w': widgets.FloatRangeSlider(value=[data['diffractogram']['2th'].min(), data['diffractogram']['2th'].max()], min=data['diffractogram']['2th'].min(), max=data['diffractogram']['2th'].max(), step=0.5, layout=widgets.Layout(width='95%')),
+            '2th_default': {'min': data['diffractogram']['2th'].min(), 'max': data['diffractogram']['2th'].max(), 'value': [data['diffractogram']['2th'].min(), data['diffractogram']['2th'].max()], 'step': 0.5},
+            '2th_cuka_default': {'min': data['diffractogram']['2th_cuka'].min(), 'max': data['diffractogram']['2th_cuka'].max(), 'value': [data['diffractogram']['2th_cuka'].min(), data['diffractogram']['2th_cuka'].max()], 'step': 0.5},
+            '2th_moka_default': {'min': data['diffractogram']['2th_moka'].min(), 'max': data['diffractogram']['2th_moka'].max(), 'value': [data['diffractogram']['2th_moka'].min(), data['diffractogram']['2th_moka'].max()], 'step': 0.5},
+            'd_default': {'min': data['diffractogram']['d'].min(), 'max': data['diffractogram']['d'].max(), 'value': [data['diffractogram']['d'].min(), data['diffractogram']['d'].max()], 'step': 0.5},
+            '1/d_default': {'min': data['diffractogram']['1/d'].min(), 'max': data['diffractogram']['1/d'].max(), 'value': [data['diffractogram']['1/d'].min(), data['diffractogram']['1/d'].max()], 'step': 0.5},
+            'q_default': {'min': data['diffractogram']['q'].min(), 'max': data['diffractogram']['q'].max(), 'value': [data['diffractogram']['q'].min(), data['diffractogram']['q'].max()], 'step': 0.5},
+            'q2_default': {'min': data['diffractogram']['q2'].min(), 'max': data['diffractogram']['q2'].max(), 'value': [data['diffractogram']['q2'].min(), data['diffractogram']['q2'].max()], 'step': 0.5},
+            'q4_default': {'min': data['diffractogram']['q4'].min(), 'max': data['diffractogram']['q4'].max(), 'value': [data['diffractogram']['q4'].min(), data['diffractogram']['q4'].max()], 'step': 0.5},
+            'state': '2th'
+        }
+    }
+
+
     if options['reflections_data']:
         w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(plot_diffractogram), data=widgets.fixed(data), options=widgets.fixed(options), 
         scatter=widgets.ToggleButton(value=False), 
         line=widgets.ToggleButton(value=True), 
         reflections_plot=widgets.ToggleButton(value=True),
         reflections_indices=widgets.ToggleButton(value=False),
-        x_vals=widgets.Dropdown(options=['2th', 'd', '1/d', 'q', 'q4', 'q4', '2th_cuka', '2th_moka'], value='2th', description='X-values'),
-        xlim=widgets.FloatRangeSlider(value=options['xlim'], min=options['xlim'][0], max=options['xlim'][1], step=1, description='xlim', layout=widgets.Layout(width='1000px')))
+        x_vals=widgets.Dropdown(options=['2th', 'd', '1/d', 'q', 'q2', 'q4', '2th_cuka', '2th_moka'], value='2th', description='X-values'),
+        xlim=options['widgets']['xlim']['w'])
     
     else:
         w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(plot_diffractogram), data=widgets.fixed(data), options=widgets.fixed(options), 
         scatter=widgets.ToggleButton(value=False), 
         line=widgets.ToggleButton(value=True),
-        xlim=widgets.IntRangeSlider(value=options['xlim'], min=options['xlim'][0], max=options['xlim'][1], step=1, description='xlim'))
+        xlim=options['widgets']['xlim']['w'])
     
     
     display(w)
+
+
+def update_widgets(options):
+
+    for widget in options['widgets'].values():
+
+        if widget['state'] != options['x_vals']:
+            for arg in widget[f'{options["x_vals"]}_default']:
+                setattr(widget['w'], arg, widget[f'{options["x_vals"]}_default'][arg])
+            
+            widget['state'] = options['x_vals']
+
 
 
 def plot_reflection_indices(data, ax, options={}):
@@ -178,10 +210,10 @@ def plot_reflection_indices(data, ax, options={}):
         'hide_indices': False
     }
 
-    data = update_options(options=data, required_options=required_options, default_options=default_options)
+    data = aux.update_options(options=data, required_options=required_options, default_options=default_options)
 
     if not data['hide_indices']:
-        reflection_table = xrd.io.load_reflection_table(data['path'])
+        reflection_table = xrd.io.load_reflection_table(data=data, options=options)
         
         if data['reflection_indices'] > 0:
 
@@ -208,12 +240,13 @@ def plot_reflection_table(data, ax=None, options={}):
     Required contents of data:
     path (str): relative path to reflection table file'''
 
-    required_options = ['reflection_indices', 'reflections_colour', 'min_alpha', 'format_params', 'rc_params', 'label']
+    required_options = ['reflection_indices', 'reflections_colour', 'min_alpha', 'wavelength', 'format_params', 'rc_params', 'label']
 
     default_options = {
         'reflection_indices': 0, # Number of indices to print
         'reflections_colour': [0,0,0],
         'min_alpha': 0,
+        'wavelength': 1.54059, # CuKalpha, [Å] 
         'format_params': {},
         'rc_params': {},
         'label': None
@@ -227,7 +260,8 @@ def plot_reflection_table(data, ax=None, options={}):
         options['reflection_indices'] = data['reflection_indices']
     if 'label' in data.keys():
         options['label'] = data['label']
-
+    if 'wavelength' in data.keys():
+        options['wavelength'] = data['wavelength']
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
@@ -235,9 +269,9 @@ def plot_reflection_table(data, ax=None, options={}):
     if not ax:
         _, ax = btp.prepare_plot(options)
 
-    reflection_table = xrd.io.load_reflection_table(data['path'])
+    reflection_table = xrd.io.load_reflection_table(data=data, options=options)
 
-    reflections, intensities  = reflection_table['2th'], reflection_table['I']
+    reflections, intensities  = reflection_table[options['x_vals']], reflection_table['I']
 
 
     
@@ -270,257 +304,6 @@ def plot_reflection_table(data, ax=None, options={}):
         ax.text(s=data['label'], x=(ax.get_xlim()[0]-0.01*xlim_range), y=ylim_avg, ha = 'right', va = 'center')
 
 
-
-
-    
-
-
-def prepare_diffractogram_plot(options=None):
-    # First take care of the options for plotting - set any values not specified to the default values
-    required_options = ['columns', 'width', 'height', 'format', 'dpi',  'facecolor']
-    default_options = {'columns': 1, 'width': 14, 'format': 'golden_ratio', 'dpi': None, 'facecolor': 'w'}
-
-
-    # Define the required sizes
-    required_sizes = ['lines', 'axes']
-
-
-
-
-    # If none are set at all, just pass the default_options
-    if not options:
-        options = default_options
-        options['height'] = options['width'] * (math.sqrt(5) - 1) / 2
-        options['figsize'] = (options['width'], options['height'])
-
-    
-    # Define default sizes
-    default_sizes = {
-            'lines': 3*options['columns'],
-            'axes': 3*options['columns']
-    }
-
-    # Initialise dictionary if it doesn't exist
-    if not 'sizes' in options.keys():
-        options['sizes'] = {}
-
-
-    # Update dictionary with default values where none is supplied
-    for size in required_sizes:
-        if size not in options['sizes']:
-            options['sizes'][size] = default_sizes[size]
-
-
-    # If options is passed, go through to fill out the rest. 
-    else:
-        # Start by setting the width:
-        if 'width' not in options.keys():
-            options['width'] = default_options['width']
-
-        # Then set height - check options for format. If not given, set the height to the width scaled by the golden ratio - if the format is square, set the same. This should possibly allow for the tweaking of custom ratios later.
-        if 'height' not in options.keys():
-            if 'format' not in options.keys():
-                options['height'] = options['width'] * (math.sqrt(5) - 1) / 2
-            elif options['format'] == 'square':
-                options['height'] = options['width']
-
-        options['figsize'] = (options['width'], options['height'])
-
-        # After height and width are set, go through the rest of the options to make sure that all the required options are filled
-        for option in required_options:
-            if option not in options.keys():
-                options[option] = default_options[option]
-
-    fig, ax = plt.subplots(figsize=(options['figsize']), dpi=options['dpi'], facecolor=options['facecolor'])
-
-
-    plt.rc('lines', linewidth=options['sizes']['lines'])
-    plt.rc('axes', linewidth=options['sizes']['axes'])
-
-    return fig, ax
-
-def prettify_diffractogram_plot(fig, ax, options=None):
-
-    ##################################################################
-    ######################### UPDATE OPTIONS #########################
-    ##################################################################
-
-    # Define the required options
-    required_options = [
-    'columns', 
-    'xticks', 'yticks', 
-    'units',
-    'show_major_ticks', 'show_minor_ticks', 'show_tick_labels',
-    'xlim', 'ylim',
-    'hide_x_axis', 'hide_y_axis', 
-    'positions', 
-    'xlabel', 'ylabel', 
-    'sizes',
-    'title'
-    ]
-
-
-    # Define the default options
-    default_options = {
-        'columns': 1,
-        'xticks': [10, 5], 'yticks': [10000, 5000],
-        'units': {'2th': '$^o$', 'I': 'arb. u.'},
-        'show_major_ticks': [True, False, True, False], 'show_minor_ticks': [True, False, True, False], 'show_tick_labels': [True, False, False, False],
-        'xlim': None,'ylim': None,
-        'hide_x_axis': False, 'hide_y_axis': False,
-        'positions': {'xaxis': 'bottom', 'yaxis': 'left'},
-        'xlabel': None, 'ylabel': None,
-        'sizes': None,
-        'title': None 	
-    }
-
-    options = update_options(options, required_options, default_options)
-
-
-
-    ##################################################################
-    ########################## DEFINE SIZES ##########################
-    ##################################################################
-
-    # Define the required sizes
-    required_sizes = [
-        'labels', 
-        'legend', 
-        'title', 
-        'line', 'axes', 
-        'tick_labels', 
-        'major_ticks', 'minor_ticks']
-
-
-
-    # Define default sizes
-    default_sizes = {
-            'labels': 30*options['columns'],
-            'legend': 30*options['columns'],
-            'title': 30*options['columns'],
-            'line': 3*options['columns'],
-            'axes': 3*options['columns'],
-            'tick_labels': 30*options['columns'],
-            'major_ticks': 20*options['columns'],
-            'minor_ticks': 10*options['columns']	
-    }
-
-    # Initialise dictionary if it doesn't exist
-    if not options['sizes']:
-        options['sizes'] = {}
-
-
-    # Update dictionary with default values where none is supplied
-    for size in required_sizes:
-        if size not in options['sizes']:
-            options['sizes'][size] = default_sizes[size]
-
-
-    ##################################################################
-    ########################## AXIS LABELS ###########################
-    ##################################################################
-
-
-    if not options['xlabel']:
-        options['xlabel'] = prettify_labels(options['x_vals']) + ' [{}]'.format(options['units'][options['x_vals']])
-
-    else:
-        options['xlabel'] = options['xlabel'] + ' [{}]'.format(options['units'][options['x_vals']])
-
-
-    if not options['ylabel']:
-        options['ylabel'] = prettify_labels(options['y_vals']) + ' [{}]'.format(options['units'][options['y_vals']])
-
-    else:
-        options['ylabel'] = options['ylabel'] + ' [{}]'.format(options['units'][options['y_vals']])
-
-    ax.set_xlabel(options['xlabel'], size=options['sizes']['labels'])
-    ax.set_ylabel(options['ylabel'], size=options['sizes']['labels'])
-
-    ##################################################################
-    ###################### TICK MARKS & LABELS #######################
-    ##################################################################
-
-    ax.tick_params(
-        direction='in', 
-        which='major', 
-        bottom=options['show_major_ticks'][0], labelbottom=options['show_tick_labels'][0],
-        left=options['show_major_ticks'][1], labelleft=options['show_tick_labels'][1],
-        top=options['show_major_ticks'][2], labeltop=options['show_tick_labels'][2],
-        right=options['show_major_ticks'][3], labelright=options['show_tick_labels'][3],
-        length=options['sizes']['major_ticks'],
-        width=options['sizes']['axes'])
-
-
-    ax.tick_params(direction='in', which='minor', bottom=options['show_minor_ticks'][0], left=options['show_minor_ticks'][1], top=options['show_minor_ticks'][2], right=options['show_minor_ticks'][3], length=options['sizes']['minor_ticks'], width=options['sizes']['axes'])
-
-
-
-    if options['positions']['yaxis'] == 'right':
-        ax.yaxis.set_label_position("right")
-        ax.yaxis.tick_right()
-
-
-    if options['hide_x_axis']:
-        ax.axes.xaxis.set_visible(False)
-
-    if options['hide_y_axis']:
-        ax.axes.yaxis.set_visible(False)
-
-
-
-    # Otherwise apply user input
-    if options['xticks']:
-        major_xtick = options['xticks'][0]
-        minor_xtick = options['xticks'][1]
-
-
-    if options['yticks']:
-
-        major_ytick = options['yticks'][0]
-        minor_ytick = options['yticks'][1]
-
-
-    # Apply values
-    ax.xaxis.set_major_locator(MultipleLocator(major_xtick))
-    ax.xaxis.set_minor_locator(MultipleLocator(minor_xtick))
-
-    ax.yaxis.set_major_locator(MultipleLocator(major_ytick))
-    ax.yaxis.set_minor_locator(MultipleLocator(minor_ytick))
-
-
-
-
-    # SET FONTSIZE OF TICK LABELS
-
-    plt.xticks(fontsize=options['sizes']['tick_labels'])
-    plt.yticks(fontsize=options['sizes']['tick_labels'])
-
-    ##################################################################
-    ########################## AXES LIMITS ###########################
-    ##################################################################
-
-    if options['xlim']:
-        plt.xlim(options['xlim'])
-
-    if options['ylim']:
-        plt.ylim(options['ylim'])
-
-    ##################################################################
-    ############################# TITLE ##############################
-    ##################################################################
-
-    if options['title']:
-        ax.set_title(options['title'], size=options['sizes']['title'])
-
-    ##################################################################
-    ############################# LEGEND #############################
-    ##################################################################
-
-    if ax.get_legend():
-        ax.get_legend().remove()
-
-    return fig, ax
 
 
 
@@ -593,19 +376,3 @@ def reverse_diffractograms(diffractograms):
     return rev_diffractograms
 
 #def plot_heatmap():
-
-
-
-
-
-def update_options(options, required_options, default_options):
-
-	if not options:
-		options = default_options
-	
-	else:
-		for option in required_options:
-			if option not in options.keys():
-				options[option] = default_options[option]
-
-	return options

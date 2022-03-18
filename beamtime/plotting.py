@@ -298,6 +298,7 @@ def ipywidgets_update(func, data, options={}, **kwargs):
     where key1, key2, key3 etc. are the values in the options-dictionary you want widget control of, and widget1, widget2, widget3 etc. are widgets to control these values, e.g. widgets.IntSlider(value=1, min=0, max=10)
     '''
 
+
     # Update the options-dictionary with the values from the widgets
     for key in kwargs:
         options[key] = kwargs[key]
@@ -305,6 +306,16 @@ def ipywidgets_update(func, data, options={}, **kwargs):
     # Call the function with the plot_data and options-dictionaries
     func(data=data, options=options)
 
+
+def update_widgets(options):
+
+    for widget in options['widgets'].values():
+
+        if widget['state'] != options['x_vals']:
+            for arg in widget[f'{options["x_vals"]}_default']:
+                setattr(widget['w'], arg, widget[f'{options["x_vals"]}_default'][arg])
+            
+            widget['state'] = options['x_vals']
 
 
 

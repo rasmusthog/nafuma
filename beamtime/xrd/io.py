@@ -1,3 +1,4 @@
+from sympy import re
 import fabio, pyFAI
 import pandas as pd
 import numpy as np
@@ -252,7 +253,7 @@ def read_brml(data, options={}):
     
 
 def read_xy(data, options={}):
-
+    
     if 'wavelength' not in data.keys():
             find_wavelength_from_xy(data=data)
 
@@ -293,23 +294,32 @@ def read_data(data, options={}):
         diffractogram = read_xy(data=data, options=options)
 
 
-    diffractogram = translate_wavelengths(diffractogram=diffractogram, wavelength=data['wavelength'])
+    diffractogram = translate_wavelengths(data=diffractogram, wavelength=data['wavelength'])
 
     return diffractogram
                 
 
 
 
-def load_reflection_table(path):
+def load_reflection_table(data, options={}):
+
+    required_options = ['wavelength', 'to_wavelength']
+
+    default_options = {
+        'wavelength': 1.54059,
+        'to_wavelength': None
+    }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
     # VESTA outputs the file with a header that has a space between the parameter and units - so there is some extra code to rectify the issue
     # that ensues from this formatting
-    reflections = pd.read_csv(path, delim_whitespace=True)
+    reflections = pd.read_csv(data['path'], delim_whitespace=True)
 
     # Remove the extra column that appears from the headers issue
     reflections.drop(reflections.columns[-1], axis=1, inplace=True)
 
-    with open(path, 'r') as f:
+    with open(data['path'], 'r') as f:
         line = f.readline()
 
         headers = line.split()
@@ -323,11 +333,16 @@ def load_reflection_table(path):
     # Set the new modified headers as the headers of 
     reflections.columns = headers
 
+    reflections = translate_wavelengths(data=reflections, wavelength=options['wavelength'], to_wavelength=options['to_wavelength'])
+
+    #print(reflections)
+
     return reflections
 
 
 
-def translate_wavelengths(diffractogram, wavelength):
+def translate_wavelengths(data, wavelength, to_wavelength=None):
+    pd.options.mode.chained_assignment = None
 
     # Translate to CuKalpha
     cuka = 1.54059 # Å
@@ -335,11 +350,11 @@ def translate_wavelengths(diffractogram, wavelength):
     if cuka > wavelength:
         max_2th_cuka = 2*np.arcsin(wavelength/cuka) * 180/np.pi
     else:
-        max_2th_cuka = diffractogram['2th'].max()
+        max_2th_cuka = data['2th'].max()
 
-    diffractogram['2th_cuka'] = np.NAN
+    data['2th_cuka'] = np.NAN
 
-    diffractogram['2th_cuka'].loc[diffractogram['2th'] <= max_2th_cuka] = 2*np.arcsin(cuka/wavelength * np.sin((diffractogram['2th']/2) * np.pi/180)) * 180/np.pi
+    data['2th_cuka'].loc[data['2th'] <= max_2th_cuka] = 2*np.arcsin(cuka/wavelength * np.sin((data['2th']/2) * np.pi/180)) * 180/np.pi
 
     # Translate to MoKalpha
     moka = 0.71073 # Å
@@ -347,22 +362,36 @@ def translate_wavelengths(diffractogram, wavelength):
     if moka > wavelength:
         max_2th_moka = 2*np.arcsin(wavelength/moka) * 180/np.pi
     else:
-        max_2th_moka = diffractogram['2th'].max()
+        max_2th_moka = data['2th'].max()
 
-    diffractogram['2th_moka'] = np.NAN
+    data['2th_moka'] = np.NAN
 
-    diffractogram['2th_moka'].loc[diffractogram['2th'] <= max_2th_moka] = 2*np.arcsin(moka/wavelength * np.sin((diffractogram['2th']/2) * np.pi/180)) * 180/np.pi
+    data['2th_moka'].loc[data['2th'] <= max_2th_moka] = 2*np.arcsin(moka/wavelength * np.sin((data['2th']/2) * np.pi/180)) * 180/np.pi
     
     
     # Convert to other parameters
-    diffractogram['d'] = wavelength  / (2*np.sin(2*diffractogram['2th']) * 180/np.pi)
-    diffractogram['1/d'] = 1/diffractogram['d']
-    diffractogram['q'] = np.abs((4*np.pi/wavelength)*np.sin(diffractogram['2th']/2 * np.pi/180))
-    diffractogram['q2'] = diffractogram['q']**2
-    diffractogram['q4'] = diffractogram['q']**4
+    data['d'] = wavelength  / (2*np.sin((2*data['2th']*np.pi/180)/2))
+    data['1/d'] = 1/data['d']
+    data['q'] = np.abs((4*np.pi/wavelength)*np.sin(data['2th']/2 * np.pi/180))
+    data['q2'] = data['q']**2
+    data['q4'] = data['q']**4
 
 
-    return diffractogram
+    if to_wavelength:
+        
+        if to_wavelength > cuka:
+            max_2th = 2*np.arcsin(cuka/to_wavelength) * 180/np.pi
+        else:
+            max_2th = data['2th_cuka'].max()
+
+        
+        data['2th'] = np.NAN
+        data['2th'].loc[data['2th_cuka'] <= max_2th] = 2*np.arcsin(to_wavelength/cuka * np.sin((data['2th_cuka']/2) * np.pi/180)) * 180/np.pi 
+
+
+
+
+    return data
 
 
 
