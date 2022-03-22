@@ -40,10 +40,11 @@ def integrate_1d(data, options={}, index=0):
     df: DataFrame contianing 1D diffractogram if option 'return' is True
     ''' 
 
-    required_options = ['unit', 'save', 'save_filename', 'save_extension', 'save_folder', 'overwrite']
+    required_options = ['unit', 'nbins', 'save', 'save_filename', 'save_extension', 'save_folder', 'overwrite']
 
     default_options = {
         'unit': '2th_deg', 
+        'nbins': 3000,
         'save': False,
         'save_filename': None,
         'save_extension': '_integrated.xy',
@@ -64,17 +65,17 @@ def integrate_1d(data, options={}, index=0):
     ai = pyFAI.load(data['calibrant'])
 
     # Determine filename
-    filename = make_filename(data=data, options=options)
+    filename = make_filename(options=options, path=data['path'][index])
     
     # Make save_folder if this does not exist already
     if not os.path.isdir(options['save_folder']):
         os.makedirs(options['save_folder'])
 
 
-    res = ai.integrate1d(data['image'], data['nbins'], unit=options['unit'], filename=filename)
+    res = ai.integrate1d(data['image'], options['nbins'], unit=options['unit'], filename=filename)
 
     data['path'][index] = filename
-    diffractogram, wavelength = read_xy(data=data, options=options)
+    diffractogram, wavelength = read_xy(data=data, options=options, index=index)
 
     if not options['save']:
         os.remove(filename)
@@ -98,7 +99,7 @@ def make_filename(options, path=None):
             # If a path is given instead of an image array, the path is taken as the trunk of the savename
             if path:
                 # Make filename by joining the save_folder, the filename (with extension deleted) and adding the save_extension
-                filename = os.path.join(options['save_folder'], os.path.split(data['path'])[-1].split('.')[0] + options['save_extension'])
+                filename = os.path.join(options['save_folder'], os.path.split(path)[-1].split('.')[0] + options['save_extension'])
             else:
                 # Make filename just "integrated.dat" in the save_folder
                 filename = os.path.join(options['save_folder'], 'integrated.xy')
@@ -402,6 +403,8 @@ def translate_wavelengths(data, wavelength, to_wavelength=None):
 
 
 def find_wavelength_from_xy(path):
+
+    print(path)
 
  
     wavelength_dict = {'Cu': 1.54059, 'Mo': 0.71073}
