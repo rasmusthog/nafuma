@@ -313,6 +313,17 @@ def update_widgets(options):
 
         if widget['state'] != options['x_vals']:
             for arg in widget[f'{options["x_vals"]}_default']:
+                
+                # If new min value is larger than previous max, or new max value is smaller than previous min, set the opposite first
+                if arg == 'min':
+                    if widget[f'{options["x_vals"]}_default']['min'] > getattr(widget['w'], 'max'):
+                        setattr(widget['w'], 'max', widget[f'{options["x_vals"]}_default']['max'])
+                
+                elif arg == 'max':
+                    if widget[f'{options["x_vals"]}_default']['max'] < getattr(widget['w'], 'min'):
+                        setattr(widget['w'], 'min', widget[f'{options["x_vals"]}_default']['min'])
+
+            
                 setattr(widget['w'], arg, widget[f'{options["x_vals"]}_default'][arg])
             
             widget['state'] = options['x_vals']

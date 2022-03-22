@@ -27,7 +27,7 @@ def get_image_headers(path):
     return image.header
 
 
-def integrate_1d(data, options={}):
+def integrate_1d(data, options={}, index=0):
     ''' Integrates an image file to a 1D diffractogram. 
 
     Required content of data:
@@ -51,11 +51,14 @@ def integrate_1d(data, options={}):
         'overwrite': False}
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+    if not isinstance(data['path'], list):
+        data['path'] = [data['path']]
     
 
     # Get image array from filename if not passed
     if 'image' not in data.keys():
-        data['image'] = get_image_array(data['path'])
+        data['image'] = get_image_array(data['path'][index])
     
     # Instanciate the azimuthal integrator from pyFAI from the calibrant (.poni-file)
     ai = pyFAI.load(data['calibrant'])
@@ -70,18 +73,18 @@ def integrate_1d(data, options={}):
 
     res = ai.integrate1d(data['image'], data['nbins'], unit=options['unit'], filename=filename)
 
-    data['path'] = filename
-    diffractogram = read_xy(data=data, options=options)
+    data['path'][index] = filename
+    diffractogram, wavelength = read_xy(data=data, options=options)
 
     if not options['save']:
         os.remove(filename)
         shutil.rmtree('tmp')
     
-    return diffractogram
+    return diffractogram, wavelength
     
 
 
-def make_filename(data, options):
+def make_filename(options, path=None):
 
     # Define save location for integrated diffractogram data
     if not options['save']:
@@ -93,7 +96,7 @@ def make_filename(data, options):
         # Case 1: No filename is given. 
         if not options['save_filename']:
             # If a path is given instead of an image array, the path is taken as the trunk of the savename
-            if data['path']:
+            if path:
                 # Make filename by joining the save_folder, the filename (with extension deleted) and adding the save_extension
                 filename = os.path.join(options['save_folder'], os.path.split(data['path'])[-1].split('.')[0] + options['save_extension'])
             else:
@@ -176,12 +179,12 @@ def view_integrator(calibrant):
 
 
 
-def read_brml(data, options={}):
+def read_brml(data, options={}, index=0):
 
 
     required_options = ['extract_folder', 'save_folder']
     default_options = {
-        'extract_folder': 'tmp',
+        'extract_folder': 'tmp/',
         'save_folder': None
     }
 
@@ -194,7 +197,7 @@ def read_brml(data, options={}):
 
 
     # Extract the RawData0.xml file from the brml-file
-    with zipfile.ZipFile(data['path'], 'r') as brml:
+    with zipfile.ZipFile(data['path'][index], 'r') as brml:
         for info in brml.infolist():
             if "RawData" in info.filename:
                 brml.extract(info.filename, options['extract_folder'])
@@ -233,9 +236,10 @@ def read_brml(data, options={}):
                             diffractogram.append({'2th': twotheta, 'I': intensity})
 
 
-    if 'wavelength' not in data.keys():
-        for chain in root.findall('./FixedInformation/Instrument/PrimaryTracks/TrackInfoData/MountedOptics/InfoData/Tube/WaveLengthAlpha1'):
-            data['wavelength'] = float(chain.attrib['Value'])
+    #if 'wavelength' not in data.keys():
+    # Find wavelength
+    for chain in root.findall('./FixedInformation/Instrument/PrimaryTracks/TrackInfoData/MountedOptics/InfoData/Tube/WaveLengthAlpha1'):
+        wavelength = float(chain.attrib['Value'])
 
     diffractogram = pd.DataFrame(diffractogram)
 
@@ -249,15 +253,16 @@ def read_brml(data, options={}):
 
 
 
-    return diffractogram
+    return diffractogram, wavelength
     
 
-def read_xy(data, options={}):
+def read_xy(data, options={}, index=0):
     
-    if 'wavelength' not in data.keys():
-            find_wavelength_from_xy(data=data)
+    #if 'wavelength' not in data.keys():
+    # Get wavelength from scan
+    wavelength = find_wavelength_from_xy(path=data['path'][index])
 
-    with open(data['path'], 'r') as f:
+    with open(data['path'][index], 'r') as f:
         position = 0
 
         current_line = f.readline()
@@ -276,37 +281,37 @@ def read_xy(data, options={}):
         diffractogram.columns = ['2th', 'I', 'sigma']
 
 
-    return diffractogram
+    return diffractogram, wavelength
 
 
-def read_data(data, options={}):
+def read_data(data, options={}, index=0):
 
     beamline_extensions = ['mar3450', 'edf', 'cbf']
-    file_extension = data['path'].split('.')[-1]
+    file_extension = data['path'][index].split('.')[-1]
 
     if file_extension in beamline_extensions:
-        diffractogram = integrate_1d(data=data, options=options)
+        diffractogram, wavelength = integrate_1d(data=data, options=options, index=index)
         
     elif file_extension == 'brml':
-        diffractogram = read_brml(data=data, options=options)
+        diffractogram, wavelength = read_brml(data=data, options=options, index=index)
 
     elif file_extension in['xy', 'xye']:
-        diffractogram = read_xy(data=data, options=options)
+        diffractogram, wavelength = read_xy(data=data, options=options, index=index)
 
 
-    diffractogram = translate_wavelengths(data=diffractogram, wavelength=data['wavelength'])
+    diffractogram = translate_wavelengths(data=diffractogram, wavelength=wavelength)
 
-    return diffractogram
+    return diffractogram, wavelength
                 
 
 
 
 def load_reflection_table(data, options={}):
 
-    required_options = ['wavelength', 'to_wavelength']
+    required_options = ['ref_wavelength', 'to_wavelength']
 
     default_options = {
-        'wavelength': 1.54059,
+        'ref_wavelength': 1.54059,
         'to_wavelength': None
     }
 
@@ -333,7 +338,7 @@ def load_reflection_table(data, options={}):
     # Set the new modified headers as the headers of 
     reflections.columns = headers
 
-    reflections = translate_wavelengths(data=reflections, wavelength=options['wavelength'], to_wavelength=options['to_wavelength'])
+    reflections = translate_wavelengths(data=reflections, wavelength=options['ref_wavelength'], to_wavelength=options['to_wavelength'])
 
     #print(reflections)
 
@@ -378,6 +383,7 @@ def translate_wavelengths(data, wavelength, to_wavelength=None):
 
 
     if to_wavelength:
+
         
         if to_wavelength > cuka:
             max_2th = 2*np.arcsin(cuka/to_wavelength) * 180/np.pi
@@ -395,19 +401,24 @@ def translate_wavelengths(data, wavelength, to_wavelength=None):
 
 
 
-def find_wavelength_from_xy(data):
+def find_wavelength_from_xy(path):
 
  
     wavelength_dict = {'Cu': 1.54059, 'Mo': 0.71073}
 
-    with open(data['path'], 'r') as f:
+    with open(path, 'r') as f:
         lines = f.readlines()
 
         for line in lines:
+            # For .xy-files output from EVA
             if 'Anode' in line:
                 anode = line.split()[8].strip('"')
-                data['wavelength'] = wavelength_dict[anode]
+                wavelength = wavelength_dict[anode]
 
+            # For .xy-files output from pyFAI integration
             elif 'Wavelength' in line:
-                data['wavelength'] = float(line.split()[2])*10**10
+                wavelength = float(line.split()[2])*10**10
 
+
+
+    return wavelength
