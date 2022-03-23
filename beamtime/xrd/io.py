@@ -45,6 +45,7 @@ def integrate_1d(data, options={}, index=0):
     default_options = {
         'unit': '2th_deg', 
         'nbins': 3000,
+        'extract_folder': 'tmp',
         'save': False,
         'save_filename': None,
         'save_extension': '_integrated.xy',
@@ -68,8 +69,8 @@ def integrate_1d(data, options={}, index=0):
     filename = make_filename(options=options, path=data['path'][index])
     
     # Make save_folder if this does not exist already
-    if not os.path.isdir(options['save_folder']):
-        os.makedirs(options['save_folder'])
+    if not os.path.isdir(options['extract_folder']):
+        os.makedirs(options['extract_folder'])
 
 
     res = ai.integrate1d(data['image'], options['nbins'], unit=options['unit'], filename=filename)
@@ -79,7 +80,11 @@ def integrate_1d(data, options={}, index=0):
 
     if not options['save']:
         os.remove(filename)
-        shutil.rmtree('tmp')
+        shutil.rmtree(f'tmp')
+
+
+    # Reset this option
+    options['save_folder'] = None
     
     return diffractogram, wavelength
     
@@ -89,8 +94,7 @@ def make_filename(options, path=None):
 
     # Define save location for integrated diffractogram data
     if not options['save']:
-            options['save_folder'] = 'tmp'
-            filename = os.path.join(options['save_folder'], 'tmp_diff.dat')
+            filename = os.path.join(options['extract_folder'], 'tmp_diff.dat')
 
     elif options['save']:
 
@@ -183,9 +187,12 @@ def view_integrator(calibrant):
 def read_brml(data, options={}, index=0):
 
 
+    # FIXME: Can't read RECX1-data, apparently must be formatted differently from RECX2. Check the RawData-files and compare between the two files.
+
+
     required_options = ['extract_folder', 'save_folder']
     default_options = {
-        'extract_folder': 'tmp/',
+        'extract_folder': 'tmp',
         'save_folder': None
     }
 
@@ -304,12 +311,41 @@ def read_data(data, options={}, index=0):
         diffractogram['I'] = diffractogram['I'] / diffractogram['I'].max()
 
 
+    if options['offset']:
+        diffractogram = apply_offset(diffractogram, wavelength, index, options)
+
+
     diffractogram = translate_wavelengths(data=diffractogram, wavelength=wavelength)
 
     return diffractogram, wavelength
-                
 
 
+def apply_offset(diffractogram, wavelength, index, options):
+    #Apply offset along y-axis
+    diffractogram['I_org'] = diffractogram['I'] # make copy of original intensities
+    diffractogram['I'] = diffractogram['I'] + index*options['offset_y']
+
+    # Apply offset along x-axis
+    relative_shift = (wavelength / 1.54059)*options['offset_x'] # Adjusts the offset-factor to account for wavelength, so that offset_x given is given in 2th_cuka-units
+    diffractogram['2th_org'] = diffractogram['2th']
+    diffractogram['2th'] = diffractogram['2th'] + index*relative_shift
+
+
+    return diffractogram
+
+def revert_offset(diffractogram,which=None):
+
+    if which == 'both':
+        diffractogram['2th'] = diffractogram['2th_org']
+        diffractogram['I'] = diffractogram['I_org']
+        
+    if which == 'y':
+        diffractogram['I'] = diffractogram['I_org']
+    
+    if which == 'x':
+        diffractogram['2th'] = diffractogram['2th_org']
+
+    return diffractogram
 
 def load_reflection_table(data, options={}):
 

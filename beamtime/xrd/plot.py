@@ -19,7 +19,7 @@ def plot_diffractogram(data, options={}):
     data (dict): Must include path = string to diffractogram data, and plot_kind = (recx, beamline, image)'''
 
     # Update options
-    required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'line', 'scatter', 'xlim', 'ylim', 'normalise',
+    required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'line', 'scatter', 'xlim', 'ylim', 'normalise', 'offset', 'offset_x', 'offset_y',
     'reflections_plot', 'reflections_indices', 'reflections_data', 'plot_kind', 'palettes', 'interactive', 'rc_params', 'format_params']
 
     default_options = {
@@ -29,6 +29,9 @@ def plot_diffractogram(data, options={}):
         'xunit': 'deg', 'yunit': 'a.u.',
         'xlim': None, 'ylim': None, 
         'normalise': True,
+        'offset': True,
+        'offset_x': 0,
+        'offset_y': 1,
         'line': True, # whether or not to plot diffractogram as a line plot
         'scatter': False, # whether or not to plot individual data points
         'reflections_plot': False, # whether to plot reflections as a plot
@@ -49,6 +52,8 @@ def plot_diffractogram(data, options={}):
         data['path'] = [data['path']]
 
    
+
+    # Check if there is some data stored already, load in data if not. This speeds up replotting in interactive mode.
     if not 'diffractogram' in data.keys():
         # Initialise empty list for diffractograms and wavelengths
         data['diffractogram'] = [None for _ in range(len(data['path']))]
@@ -72,7 +77,7 @@ def plot_diffractogram(data, options={}):
         options['xlim'] = [diffractogram[options['x_vals']].min(), diffractogram[options['x_vals']].max()]
 
 
-    # Start inteactive session with ipywidgets
+    # Start inteactive session with ipywidgets. Disables options['interactive'] in order for the interactive loop to not start another interactive session
     if options['interactive']:
         options['interactive'] = False
         options['interactive_session_active'] = True
@@ -91,7 +96,6 @@ def plot_diffractogram(data, options={}):
 
 
     # Prepare plot, and read and process data
-
     fig, ax = btp.prepare_plot(options=options)
 
 
@@ -125,7 +129,7 @@ def plot_diffractogram(data, options={}):
 
     
 
-    # Make the reflection plots
+    # Make the reflection plots. By default, the wavelength of the first diffractogram will be used for these.
     if options['reflections_plot'] and options['reflections_data']:
         options['xlim'] = ax.get_xlim()
         options['to_wavelength'] = data['wavelength'][0]
@@ -133,7 +137,7 @@ def plot_diffractogram(data, options={}):
         for reference, axis in zip(options['reflections_data'], ref_axes):
             plot_reflection_table(data=reference, ax=axis, options=options)
 
-    # Print the reflection indices
+    # Print the reflection indices. By default, the wavelength of the first diffractogram will be used for this.
     if options['reflections_indices'] and options['reflections_data']:
         options['xlim'] = ax.get_xlim()
         options['to_wavelength'] = data['wavelength'][0]
