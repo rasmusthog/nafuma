@@ -19,7 +19,7 @@ def plot_diffractogram(data, options={}):
     data (dict): Must include path = string to diffractogram data, and plot_kind = (recx, beamline, image)'''
 
     # Update options
-    required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'line', 'scatter', 'xlim', 'ylim',
+    required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'line', 'scatter', 'xlim', 'ylim', 'normalise',
     'reflections_plot', 'reflections_indices', 'reflections_data', 'plot_kind', 'palettes', 'interactive', 'rc_params', 'format_params']
 
     default_options = {
@@ -28,6 +28,7 @@ def plot_diffractogram(data, options={}):
         'ylabel': 'Intensity', 'xlabel': '2theta', 
         'xunit': 'deg', 'yunit': 'a.u.',
         'xlim': None, 'ylim': None, 
+        'normalise': True,
         'line': True, # whether or not to plot diffractogram as a line plot
         'scatter': False, # whether or not to plot individual data points
         'reflections_plot': False, # whether to plot reflections as a plot
@@ -55,8 +56,11 @@ def plot_diffractogram(data, options={}):
 
         for index in range(len(data['path'])):
             diffractogram, wavelength = xrd.io.read_data(data=data, options=options, index=index)
+            
             data['diffractogram'][index] = diffractogram
             data['wavelength'][index] = wavelength
+
+            
 
     else:
         if not isinstance(data['diffractogram'], list):

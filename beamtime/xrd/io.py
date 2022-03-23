@@ -300,6 +300,10 @@ def read_data(data, options={}, index=0):
         diffractogram, wavelength = read_xy(data=data, options=options, index=index)
 
 
+    if options['normalise']:
+        diffractogram['I'] = diffractogram['I'] / diffractogram['I'].max()
+
+
     diffractogram = translate_wavelengths(data=diffractogram, wavelength=wavelength)
 
     return diffractogram, wavelength
