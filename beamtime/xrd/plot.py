@@ -176,6 +176,24 @@ def plot_diffractogram_interactive(data, options):
     
     update_minmax(minmax, data)
 
+    ymin, ymax = None, None
+    for index, diffractogram in enumerate(data['diffractogram']):
+        if not ymin or (ymin > (diffractogram['I'].min())): #+index*options['offset_y'])):
+            ymin = diffractogram['I'].min()#+index*options['offset_y']
+
+        if not ymax or (ymax < (diffractogram['I'].max())):#+index*options['offset_y'])):
+            ymax = diffractogram['I'].max()#+index*options['offset_y']
+            print(ymax)
+
+
+    ymin_start = ymin - 0.1*ymax
+    ymax_start = ymax+0.2*ymax
+    ymin = ymin - 5*ymax
+    ymax = ymax*5
+
+        
+
+
     options['widgets'] = {
         'xlim': {
             'w': widgets.FloatRangeSlider(value=[minmax['2th'][0], minmax['2th'][1]], min=minmax['2th'][0], max=minmax['2th'][1], step=0.5, layout=widgets.Layout(width='95%')),
@@ -199,7 +217,8 @@ def plot_diffractogram_interactive(data, options):
         reflections_plot=widgets.ToggleButton(value=True),
         reflections_indices=widgets.ToggleButton(value=False),
         x_vals=widgets.Dropdown(options=['2th', 'd', '1/d', 'q', 'q2', 'q4', '2th_cuka', '2th_moka'], value='2th', description='X-values'),
-        xlim=options['widgets']['xlim']['w'])
+        xlim=options['widgets']['xlim']['w'],
+        ylim=widgets.FloatRangeSlider(value=[ymin_start, ymax_start], min=ymin, max=ymax, step=0.5, layout=widgets.Layout(width='95%')))
     
     else:
         w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(plot_diffractogram), data=widgets.fixed(data), options=widgets.fixed(options), 

@@ -388,6 +388,8 @@ def load_reflection_table(data, options={}):
 
 
 def translate_wavelengths(data, wavelength, to_wavelength=None):
+    # FIXME Somewhere here there is an invalid arcsin-argument. Not sure where.
+
     pd.options.mode.chained_assignment = None
 
     # Translate to CuKalpha
@@ -424,9 +426,7 @@ def translate_wavelengths(data, wavelength, to_wavelength=None):
 
 
     if to_wavelength:
-
-        
-        if to_wavelength > cuka:
+        if to_wavelength >= cuka:
             max_2th = 2*np.arcsin(cuka/to_wavelength) * 180/np.pi
         else:
             max_2th = data['2th_cuka'].max()
