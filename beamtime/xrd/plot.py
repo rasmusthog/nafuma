@@ -166,43 +166,12 @@ def plot_diffractogram_interactive(data, options):
 
     minmax = {'2th': [None, None], '2th_cuka': [None, None], '2th_moka': [None, None], 'd': [None, None], '1/d': [None, None], 'q': [None, None], 'q2': [None, None], 'q4': [None, None]}
     
-    for index, diffractogram in enumerate(data['diffractogram']):
-        if not minmax['2th'][0] or diffractogram['2th'].min() < minmax['2th'][0]:
-            minmax['2th'][0] = diffractogram['2th'].min()
-            min_index = index
-
-        if not minmax['2th'][1] or diffractogram['2th'].max() > minmax['2th'][1]:
-            minmax['2th'][1] = diffractogram['2th'].max()
-            max_index = index
-
-    minmax['2th_cuka'][0], minmax['2th_cuka'][1] = data['diffractogram'][min_index]['2th_cuka'].min(), data['diffractogram'][max_index]['2th_cuka'].max()
-    minmax['2th_moka'][0], minmax['2th_moka'][1] = data['diffractogram'][min_index]['2th_moka'].min(), data['diffractogram'][max_index]['2th_moka'].max() 
-    minmax['d'][0], minmax['d'][1] = data['diffractogram'][max_index]['d'].min(), data['diffractogram'][min_index]['d'].max() 
-    minmax['1/d'][0], minmax['1/d'][1] = data['diffractogram'][min_index]['1/d'].min(), data['diffractogram'][max_index]['1/d'].max() 
-    minmax['q'][0], minmax['q'][1] = data['diffractogram'][min_index]['q'].min(), data['diffractogram'][max_index]['q'].max()
-    minmax['q2'][0], minmax['q2'][1] = data['diffractogram'][min_index]['q2'].min(), data['diffractogram'][max_index]['q2'].max() 
-    minmax['q4'][0], minmax['q4'][1] = data['diffractogram'][min_index]['q4'].min(), data['diffractogram'][max_index]['q4'].max() 
-
-
-
-    # options['widgets'] = {
-    #     'xlim': {
-    #         'w': widgets.FloatRangeSlider(value=[data['diffractogram']['2th'].min(), data['diffractogram']['2th'].max()], min=data['diffractogram']['2th'].min(), max=data['diffractogram']['2th'].max(), step=0.5, layout=widgets.Layout(width='95%')),
-    #         '2th_default': {'min': data['diffractogram']['2th'].min(), 'max': data['diffractogram']['2th'].max(), 'value': [data['diffractogram']['2th'].min(), data['diffractogram']['2th'].max()], 'step': 0.5},
-    #         '2th_cuka_default': {'min': data['diffractogram']['2th_cuka'].min(), 'max': data['diffractogram']['2th_cuka'].max(), 'value': [data['diffractogram']['2th_cuka'].min(), data['diffractogram']['2th_cuka'].max()], 'step': 0.5},
-    #         '2th_moka_default': {'min': data['diffractogram']['2th_moka'].min(), 'max': data['diffractogram']['2th_moka'].max(), 'value': [data['diffractogram']['2th_moka'].min(), data['diffractogram']['2th_moka'].max()], 'step': 0.5},
-    #         'd_default': {'min': data['diffractogram']['d'].min(), 'max': data['diffractogram']['d'].max(), 'value': [data['diffractogram']['d'].min(), data['diffractogram']['d'].max()], 'step': 0.5},
-    #         '1/d_default': {'min': data['diffractogram']['1/d'].min(), 'max': data['diffractogram']['1/d'].max(), 'value': [data['diffractogram']['1/d'].min(), data['diffractogram']['1/d'].max()], 'step': 0.5},
-    #         'q_default': {'min': data['diffractogram']['q'].min(), 'max': data['diffractogram']['q'].max(), 'value': [data['diffractogram']['q'].min(), data['diffractogram']['q'].max()], 'step': 0.5},
-    #         'q2_default': {'min': data['diffractogram']['q2'].min(), 'max': data['diffractogram']['q2'].max(), 'value': [data['diffractogram']['q2'].min(), data['diffractogram']['q2'].max()], 'step': 0.5},
-    #         'q4_default': {'min': data['diffractogram']['q4'].min(), 'max': data['diffractogram']['q4'].max(), 'value': [data['diffractogram']['q4'].min(), data['diffractogram']['q4'].max()], 'step': 0.5},
-    #         'state': '2th'
-    #     }
-    # }
+    update_minmax(minmax, data)
 
     options['widgets'] = {
         'xlim': {
             'w': widgets.FloatRangeSlider(value=[minmax['2th'][0], minmax['2th'][1]], min=minmax['2th'][0], max=minmax['2th'][1], step=0.5, layout=widgets.Layout(width='95%')),
+            'state': '2th',
             '2th_default':      {'min': minmax['2th'][0],       'max': minmax['2th'][1],        'value': [minmax['2th'][0],         minmax['2th'][1]],      'step': 0.5},
             '2th_cuka_default': {'min': minmax['2th_cuka'][0],  'max': minmax['2th_cuka'][1],   'value': [minmax['2th_cuka'][0],    minmax['2th_cuka'][1]], 'step': 0.5},
             '2th_moka_default': {'min': minmax['2th_moka'][0],  'max': minmax['2th_moka'][1],   'value': [minmax['2th_moka'][0],    minmax['2th_moka'][1]], 'step': 0.5},
@@ -210,8 +179,7 @@ def plot_diffractogram_interactive(data, options):
             '1/d_default':      {'min': minmax['1/d'][0],       'max': minmax['1/d'][1],        'value': [minmax['1/d'][0],         minmax['1/d'][1]],      'step': 0.5},
             'q_default':        {'min': minmax['q'][0],         'max': minmax['q'][1],          'value': [minmax['q'][0],           minmax['q'][1]],        'step': 0.5},
             'q2_default':       {'min': minmax['q2'][0],        'max': minmax['q2'][1],         'value': [minmax['q2'][0],          minmax['q2'][1]],       'step': 0.5},
-            'q4_default':       {'min': minmax['q4'][0],        'max': minmax['q4'][1],         'value': [minmax['q4'][0],          minmax['q4'][1]],       'step': 0.5},
-            'state': '2th'
+            'q4_default':       {'min': minmax['q4'][0],        'max': minmax['q4'][1],         'value': [minmax['q4'][0],          minmax['q4'][1]],       'step': 0.5}
         }
     }
 
@@ -234,6 +202,29 @@ def plot_diffractogram_interactive(data, options):
     
     display(w)
 
+
+def update_minmax(minmax, data):
+    ''' Finds minimum and maximum values of each column and updates the minmax dictionary to contain the correct values.
+    
+    Input:
+    minmax (dict): contains '''
+
+    for index, diffractogram in enumerate(data['diffractogram']):
+        if not minmax['2th'][0] or diffractogram['2th'].min() < minmax['2th'][0]:
+            minmax['2th'][0] = diffractogram['2th'].min()
+            min_index = index
+
+        if not minmax['2th'][1] or diffractogram['2th'].max() > minmax['2th'][1]:
+            minmax['2th'][1] = diffractogram['2th'].max()
+            max_index = index
+
+    minmax['2th_cuka'][0], minmax['2th_cuka'][1] = data['diffractogram'][min_index]['2th_cuka'].min(),  data['diffractogram'][max_index]['2th_cuka'].max()
+    minmax['2th_moka'][0], minmax['2th_moka'][1] = data['diffractogram'][min_index]['2th_moka'].min(),  data['diffractogram'][max_index]['2th_moka'].max() 
+    minmax['d'][0], minmax['d'][1]               = data['diffractogram'][max_index]['d'].min(),         data['diffractogram'][min_index]['d'].max() # swapped, intended
+    minmax['1/d'][0], minmax['1/d'][1]           = data['diffractogram'][min_index]['1/d'].min(),       data['diffractogram'][max_index]['1/d'].max() 
+    minmax['q'][0], minmax['q'][1]               = data['diffractogram'][min_index]['q'].min(),         data['diffractogram'][max_index]['q'].max()
+    minmax['q2'][0], minmax['q2'][1]             = data['diffractogram'][min_index]['q2'].min(),        data['diffractogram'][max_index]['q2'].max() 
+    minmax['q4'][0], minmax['q4'][1]             = data['diffractogram'][min_index]['q4'].min(),        data['diffractogram'][max_index]['q4'].max() 
 
 def update_widgets(options):
 
