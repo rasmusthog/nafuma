@@ -224,24 +224,56 @@ def read_brml(data, options={}, index=0):
 
     for chain in root.findall('./DataRoutes/DataRoute'):
 
-        for scantype in chain.findall('ScanInformation/ScanMode'):
-            if scantype.text == 'StillScan':
 
-                if chain.get('Description') == 'Originally measured data.':
-                    for scandata in chain.findall('Datum'):
-                        scandata = scandata.text.split(',')
-                        scandata = [float(i) for i in scandata]
-                        twotheta, intensity = float(scandata[2]), float(scandata[3])
+        # Get the scan type to be able to handle different data formats
+        scantype = chain.findall('ScanInformation')[0].get('VisibleName')
 
-        
-            else:
-                if chain.get('Description') == 'Originally measured data.':
-                    for scandata in chain.findall('Datum'):
+        # Check if the chain is the right one to extract the data from
+        if chain.get('Description') == 'Originally measured data.':
+            
+            
+            if scantype == 'TwoTheta':
+                for scandata in chain.findall('Datum'):
+                    scandata = scandata.text.split(',')
+                    twotheta, intensity = float(scandata[2]), float(scandata[3])
+                    
+                    if twotheta > 0:
+                        diffractogram.append({'2th': twotheta, 'I': intensity})
+
+            elif scantype == 'Coupled TwoTheta/Theta':
+                for scandata in chain.findall('Datum'):
+                    scandata = scandata.text.split(',')
+                    twotheta, intensity = float(scandata[2]), float(scandata[4])
+                    
+                    if twotheta > 0:
+                        diffractogram.append({'2th': twotheta, 'I': intensity})
+
+            elif scantype == 'Still (Eiger2R_500K (1D mode))':
+
+                start = float(chain.findall('ScanInformation/ScaleAxes/ScaleAxisInfo/Start')[0].text)
+                stop = float(chain.findall('ScanInformation/ScaleAxes/ScaleAxisInfo/Stop')[0].text)
+                increment = float(chain.findall('ScanInformation/ScaleAxes/ScaleAxisInfo/Increment')[0].text)
+
+
+
+                for scandata in chain.findall('Datum'):
                         scandata = scandata.text.split(',')
-                        twotheta, intensity = float(scandata[2]), float(scandata[3])
-                        
-                        if twotheta > 0:
-                            diffractogram.append({'2th': twotheta, 'I': intensity})
+                        raw = [float(i) for i in scandata]
+
+                        intensity = []
+                        for r in raw:
+                            if r > 600:
+                                intensity.append(r)
+
+                        intensity = np.array(intensity)
+
+            
+             
+
+                twotheta = np.linspace(start, stop, len(intensity))
+
+                diffractogram = {'2th': twotheta, 'I': intensity}
+
 
 
     #if 'wavelength' not in data.keys():
@@ -249,7 +281,9 @@ def read_brml(data, options={}, index=0):
     for chain in root.findall('./FixedInformation/Instrument/PrimaryTracks/TrackInfoData/MountedOptics/InfoData/Tube/WaveLengthAlpha1'):
         wavelength = float(chain.attrib['Value'])
 
+
     diffractogram = pd.DataFrame(diffractogram)
+    
 
 
 
