@@ -66,7 +66,6 @@ def plot_diffractogram(data, options={}):
         for index in range(len(data['path'])):
             diffractogram, wavelength = xrd.io.read_data(data=data, options=options, index=index)
             
-            
             data['diffractogram'][index] = diffractogram
             data['wavelength'][index] = wavelength
 
@@ -157,6 +156,8 @@ def plot_diffractogram(data, options={}):
     if options['interactive_session_active']:
         btp.update_widgets(options=options)
 
+        xrd.io.up
+
 
     return diffractogram, fig, ax
 
@@ -225,7 +226,9 @@ def plot_diffractogram_interactive(data, options):
         reflections_indices=widgets.ToggleButton(value=False),
         x_vals=widgets.Dropdown(options=['2th', 'd', '1/d', 'q', 'q2', 'q4', '2th_cuka', '2th_moka'], value='2th', description='X-values'),
         xlim=options['widgets']['xlim']['w'],
-        ylim=widgets.FloatRangeSlider(value=[ymin_start, ymax_start], min=ymin, max=ymax, step=0.5, layout=widgets.Layout(width='95%')))
+        ylim=widgets.FloatRangeSlider(value=[ymin_start, ymax_start], min=ymin, max=ymax, step=0.5, layout=widgets.Layout(width='95%')),
+        offset_y=widgets.FloatSlider(value=options['offset_y'], min=-5, max=5)
+        )
     
     else:
         w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(plot_diffractogram), data=widgets.fixed(data), options=widgets.fixed(options), 
