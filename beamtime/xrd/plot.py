@@ -20,7 +20,7 @@ def plot_diffractogram(data, options={}):
 
     # Update options
     required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'line', 'scatter', 'xlim', 'ylim', 'normalise', 'offset', 'offset_x', 'offset_y',
-    'reflections_plot', 'reflections_indices', 'reflections_data', 'plot_kind', 'palettes', 'interactive', 'rc_params', 'format_params']
+    'reflections_plot', 'reflections_indices', 'reflections_data', 'plot_kind', 'palettes', 'interactive', 'rc_params', 'format_params', 'interactive_session_active']
 
     default_options = {
         'x_vals': '2th', 
@@ -45,6 +45,10 @@ def plot_diffractogram(data, options={}):
         'format_params': {},
         }
 
+    if 'offset_y' not in options.keys():
+        if len(data['path']) > 10:
+            default_options['offset_y'] = 0.05
+
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
     # Convert data['path'] to list to allow iteration over this to accommodate both single and multiple diffractograms
@@ -61,6 +65,7 @@ def plot_diffractogram(data, options={}):
 
         for index in range(len(data['path'])):
             diffractogram, wavelength = xrd.io.read_data(data=data, options=options, index=index)
+            
             
             data['diffractogram'][index] = diffractogram
             data['wavelength'][index] = wavelength
@@ -113,7 +118,10 @@ def plot_diffractogram(data, options={}):
 
         ax = ax[-1]
 
-    colours = btp.generate_colours(options['palettes'])
+    if len(data['path']) < 10:
+        colours = btp.generate_colours(options['palettes'])
+    else:
+        colours = btp.generate_colours(['black'], kind='single')
 
 
     for diffractogram in data['diffractogram']:
@@ -183,7 +191,6 @@ def plot_diffractogram_interactive(data, options):
 
         if not ymax or (ymax < (diffractogram['I'].max())):#+index*options['offset_y'])):
             ymax = diffractogram['I'].max()#+index*options['offset_y']
-            print(ymax)
 
 
     ymin_start = ymin - 0.1*ymax

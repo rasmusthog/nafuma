@@ -377,16 +377,20 @@ def update_rc_params(rc_params):
             plt.rcParams.update({key: rc_params[key]})
 
 
-def generate_colours(palettes):
+def generate_colours(palettes, kind=None):
 
-    # Creates a list of all the colours that is passed in the colour_cycles argument. Then makes cyclic iterables of these. 
-    colour_collection = []
-    for palette in palettes:
-        mod = importlib.import_module("palettable.colorbrewer.%s" % palette[0])
-        colour = getattr(mod, palette[1]).mpl_colors
-        colour_collection = colour_collection + colour
+    if kind == 'single':
+        colour_cycle = itertools.cycle(palettes)
 
-    colour_cycle = itertools.cycle(colour_collection)
+    else:
+        # Creates a list of all the colours that is passed in the colour_cycles argument. Then makes cyclic iterables of these. 
+        colour_collection = []
+        for palette in palettes:
+            mod = importlib.import_module("palettable.colorbrewer.%s" % palette[0])
+            colour = getattr(mod, palette[1]).mpl_colors
+            colour_collection = colour_collection + colour
+
+        colour_cycle = itertools.cycle(colour_collection)
 
 
     return colour_cycle

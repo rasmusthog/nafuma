@@ -252,7 +252,7 @@ def read_brml(data, options={}, index=0):
 
                 start = float(chain.findall('ScanInformation/ScaleAxes/ScaleAxisInfo/Start')[0].text)
                 stop = float(chain.findall('ScanInformation/ScaleAxes/ScaleAxisInfo/Stop')[0].text)
-                increment = float(chain.findall('ScanInformation/ScaleAxes/ScaleAxisInfo/Increment')[0].text)
+                
 
 
 
@@ -262,7 +262,7 @@ def read_brml(data, options={}, index=0):
 
                         intensity = []
                         for r in raw:
-                            if r > 600:
+                            if r > 601:
                                 intensity.append(r)
 
                         intensity = np.array(intensity)
@@ -478,9 +478,7 @@ def translate_wavelengths(data, wavelength, to_wavelength=None):
 
 def find_wavelength_from_xy(path):
 
-    print(path)
 
- 
     wavelength_dict = {'Cu': 1.54059, 'Mo': 0.71073}
 
     with open(path, 'r') as f:
