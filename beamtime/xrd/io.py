@@ -341,11 +341,13 @@ def read_data(data, options={}, index=0):
         diffractogram, wavelength = read_xy(data=data, options=options, index=index)
 
 
-    if options['normalise']:
-        diffractogram['I'] = diffractogram['I'] / diffractogram['I'].max()
 
 
-    if options['offset']:
+    if options['offset'] or options['normalise']:
+        # Make copy of the original intensities before any changes are made through normalisation or offset, to easily revert back if need to update.
+        diffractogram['I_org'] = diffractogram['I']
+        diffractogram['2th_org'] = diffractogram['2th']
+        
         diffractogram = apply_offset(diffractogram, wavelength, index, options)
 
 
@@ -355,13 +357,21 @@ def read_data(data, options={}, index=0):
 
 
 def apply_offset(diffractogram, wavelength, index, options):
+
+    options['current_offset_y'] = options['offset_y']
+    options['current_offset_x'] = options['offset_x']
+
     #Apply offset along y-axis
-    diffractogram['I_org'] = diffractogram['I'] # make copy of original intensities
+    diffractogram['I'] = diffractogram['I_org'] # Reset intensities
+
+    if options['normalise']:
+        diffractogram['I'] = diffractogram['I'] / diffractogram['I'].max()
+
     diffractogram['I'] = diffractogram['I'] + index*options['offset_y']
 
     # Apply offset along x-axis
     relative_shift = (wavelength / 1.54059)*options['offset_x'] # Adjusts the offset-factor to account for wavelength, so that offset_x given is given in 2th_cuka-units
-    diffractogram['2th_org'] = diffractogram['2th']
+    diffractogram['2th'] = diffractogram['2th_org']
     diffractogram['2th'] = diffractogram['2th'] + index*relative_shift
 
 
