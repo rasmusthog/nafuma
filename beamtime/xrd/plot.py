@@ -1,3 +1,4 @@
+import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,AutoMinorLocator)
 
@@ -20,7 +21,7 @@ def plot_diffractogram(data, options={}):
 
     # Update options
     required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'line', 'scatter', 'xlim', 'ylim', 'normalise', 'offset', 'offset_x', 'offset_y',
-    'reflections_plot', 'reflections_indices', 'reflections_data', 'plot_kind', 'palettes', 'interactive', 'rc_params', 'format_params', 'interactive_session_active']
+    'reflections_plot', 'reflections_indices', 'reflections_data', 'heatmap', 'cmap', 'plot_kind', 'palettes', 'interactive', 'rc_params', 'format_params', 'interactive_session_active']
 
     default_options = {
         'x_vals': '2th', 
@@ -37,6 +38,8 @@ def plot_diffractogram(data, options={}):
         'reflections_plot': False, # whether to plot reflections as a plot
         'reflections_indices': False, # whether to plot the reflection indices
         'reflections_data': None, # Should be passed as a list of dictionaries on the form {path: rel_path, reflection_indices: number of indices, colour: [r,g,b], min_alpha: 0-1]
+        'heatmap': False,
+        'cmap': 'viridis',
         'plot_kind': None,
         'palettes': [('qualitative', 'Dark2_8')],
         'interactive': False,
@@ -69,12 +72,19 @@ def plot_diffractogram(data, options={}):
             data['diffractogram'][index] = diffractogram
             data['wavelength'][index] = wavelength
 
-            
 
     else:
         if not isinstance(data['diffractogram'], list):
             data['diffractogram'] = [data['diffractogram']]
             data['wavelength'] = [data['wavelength']]
+
+    if options['heatmap']:
+        data['heatmap'] = []
+        for diff in data['diffractogram']:
+            data['heatmap'].append(np.array(diff['I']))
+
+        data['heatmap'] = np.array(data['heatmap'])
+        data['heatmap'] = np.flipud(data['heatmap'])
 
     # Sets the xlim if this has not bee specified
     if not options['xlim']:
@@ -130,12 +140,17 @@ def plot_diffractogram(data, options={}):
         colours = btp.generate_colours(['black'], kind='single')
 
 
-    for diffractogram in data['diffractogram']:
-        if options['line']:
-            diffractogram.plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=next(colours), zorder=1)
-    
-        if options['scatter']:
-            ax.scatter(x=diffractogram[options['x_vals']], y = diffractogram[options['y_vals']], c=[(1,1,1,0)], edgecolors=[next(colours)], linewidths=plt.rcParams['lines.markeredgewidth'], zorder=2) #, edgecolors=np.array([next(colours)]))
+    # FIXME Must be changed to map the x-value to the 2th-value somehow
+    if options['heatmap']:
+        sns.heatmap(data['heatmap'], cmap=options['cmap'])
+
+    else:
+        for diffractogram in data['diffractogram']:
+            if options['line']:
+                diffractogram.plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=next(colours), zorder=1)
+        
+            if options['scatter']:
+                ax.scatter(x=diffractogram[options['x_vals']], y = diffractogram[options['y_vals']], c=[(1,1,1,0)], edgecolors=[next(colours)], linewidths=plt.rcParams['lines.markeredgewidth'], zorder=2) #, edgecolors=np.array([next(colours)]))
 
 
 
@@ -168,7 +183,7 @@ def plot_diffractogram(data, options={}):
 
 
 
-    return diffractogram, fig, ax
+    return data['diffractogram'], fig, ax
 
 
 def determine_grid_layout(options):
