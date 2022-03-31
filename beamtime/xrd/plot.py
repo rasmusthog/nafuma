@@ -81,6 +81,13 @@ def plot_diffractogram(data, options={}):
         options['xlim'] = [diffractogram[options['x_vals']].min(), diffractogram[options['x_vals']].max()]
 
 
+    if options['interactive_session_active']:
+        if options['offset']:
+            if (options['offset_x'] != options['current_offset_x']) or (options['offset_y'] != options['current_offset_y']):
+                for i, (diff, wl) in enumerate(zip(data['diffractogram'], data['wavelength'])):
+                    xrd.io.apply_offset(diff, wl, i, options)
+
+
     # Start inteactive session with ipywidgets. Disables options['interactive'] in order for the interactive loop to not start another interactive session
     if options['interactive']:
         options['interactive'] = False
@@ -156,7 +163,9 @@ def plot_diffractogram(data, options={}):
     if options['interactive_session_active']:
         btp.update_widgets(options=options)
 
-        xrd.io.up
+        
+
+
 
 
     return diffractogram, fig, ax
@@ -227,7 +236,8 @@ def plot_diffractogram_interactive(data, options):
         x_vals=widgets.Dropdown(options=['2th', 'd', '1/d', 'q', 'q2', 'q4', '2th_cuka', '2th_moka'], value='2th', description='X-values'),
         xlim=options['widgets']['xlim']['w'],
         ylim=widgets.FloatRangeSlider(value=[ymin_start, ymax_start], min=ymin, max=ymax, step=0.5, layout=widgets.Layout(width='95%')),
-        offset_y=widgets.FloatSlider(value=options['offset_y'], min=-5, max=5)
+        offset_y=widgets.BoundedFloatText(value=options['offset_y'], min=-5, max=5, step=0.01),
+        offset_x=widgets.BoundedFloatText(value=options['offset_x'], min=-1, max=1, step=0.01)
         )
     
     else:
