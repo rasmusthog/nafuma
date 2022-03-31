@@ -1,0 +1,2 @@
+- Must allow for automatic normalisation between different diffractograms, must only happen upon reading data
+- 

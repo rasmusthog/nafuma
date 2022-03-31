@@ -313,6 +313,17 @@ def update_widgets(options):
 
         if widget['state'] != options['x_vals']:
             for arg in widget[f'{options["x_vals"]}_default']:
+                
+                # If new min value is larger than previous max, or new max value is smaller than previous min, set the opposite first
+                if arg == 'min':
+                    if widget[f'{options["x_vals"]}_default']['min'] > getattr(widget['w'], 'max'):
+                        setattr(widget['w'], 'max', widget[f'{options["x_vals"]}_default']['max'])
+                
+                elif arg == 'max':
+                    if widget[f'{options["x_vals"]}_default']['max'] < getattr(widget['w'], 'min'):
+                        setattr(widget['w'], 'min', widget[f'{options["x_vals"]}_default']['min'])
+
+            
                 setattr(widget['w'], arg, widget[f'{options["x_vals"]}_default'][arg])
             
             widget['state'] = options['x_vals']
@@ -366,16 +377,20 @@ def update_rc_params(rc_params):
             plt.rcParams.update({key: rc_params[key]})
 
 
-def generate_colours(palettes):
+def generate_colours(palettes, kind=None):
 
-    # Creates a list of all the colours that is passed in the colour_cycles argument. Then makes cyclic iterables of these. 
-    colour_collection = []
-    for palette in palettes:
-        mod = importlib.import_module("palettable.colorbrewer.%s" % palette[0])
-        colour = getattr(mod, palette[1]).mpl_colors
-        colour_collection = colour_collection + colour
+    if kind == 'single':
+        colour_cycle = itertools.cycle(palettes)
 
-    colour_cycle = itertools.cycle(colour_collection)
+    else:
+        # Creates a list of all the colours that is passed in the colour_cycles argument. Then makes cyclic iterables of these. 
+        colour_collection = []
+        for palette in palettes:
+            mod = importlib.import_module("palettable.colorbrewer.%s" % palette[0])
+            colour = getattr(mod, palette[1]).mpl_colors
+            colour_collection = colour_collection + colour
+
+        colour_cycle = itertools.cycle(colour_collection)
 
 
     return colour_cycle

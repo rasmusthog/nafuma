@@ -19,8 +19,8 @@ def plot_diffractogram(data, options={}):
     data (dict): Must include path = string to diffractogram data, and plot_kind = (recx, beamline, image)'''
 
     # Update options
-    required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'line', 'scatter', 'xlim', 'ylim',
-    'reflections_plot', 'reflections_indices', 'reflections_data', 'plot_kind', 'palettes', 'interactive', 'rc_params', 'format_params']
+    required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'line', 'scatter', 'xlim', 'ylim', 'normalise', 'offset', 'offset_x', 'offset_y',
+    'reflections_plot', 'reflections_indices', 'reflections_data', 'plot_kind', 'palettes', 'interactive', 'rc_params', 'format_params', 'interactive_session_active']
 
     default_options = {
         'x_vals': '2th', 
@@ -28,6 +28,10 @@ def plot_diffractogram(data, options={}):
         'ylabel': 'Intensity', 'xlabel': '2theta', 
         'xunit': 'deg', 'yunit': 'a.u.',
         'xlim': None, 'ylim': None, 
+        'normalise': True,
+        'offset': True,
+        'offset_x': 0,
+        'offset_y': 1,
         'line': True, # whether or not to plot diffractogram as a line plot
         'scatter': False, # whether or not to plot individual data points
         'reflections_plot': False, # whether to plot reflections as a plot
@@ -41,21 +45,43 @@ def plot_diffractogram(data, options={}):
         'format_params': {},
         }
 
+    if 'offset_y' not in options.keys():
+        if len(data['path']) > 10:
+            default_options['offset_y'] = 0.05
+
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
+    # Convert data['path'] to list to allow iteration over this to accommodate both single and multiple diffractograms
+    if not isinstance(data['path'], list):
+        data['path'] = [data['path']]
+
+   
+
+    # Check if there is some data stored already, load in data if not. This speeds up replotting in interactive mode.
     if not 'diffractogram' in data.keys():
-        diffractogram = xrd.io.read_data(data=data, options=options)
-        data['diffractogram'] = diffractogram
+        # Initialise empty list for diffractograms and wavelengths
+        data['diffractogram'] = [None for _ in range(len(data['path']))]
+        data['wavelength'] = [None for _ in range(len(data['path']))]
+
+        for index in range(len(data['path'])):
+            diffractogram, wavelength = xrd.io.read_data(data=data, options=options, index=index)
+            
+            data['diffractogram'][index] = diffractogram
+            data['wavelength'][index] = wavelength
+
+            
 
     else:
-        diffractogram = data['diffractogram']
+        if not isinstance(data['diffractogram'], list):
+            data['diffractogram'] = [data['diffractogram']]
+            data['wavelength'] = [data['wavelength']]
 
     # Sets the xlim if this has not bee specified
     if not options['xlim']:
         options['xlim'] = [diffractogram[options['x_vals']].min(), diffractogram[options['x_vals']].max()]
 
 
-    # Start inteactive session with ipywidgets
+    # Start inteactive session with ipywidgets. Disables options['interactive'] in order for the interactive loop to not start another interactive session
     if options['interactive']:
         options['interactive'] = False
         options['interactive_session_active'] = True
@@ -74,7 +100,6 @@ def plot_diffractogram(data, options={}):
 
 
     # Prepare plot, and read and process data
-
     fig, ax = btp.prepare_plot(options=options)
 
 
@@ -92,14 +117,18 @@ def plot_diffractogram(data, options={}):
 
         ax = ax[-1]
 
-    colours = btp.generate_colours(options['palettes'])
+    if len(data['path']) < 10:
+        colours = btp.generate_colours(options['palettes'])
+    else:
+        colours = btp.generate_colours(['black'], kind='single')
 
 
-    if options['line']:
-        diffractogram.plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=next(colours), zorder=1)
+    for diffractogram in data['diffractogram']:
+        if options['line']:
+            diffractogram.plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=next(colours), zorder=1)
     
-    if options['scatter']:
-        ax.scatter(x=diffractogram[options['x_vals']], y = diffractogram[options['y_vals']], c=[(1,1,1,0)], edgecolors=[next(colours)], linewidths=plt.rcParams['lines.markeredgewidth'], zorder=2) #, edgecolors=np.array([next(colours)]))
+        if options['scatter']:
+            ax.scatter(x=diffractogram[options['x_vals']], y = diffractogram[options['y_vals']], c=[(1,1,1,0)], edgecolors=[next(colours)], linewidths=plt.rcParams['lines.markeredgewidth'], zorder=2) #, edgecolors=np.array([next(colours)]))
 
 
 
@@ -107,18 +136,18 @@ def plot_diffractogram(data, options={}):
 
     
 
-    # Make the reflection plots
+    # Make the reflection plots. By default, the wavelength of the first diffractogram will be used for these.
     if options['reflections_plot'] and options['reflections_data']:
         options['xlim'] = ax.get_xlim()
-        options['to_wavelength'] = data['wavelength']
+        options['to_wavelength'] = data['wavelength'][0]
         
         for reference, axis in zip(options['reflections_data'], ref_axes):
             plot_reflection_table(data=reference, ax=axis, options=options)
 
-    # Print the reflection indices
+    # Print the reflection indices. By default, the wavelength of the first diffractogram will be used for this.
     if options['reflections_indices'] and options['reflections_data']:
         options['xlim'] = ax.get_xlim()
-        options['to_wavelength'] = data['wavelength']
+        options['to_wavelength'] = data['wavelength'][0]
 
         for reference in options['reflections_data']:
             plot_reflection_indices(data=reference, ax=indices_ax, options=options)
@@ -126,6 +155,8 @@ def plot_diffractogram(data, options={}):
 
     if options['interactive_session_active']:
         btp.update_widgets(options=options)
+
+        xrd.io.up
 
 
     return diffractogram, fig, ax
@@ -149,18 +180,40 @@ def determine_grid_layout(options):
 
 def plot_diffractogram_interactive(data, options):
 
+
+    minmax = {'2th': [None, None], '2th_cuka': [None, None], '2th_moka': [None, None], 'd': [None, None], '1/d': [None, None], 'q': [None, None], 'q2': [None, None], 'q4': [None, None]}
+    
+    update_minmax(minmax, data)
+
+    ymin, ymax = None, None
+    for index, diffractogram in enumerate(data['diffractogram']):
+        if not ymin or (ymin > (diffractogram['I'].min())): #+index*options['offset_y'])):
+            ymin = diffractogram['I'].min()#+index*options['offset_y']
+
+        if not ymax or (ymax < (diffractogram['I'].max())):#+index*options['offset_y'])):
+            ymax = diffractogram['I'].max()#+index*options['offset_y']
+
+
+    ymin_start = ymin - 0.1*ymax
+    ymax_start = ymax+0.2*ymax
+    ymin = ymin - 5*ymax
+    ymax = ymax*5
+
+        
+
+
     options['widgets'] = {
         'xlim': {
-            'w': widgets.FloatRangeSlider(value=[data['diffractogram']['2th'].min(), data['diffractogram']['2th'].max()], min=data['diffractogram']['2th'].min(), max=data['diffractogram']['2th'].max(), step=0.5, layout=widgets.Layout(width='95%')),
-            '2th_default': {'min': data['diffractogram']['2th'].min(), 'max': data['diffractogram']['2th'].max(), 'value': [data['diffractogram']['2th'].min(), data['diffractogram']['2th'].max()], 'step': 0.5},
-            '2th_cuka_default': {'min': data['diffractogram']['2th_cuka'].min(), 'max': data['diffractogram']['2th_cuka'].max(), 'value': [data['diffractogram']['2th_cuka'].min(), data['diffractogram']['2th_cuka'].max()], 'step': 0.5},
-            '2th_moka_default': {'min': data['diffractogram']['2th_moka'].min(), 'max': data['diffractogram']['2th_moka'].max(), 'value': [data['diffractogram']['2th_moka'].min(), data['diffractogram']['2th_moka'].max()], 'step': 0.5},
-            'd_default': {'min': data['diffractogram']['d'].min(), 'max': data['diffractogram']['d'].max(), 'value': [data['diffractogram']['d'].min(), data['diffractogram']['d'].max()], 'step': 0.5},
-            '1/d_default': {'min': data['diffractogram']['1/d'].min(), 'max': data['diffractogram']['1/d'].max(), 'value': [data['diffractogram']['1/d'].min(), data['diffractogram']['1/d'].max()], 'step': 0.5},
-            'q_default': {'min': data['diffractogram']['q'].min(), 'max': data['diffractogram']['q'].max(), 'value': [data['diffractogram']['q'].min(), data['diffractogram']['q'].max()], 'step': 0.5},
-            'q2_default': {'min': data['diffractogram']['q2'].min(), 'max': data['diffractogram']['q2'].max(), 'value': [data['diffractogram']['q2'].min(), data['diffractogram']['q2'].max()], 'step': 0.5},
-            'q4_default': {'min': data['diffractogram']['q4'].min(), 'max': data['diffractogram']['q4'].max(), 'value': [data['diffractogram']['q4'].min(), data['diffractogram']['q4'].max()], 'step': 0.5},
-            'state': '2th'
+            'w': widgets.FloatRangeSlider(value=[minmax['2th'][0], minmax['2th'][1]], min=minmax['2th'][0], max=minmax['2th'][1], step=0.5, layout=widgets.Layout(width='95%')),
+            'state': '2th',
+            '2th_default':      {'min': minmax['2th'][0],       'max': minmax['2th'][1],        'value': [minmax['2th'][0],         minmax['2th'][1]],      'step': 0.5},
+            '2th_cuka_default': {'min': minmax['2th_cuka'][0],  'max': minmax['2th_cuka'][1],   'value': [minmax['2th_cuka'][0],    minmax['2th_cuka'][1]], 'step': 0.5},
+            '2th_moka_default': {'min': minmax['2th_moka'][0],  'max': minmax['2th_moka'][1],   'value': [minmax['2th_moka'][0],    minmax['2th_moka'][1]], 'step': 0.5},
+            'd_default':        {'min': minmax['d'][0],         'max': minmax['d'][1],          'value': [minmax['d'][0],           minmax['d'][1]],        'step': 0.5},
+            '1/d_default':      {'min': minmax['1/d'][0],       'max': minmax['1/d'][1],        'value': [minmax['1/d'][0],         minmax['1/d'][1]],      'step': 0.5},
+            'q_default':        {'min': minmax['q'][0],         'max': minmax['q'][1],          'value': [minmax['q'][0],           minmax['q'][1]],        'step': 0.5},
+            'q2_default':       {'min': minmax['q2'][0],        'max': minmax['q2'][1],         'value': [minmax['q2'][0],          minmax['q2'][1]],       'step': 0.5},
+            'q4_default':       {'min': minmax['q4'][0],        'max': minmax['q4'][1],         'value': [minmax['q4'][0],          minmax['q4'][1]],       'step': 0.5}
         }
     }
 
@@ -172,7 +225,10 @@ def plot_diffractogram_interactive(data, options):
         reflections_plot=widgets.ToggleButton(value=True),
         reflections_indices=widgets.ToggleButton(value=False),
         x_vals=widgets.Dropdown(options=['2th', 'd', '1/d', 'q', 'q2', 'q4', '2th_cuka', '2th_moka'], value='2th', description='X-values'),
-        xlim=options['widgets']['xlim']['w'])
+        xlim=options['widgets']['xlim']['w'],
+        ylim=widgets.FloatRangeSlider(value=[ymin_start, ymax_start], min=ymin, max=ymax, step=0.5, layout=widgets.Layout(width='95%')),
+        offset_y=widgets.FloatSlider(value=options['offset_y'], min=-5, max=5)
+        )
     
     else:
         w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(plot_diffractogram), data=widgets.fixed(data), options=widgets.fixed(options), 
@@ -183,6 +239,29 @@ def plot_diffractogram_interactive(data, options):
     
     display(w)
 
+
+def update_minmax(minmax, data):
+    ''' Finds minimum and maximum values of each column and updates the minmax dictionary to contain the correct values.
+    
+    Input:
+    minmax (dict): contains '''
+
+    for index, diffractogram in enumerate(data['diffractogram']):
+        if not minmax['2th'][0] or diffractogram['2th'].min() < minmax['2th'][0]:
+            minmax['2th'][0] = diffractogram['2th'].min()
+            min_index = index
+
+        if not minmax['2th'][1] or diffractogram['2th'].max() > minmax['2th'][1]:
+            minmax['2th'][1] = diffractogram['2th'].max()
+            max_index = index
+
+    minmax['2th_cuka'][0], minmax['2th_cuka'][1] = data['diffractogram'][min_index]['2th_cuka'].min(),  data['diffractogram'][max_index]['2th_cuka'].max()
+    minmax['2th_moka'][0], minmax['2th_moka'][1] = data['diffractogram'][min_index]['2th_moka'].min(),  data['diffractogram'][max_index]['2th_moka'].max() 
+    minmax['d'][0], minmax['d'][1]               = data['diffractogram'][max_index]['d'].min(),         data['diffractogram'][min_index]['d'].max() # swapped, intended
+    minmax['1/d'][0], minmax['1/d'][1]           = data['diffractogram'][min_index]['1/d'].min(),       data['diffractogram'][max_index]['1/d'].max() 
+    minmax['q'][0], minmax['q'][1]               = data['diffractogram'][min_index]['q'].min(),         data['diffractogram'][max_index]['q'].max()
+    minmax['q2'][0], minmax['q2'][1]             = data['diffractogram'][min_index]['q2'].min(),        data['diffractogram'][max_index]['q2'].max() 
+    minmax['q4'][0], minmax['q4'][1]             = data['diffractogram'][min_index]['q4'].min(),        data['diffractogram'][max_index]['q4'].max() 
 
 def update_widgets(options):
 
