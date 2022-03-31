@@ -236,7 +236,8 @@ def plot_diffractogram_interactive(data, options):
         x_vals=widgets.Dropdown(options=['2th', 'd', '1/d', 'q', 'q2', 'q4', '2th_cuka', '2th_moka'], value='2th', description='X-values'),
         xlim=options['widgets']['xlim']['w'],
         ylim=widgets.FloatRangeSlider(value=[ymin_start, ymax_start], min=ymin, max=ymax, step=0.5, layout=widgets.Layout(width='95%')),
-        offset_y=widgets.FloatSlider(value=options['offset_y'], min=-5, max=5)
+        offset_y=widgets.BoundedFloatText(value=options['offset_y'], min=-5, max=5, step=0.01),
+        offset_x=widgets.BoundedFloatText(value=options['offset_x'], min=-1, max=1, step=0.01)
         )
     
     else:
