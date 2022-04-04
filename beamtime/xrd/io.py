@@ -40,7 +40,7 @@ def integrate_1d(data, options={}, index=0):
     df: DataFrame contianing 1D diffractogram if option 'return' is True
     ''' 
 
-    required_options = ['unit', 'nbins', 'save', 'save_filename', 'save_extension', 'save_folder', 'overwrite']
+    required_options = ['unit', 'nbins', 'save', 'save_filename', 'save_extension', 'save_folder', 'overwrite', 'extract_folder']
 
     default_options = {
         'unit': '2th_deg', 
