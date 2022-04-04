@@ -72,23 +72,20 @@ def plot_diffractogram(data, options={}):
             data['diffractogram'][index] = diffractogram
             data['wavelength'][index] = wavelength
 
+        # Sets the xlim if this has not bee specified
+        if not options['xlim']:
+            options['xlim'] = [data['diffractogram'][0][options['x_vals']].min(), data['diffractogram'][0][options['x_vals']].max()]
+
+
+        if options['heatmap']:   
+            data['heatmap'], data['heatmap_xticks'], data['heatmap_xticklabels'] = generate_heatmap(data=data, options=options)
+            options['xlim'] = options['heatmap_xlim']
 
     else:
         if not isinstance(data['diffractogram'], list):
             data['diffractogram'] = [data['diffractogram']]
             data['wavelength'] = [data['wavelength']]
 
-    if options['heatmap']:
-        data['heatmap'] = []
-        for diff in data['diffractogram']:
-            data['heatmap'].append(np.array(diff['I']))
-
-        data['heatmap'] = np.array(data['heatmap'])
-        data['heatmap'] = np.flipud(data['heatmap'])
-
-    # Sets the xlim if this has not bee specified
-    if not options['xlim']:
-        options['xlim'] = [diffractogram[options['x_vals']].min(), diffractogram[options['x_vals']].max()]
 
 
     if options['interactive_session_active']:
@@ -142,7 +139,10 @@ def plot_diffractogram(data, options={}):
 
     # FIXME Must be changed to map the x-value to the 2th-value somehow
     if options['heatmap']:
-        sns.heatmap(data['heatmap'], cmap=options['cmap'])
+        sns.heatmap(data['heatmap'], cmap=options['cmap'], cbar=False, ax=ax)
+        ax.set_xticks(data['heatmap_xticks'])
+        ax.set_xticklabels(data['heatmap_xticklabels'])
+        ax.tick_params(axis='x', which='minor', bottom=False, top=False)
 
     else:
         for diffractogram in data['diffractogram']:
@@ -186,6 +186,68 @@ def plot_diffractogram(data, options={}):
     return data['diffractogram'], fig, ax
 
 
+
+def generate_heatmap(data, options={}):
+
+    required_options = ['x_tick_locators']
+
+    default_options = {
+        'x_tick_locators': [0.5, 0.1]
+    }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+    twotheta = []
+    intensities = []
+    scans = []
+
+    for i, d in enumerate(data['diffractogram']):
+        twotheta = np.append(twotheta, d['2th'].to_numpy())
+        intensities = np.append(intensities, d['I'].to_numpy())
+        scans = np.append(scans, np.full(len(d['2th'].to_numpy()), int(i)))
+
+
+    # Generate ticks and xtick-labels
+    twotheta_max = data['diffractogram'][0]['2th'].max()
+    twotheta_min = data['diffractogram'][0]['2th'].min()
+    twotheta_span = twotheta_max - twotheta_min
+    ndatapoints = len(data['diffractogram'][0]['2th'])
+    steps = twotheta_span / ndatapoints
+
+    twotheta_label_max = aux.floor(twotheta_max, roundto=options['x_tick_locators'][0])
+    twotheta_label_min = aux.ceil(twotheta_min, roundto=options['x_tick_locators'][0])
+    label_steps = (twotheta_label_max - twotheta_label_min)/options['x_tick_locators'][0]
+
+    
+
+    xtick_labels = np.linspace(twotheta_label_min, twotheta_label_max, num=int(label_steps)+1)
+
+    options['x_tick_locators'] = None
+
+    xticks = []
+    for tick in xtick_labels:
+        xticks.append((tick - twotheta_min)/steps)
+
+    heatmap = pd.DataFrame({'2th': twotheta, 'scan': scans, 'I': intensities})
+    heatmap = heatmap.reset_index().pivot_table(index='scan', columns='2th', values='I')
+
+    options['heatmap_xlim'] = [(options['xlim'][0] - twotheta_min)/steps, (options['xlim'][1] - twotheta_min)/steps]
+
+
+    print(xticks, xtick_labels)
+
+
+    return heatmap, xticks, xtick_labels
+
+
+
+
+
+
+
+# #results = np.transpose(np.vstack([twotheta, scans, intensities]))
+
+
 def determine_grid_layout(options):
 
 
@@ -199,6 +261,8 @@ def determine_grid_layout(options):
     options['format_params']['grid_ratio_height'] = [1 for i in range(nrows-1)]+[10]
 
     return options
+
+
 
 
 
