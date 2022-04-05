@@ -176,9 +176,6 @@ def plot_diffractogram(data, options={}):
     if options['interactive_session_active']:
         update_widgets(options=options)
 
-        
-
-
 
 
     return data['diffractogram'], fig, ax
@@ -282,38 +279,51 @@ def determine_grid_layout(options):
 def plot_diffractogram_interactive(data, options):
 
 
-    minmax = {'2th': [None, None], '2th_cuka': [None, None], '2th_moka': [None, None], 'd': [None, None], '1/d': [None, None], 'q': [None, None], 'q2': [None, None], 'q4': [None, None], 'heatmap': [None, None]}
+    xminmax = {'2th': [None, None], '2th_cuka': [None, None], '2th_moka': [None, None], 'd': [None, None], '1/d': [None, None], 'q': [None, None], 'q2': [None, None], 'q4': [None, None], 'heatmap': [None, None], 'start': [None, None, None, None]}
+    yminmax = {'diff': [None, None, None, None], 'heatmap': [None, None], 'start': [None, None, None, None]}
     
-    update_minmax(minmax=minmax, data=data, options=options)
-
-    ymin, ymax = None, None
-    for index, diffractogram in enumerate(data['diffractogram']):
-        if not ymin or (ymin > (diffractogram['I'].min())): #+index*options['offset_y'])):
-            ymin = diffractogram['I'].min()#+index*options['offset_y']
-
-        if not ymax or (ymax < (diffractogram['I'].max())):#+index*options['offset_y'])):
-            ymax = diffractogram['I'].max()#+index*options['offset_y']
+    update_xminmax(xminmax=xminmax, data=data, options=options)
+    update_yminmax(yminmax=yminmax, data=data, options=options)
 
 
-    ymin_start = ymin - 0.1*ymax
-    ymax_start = ymax+0.2*ymax
-    ymin = ymin - 5*ymax
-    ymax = ymax*5
+
+    # Get start values for ylim slider based on choice (FIXME This can be impleneted into update_yminmax). Can also make a 'start' item that stores the start values, instead of having 4 items in 'diff' as it is now.
+    if options['heatmap']:
+        ymin = yminmax['heatmap'][0]
+        ymax = yminmax['heatmap'][1]
+        ymin_start = yminmax['heatmap'][0]
+        ymax_start = yminmax['heatmap'][1]
+
+    elif not options['heatmap']:
+        ymin = yminmax['diff'][0]
+        ymax = yminmax['diff'][1]
+        ymin_start = yminmax['diff'][2]
+        ymax_start = yminmax['diff'][3]
+
+    
+    # FIXME The start values for xlim should probably also be decided by initial value of x_vals, and can likewise be implemented in update_xminmax() 
+
 
         
     options['widgets'] = {
         'xlim': {
-            'w': widgets.FloatRangeSlider(value=[minmax['2th'][0], minmax['2th'][1]], min=minmax['2th'][0], max=minmax['2th'][1], step=0.5, layout=widgets.Layout(width='95%')),
-            'state': '2th',
-            '2th_default':      {'min': minmax['2th'][0],       'max': minmax['2th'][1],        'value': [minmax['2th'][0],         minmax['2th'][1]],      'step': 0.5},
-            '2th_cuka_default': {'min': minmax['2th_cuka'][0],  'max': minmax['2th_cuka'][1],   'value': [minmax['2th_cuka'][0],    minmax['2th_cuka'][1]], 'step': 0.5},
-            '2th_moka_default': {'min': minmax['2th_moka'][0],  'max': minmax['2th_moka'][1],   'value': [minmax['2th_moka'][0],    minmax['2th_moka'][1]], 'step': 0.5},
-            'd_default':        {'min': minmax['d'][0],         'max': minmax['d'][1],          'value': [minmax['d'][0],           minmax['d'][1]],        'step': 0.5},
-            '1/d_default':      {'min': minmax['1/d'][0],       'max': minmax['1/d'][1],        'value': [minmax['1/d'][0],         minmax['1/d'][1]],      'step': 0.5},
-            'q_default':        {'min': minmax['q'][0],         'max': minmax['q'][1],          'value': [minmax['q'][0],           minmax['q'][1]],        'step': 0.5},
-            'q2_default':       {'min': minmax['q2'][0],        'max': minmax['q2'][1],         'value': [minmax['q2'][0],          minmax['q2'][1]],       'step': 0.5},
-            'q4_default':       {'min': minmax['q4'][0],        'max': minmax['q4'][1],         'value': [minmax['q4'][0],          minmax['q4'][1]],       'step': 0.5},
-            'heatmap_default':  {'min': minmax['heatmap'][0],   'max': minmax['heatmap'][1],    'value': [minmax['heatmap'][0],     minmax['heatmap'][1]],  'step': 10}
+            'w': widgets.FloatRangeSlider(value=[xminmax['start'][2], xminmax['start'][3]], min=xminmax['start'][0], max=xminmax['start'][1], step=0.5, layout=widgets.Layout(width='95%')),
+            'state': options['x_vals'],
+            '2th_default':      {'min': xminmax['2th'][0],          'max': xminmax['2th'][1],           'value': [xminmax['2th'][0],            xminmax['2th'][1]],             'step': 0.5},
+            '2th_cuka_default': {'min': xminmax['2th_cuka'][0],     'max': xminmax['2th_cuka'][1],      'value': [xminmax['2th_cuka'][0],       xminmax['2th_cuka'][1]],        'step': 0.5},
+            '2th_moka_default': {'min': xminmax['2th_moka'][0],     'max': xminmax['2th_moka'][1],      'value': [xminmax['2th_moka'][0],       xminmax['2th_moka'][1]],        'step': 0.5},
+            'd_default':        {'min': xminmax['d'][0],            'max': xminmax['d'][1],             'value': [xminmax['d'][0],              xminmax['d'][1]],               'step': 0.5},
+            '1/d_default':      {'min': xminmax['1/d'][0],          'max': xminmax['1/d'][1],           'value': [xminmax['1/d'][0],            xminmax['1/d'][1]],             'step': 0.5},
+            'q_default':        {'min': xminmax['q'][0],            'max': xminmax['q'][1],             'value': [xminmax['q'][0],              xminmax['q'][1]],               'step': 0.5},
+            'q2_default':       {'min': xminmax['q2'][0],           'max': xminmax['q2'][1],            'value': [xminmax['q2'][0],             xminmax['q2'][1]],              'step': 0.5},
+            'q4_default':       {'min': xminmax['q4'][0],           'max': xminmax['q4'][1],            'value': [xminmax['q4'][0],             xminmax['q4'][1]],              'step': 0.5},
+            'heatmap_default':  {'min': xminmax['heatmap'][0],      'max': xminmax['heatmap'][1],       'value': [xminmax['heatmap'][0],        xminmax['heatmap'][1]],         'step': 10}
+        },
+        'ylim': { 
+            'w': widgets.FloatRangeSlider(value=[yminmax['start'][2], yminmax['start'][3]], min=yminmax['start'][0], max=yminmax['start'][1], step=0.5, layout=widgets.Layout(width='95%')),
+            'state': 'heatmap' if options['heatmap'] else 'diff',
+            'diff_default':     {'min': yminmax['diff'][0],         'max': yminmax['diff'][1],          'value': [yminmax['diff'][2],           yminmax['diff'][3]],            'step': 0.1},
+            'heatmap_default':  {'min': yminmax['heatmap'][0],      'max': yminmax['heatmap'][1],       'value': [yminmax['heatmap'][0],        yminmax['heatmap'][1]],         'step': 0.1}
         }
     }
 
@@ -326,7 +336,7 @@ def plot_diffractogram_interactive(data, options):
         heatmap=widgets.ToggleButton(value=options['heatmap']),
         x_vals=widgets.Dropdown(options=['2th', 'd', '1/d', 'q', 'q2', 'q4', '2th_cuka', '2th_moka'], value='2th', description='X-values'),
         xlim=options['widgets']['xlim']['w'],
-        ylim=widgets.FloatRangeSlider(value=[ymin_start, ymax_start], min=ymin, max=ymax, step=0.5, layout=widgets.Layout(width='95%')),
+        ylim=options['widgets']['ylim']['w'],
         offset_y=widgets.BoundedFloatText(value=options['offset_y'], min=-5, max=5, step=0.01),
         offset_x=widgets.BoundedFloatText(value=options['offset_x'], min=-1, max=1, step=0.01)
         )
@@ -341,61 +351,122 @@ def plot_diffractogram_interactive(data, options):
     display(w)
 
 
-def update_minmax(minmax, data, options={}):
+def update_xminmax(xminmax, data, options={}):
     ''' Finds minimum and maximum values of each column and updates the minmax dictionary to contain the correct values.
     
     Input:
     minmax (dict): contains '''
 
     for index, diffractogram in enumerate(data['diffractogram']):
-        if not minmax['2th'][0] or diffractogram['2th'].min() < minmax['2th'][0]:
-            minmax['2th'][0] = diffractogram['2th'].min()
+        if not xminmax['2th'][0] or diffractogram['2th'].min() < xminmax['2th'][0]:
+            xminmax['2th'][0] = diffractogram['2th'].min()
             min_index = index
 
-        if not minmax['2th'][1] or diffractogram['2th'].max() > minmax['2th'][1]:
-            minmax['2th'][1] = diffractogram['2th'].max()
+        if not xminmax['2th'][1] or diffractogram['2th'].max() > xminmax['2th'][1]:
+            xminmax['2th'][1] = diffractogram['2th'].max()
             max_index = index
 
-    minmax['2th_cuka'][0], minmax['2th_cuka'][1] = data['diffractogram'][min_index]['2th_cuka'].min(),  data['diffractogram'][max_index]['2th_cuka'].max()
-    minmax['2th_moka'][0], minmax['2th_moka'][1] = data['diffractogram'][min_index]['2th_moka'].min(),  data['diffractogram'][max_index]['2th_moka'].max() 
-    minmax['d'][0], minmax['d'][1]               = data['diffractogram'][max_index]['d'].min(),         data['diffractogram'][min_index]['d'].max() # swapped, intended
-    minmax['1/d'][0], minmax['1/d'][1]           = data['diffractogram'][min_index]['1/d'].min(),       data['diffractogram'][max_index]['1/d'].max() 
-    minmax['q'][0], minmax['q'][1]               = data['diffractogram'][min_index]['q'].min(),         data['diffractogram'][max_index]['q'].max()
-    minmax['q2'][0], minmax['q2'][1]             = data['diffractogram'][min_index]['q2'].min(),        data['diffractogram'][max_index]['q2'].max() 
-    minmax['q4'][0], minmax['q4'][1]             = data['diffractogram'][min_index]['q4'].min(),        data['diffractogram'][max_index]['q4'].max() 
-    minmax['heatmap'] = options['heatmap_xlim']
+    xminmax['2th_cuka'][0], xminmax['2th_cuka'][1] = data['diffractogram'][min_index]['2th_cuka'].min(),  data['diffractogram'][max_index]['2th_cuka'].max()
+    xminmax['2th_moka'][0], xminmax['2th_moka'][1] = data['diffractogram'][min_index]['2th_moka'].min(),  data['diffractogram'][max_index]['2th_moka'].max() 
+    xminmax['d'][0], xminmax['d'][1]               = data['diffractogram'][max_index]['d'].min(),         data['diffractogram'][min_index]['d'].max() # swapped, intended
+    xminmax['1/d'][0], xminmax['1/d'][1]           = data['diffractogram'][min_index]['1/d'].min(),       data['diffractogram'][max_index]['1/d'].max() 
+    xminmax['q'][0], xminmax['q'][1]               = data['diffractogram'][min_index]['q'].min(),         data['diffractogram'][max_index]['q'].max()
+    xminmax['q2'][0], xminmax['q2'][1]             = data['diffractogram'][min_index]['q2'].min(),        data['diffractogram'][max_index]['q2'].max() 
+    xminmax['q4'][0], xminmax['q4'][1]             = data['diffractogram'][min_index]['q4'].min(),        data['diffractogram'][max_index]['q4'].max() 
+    xminmax['heatmap'] = options['heatmap_xlim']
+
+
+    xminmax['start'][0], xminmax['start'][1] = xminmax[options['x_vals']][0], xminmax[options['x_vals']][1]
+    xminmax['start'][2], xminmax['start'][3] = xminmax[options['x_vals']][0], xminmax[options['x_vals']][1]
+
+
+def update_yminmax(yminmax: dict, data, options={}):
+    
+    for index, diffractogram in enumerate(data['diffractogram']):
+        if not yminmax['diff'][0] or (yminmax['diff'][0] > (diffractogram['I'].min())): 
+            yminmax['diff'][0] = diffractogram['I'].min()
+
+        if not yminmax['diff'][1] or (yminmax['diff'][1] < (diffractogram['I'].max())):
+            yminmax['diff'][1] = diffractogram['I'].max()
+
+
+    # Set start values of ymin and ymax to be slightly below lowest data points and slightly above highest data points to give some whitespace around the plot
+    yminmax['diff'][2] = yminmax['diff'][0] - 0.1*yminmax['diff'][1]
+    yminmax['diff'][3] = yminmax['diff'][1] + 0.2*yminmax['diff'][1]
+    
+    # Allow for adjustment up to five times ymax above and below data
+    yminmax['diff'][0] = yminmax['diff'][0] - 5*yminmax['diff'][1]
+    yminmax['diff'][1] = yminmax['diff'][1]*5
+
+
+    yminmax['heatmap'][0] = 0
+    yminmax['heatmap'][1] = data['heatmap'].shape[0]
+
+
+    if options['heatmap']:
+        yminmax['start'][0], yminmax['start'][1] = yminmax['heatmap'][0], yminmax['heatmap'][1]
+        yminmax['start'][2], yminmax['start'][3] = yminmax['heatmap'][0], yminmax['heatmap'][1]
+
+    else:
+        # The third and fourth index are different here to not be zoomed completely out to begin with.
+        yminmax['start'][0], yminmax['start'][1] = yminmax['diff'][0], yminmax['diff'][1]
+        yminmax['start'][2], yminmax['start'][3] = yminmax['diff'][2], yminmax['diff'][3]
+    
 
 
 
 def update_widgets(options):
 
-    for widget in options['widgets'].values():
+    for widget, attr in options['widgets'].items():
 
-        if options['heatmap'] and (widget['state'] != 'heatmap'):
-            setattr(widget['w'], 'min', widget['heatmap_default']['min'])
-            setattr(widget['w'], 'max', widget['heatmap_default']['max'])
-            setattr(widget['w'], 'value', widget['heatmap_default']['value'])
-            setattr(widget['w'], 'step', widget['heatmap_default']['step'])
+        if widget == 'xlim':
 
-            widget['state'] = 'heatmap'
-        
-        elif not options['heatmap'] and (widget['state'] != options['x_vals']):
-            for arg in widget[f'{options["x_vals"]}_default']:
+            if options['heatmap'] and (attr['state'] != 'heatmap'):
+                setattr(attr['w'], 'min', attr['heatmap_default']['min'])
+                setattr(attr['w'], 'max', attr['heatmap_default']['max'])
+                setattr(attr['w'], 'value', attr['heatmap_default']['value'])
+                setattr(attr['w'], 'step', attr['heatmap_default']['step'])
+
+                attr['state'] = 'heatmap'
+            
+            elif not options['heatmap'] and (attr['state'] != options['x_vals']):
+                for arg in attr[f'{options["x_vals"]}_default']:
+                    
+                    # If new min value is larger than previous max, or new max value is smaller than previous min, set the opposite first
+                    if arg == 'min':
+                        if attr[f'{options["x_vals"]}_default']['min'] > getattr(attr['w'], 'max'):
+                            setattr(attr['w'], 'max', attr[f'{options["x_vals"]}_default']['max'])
+                    
+                    elif arg == 'max':
+                        if attr[f'{options["x_vals"]}_default']['max'] < getattr(attr['w'], 'min'):
+                            setattr(attr['w'], 'min', attr[f'{options["x_vals"]}_default']['min'])
+
                 
-                # If new min value is larger than previous max, or new max value is smaller than previous min, set the opposite first
-                if arg == 'min':
-                    if widget[f'{options["x_vals"]}_default']['min'] > getattr(widget['w'], 'max'):
-                        setattr(widget['w'], 'max', widget[f'{options["x_vals"]}_default']['max'])
+                    setattr(attr['w'], arg, attr[f'{options["x_vals"]}_default'][arg])
                 
-                elif arg == 'max':
-                    if widget[f'{options["x_vals"]}_default']['max'] < getattr(widget['w'], 'min'):
-                        setattr(widget['w'], 'min', widget[f'{options["x_vals"]}_default']['min'])
+                
+                attr['state'] = options['x_vals']
 
-            
-                setattr(widget['w'], arg, widget[f'{options["x_vals"]}_default'][arg])
-            
-            
-            widget['state'] = options['x_vals']
+        elif widget == 'ylim':
+            state = 'heatmap' if options['heatmap'] else 'diff'
+    
+            if attr['state'] != state:
+
+                for arg in attr[f'{state}_default']:
+                    # If new min value is larger than previous max, or new max value is smaller than previous min, set the opposite first
+                    if arg == 'min':                     
+                        if attr[f'{state}_default']['min'] > getattr(attr['w'], 'max'):
+                            setattr(attr['w'], 'max', attr[f'{state}_default']['max'])
+                    
+                    elif arg == 'max':
+                        if attr[f'{state}_default']['max'] < getattr(attr['w'], 'min'):
+                            setattr(attr['w'], 'min', attr[f'{state}_default']['min'])
+
+                
+                    setattr(attr['w'], arg, attr[f'{state}_default'][arg])
+
+                attr['state'] = state
+
 
 
 
