@@ -358,8 +358,17 @@ def read_data(data, options={}, index=0):
 
 def apply_offset(diffractogram, wavelength, index, options):
 
-    options['current_offset_y'] = options['offset_y']
+    if 'current_offset_y' not in options.keys():
+        options['current_offset_y'] = options['offset_y']
+    else:
+        if options['current_offset_y'] != options['offset_y']:
+            options['offset_change'] = True
+        
+        options['current_offset_y'] = options['offset_y']
+
     options['current_offset_x'] = options['offset_x']
+
+    
 
     #Apply offset along y-axis
     diffractogram['I'] = diffractogram['I_org'] # Reset intensities
