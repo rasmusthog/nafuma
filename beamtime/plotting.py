@@ -182,7 +182,7 @@ def adjust_plot(fig, ax, options):
         ax.xaxis.set_minor_locator(MultipleLocator(options['x_tick_locators'][1]))
 
     
-    # THIS NEEDS REWORK FOR IT TO FUNCTION PROPERLY!
+    # FIXME THIS NEEDS REWORK FOR IT TO FUNCTION PROPERLY!
     if options['xticks']:
         ax.set_xticks(np.arange(plot_data['start'], plot_data['end']+1))
         ax.set_xticklabels(options['xticks'])

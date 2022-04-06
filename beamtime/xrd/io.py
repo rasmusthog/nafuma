@@ -40,7 +40,7 @@ def integrate_1d(data, options={}, index=0):
     df: DataFrame contianing 1D diffractogram if option 'return' is True
     ''' 
 
-    required_options = ['unit', 'nbins', 'save', 'save_filename', 'save_extension', 'save_folder', 'overwrite']
+    required_options = ['unit', 'nbins', 'save', 'save_filename', 'save_extension', 'save_folder', 'overwrite', 'extract_folder']
 
     default_options = {
         'unit': '2th_deg', 
@@ -358,8 +358,17 @@ def read_data(data, options={}, index=0):
 
 def apply_offset(diffractogram, wavelength, index, options):
 
-    options['current_offset_y'] = options['offset_y']
+    if 'current_offset_y' not in options.keys():
+        options['current_offset_y'] = options['offset_y']
+    else:
+        if options['current_offset_y'] != options['offset_y']:
+            options['offset_change'] = True
+        
+        options['current_offset_y'] = options['offset_y']
+
     options['current_offset_x'] = options['offset_x']
+
+    
 
     #Apply offset along y-axis
     diffractogram['I'] = diffractogram['I_org'] # Reset intensities
@@ -391,7 +400,7 @@ def revert_offset(diffractogram,which=None):
 
     return diffractogram
 
-def load_reflection_table(data, options={}):
+def load_reflection_table(data: dict, reflections_params: dict, options={}):
 
     required_options = ['ref_wavelength', 'to_wavelength']
 
@@ -404,12 +413,12 @@ def load_reflection_table(data, options={}):
 
     # VESTA outputs the file with a header that has a space between the parameter and units - so there is some extra code to rectify the issue
     # that ensues from this formatting
-    reflections = pd.read_csv(data['path'], delim_whitespace=True)
+    reflections = pd.read_csv(reflections_params['path'], delim_whitespace=True)
 
     # Remove the extra column that appears from the headers issue
     reflections.drop(reflections.columns[-1], axis=1, inplace=True)
 
-    with open(data['path'], 'r') as f:
+    with open(reflections_params['path'], 'r') as f:
         line = f.readline()
 
         headers = line.split()
@@ -425,13 +434,28 @@ def load_reflection_table(data, options={}):
 
     reflections = translate_wavelengths(data=reflections, wavelength=options['ref_wavelength'], to_wavelength=options['to_wavelength'])
 
-    #print(reflections)
+    if 'heatmap' in data.keys():
+        
+        start_2th, stop_2th = data['diffractogram'][0]['2th'].min(), data['diffractogram'][0]['2th'].max()
+        len_2th = stop_2th - start_2th 
+        #print(start_2th, stop_2th, len_2th)
+        
+        start_heatmap, stop_heatmap = 0, data['heatmap'].shape[1]
+        len_heatmap = stop_heatmap - start_heatmap
+        #print(start_heatmap, stop_heatmap, len_heatmap)
+
+        scale = len_heatmap/len_2th
+
+        #print(scale)
+        #print(stop_2th * scale)
+
+        reflections['heatmap'] = (reflections['2th']-start_2th) * scale
 
     return reflections
 
 
 
-def translate_wavelengths(data, wavelength, to_wavelength=None):
+def translate_wavelengths(data: pd.DataFrame, wavelength: float, to_wavelength=None) -> pd.DataFrame:
     # FIXME Somewhere here there is an invalid arcsin-argument. Not sure where.
 
     pd.options.mode.chained_assignment = None

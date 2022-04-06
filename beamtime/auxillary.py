@@ -1,4 +1,5 @@
 import json
+import numpy as np
 
 def update_options(options, required_options, default_options):
     ''' Takes a dictionary of options along with a list of required options and dictionary of default options, and sets all keyval-pairs of options that is not already defined to the default values'''
@@ -37,6 +38,18 @@ def swap_values(dict, key1, key2):
 
 
 
-def hello_world2(a=1, b=2):
+def ceil(a, roundto=1):
 
-    print(f'Halla, MAFAKKAS! a = {a} og b = {b}')
+    fac = 1/roundto
+
+    a = np.ceil(a*fac) / fac
+
+    return a
+
+def floor(a, roundto=1):
+
+    fac = 1/roundto
+
+    a = np.floor(a*fac) / fac
+
+    return a
