@@ -1,7 +1,7 @@
 import pandas as pd
 import matplotlib.pyplot as plt
 import os
-
+import numpy as np
 
 def split_xanes_scan(root, destination=None, replace=False):
     #root is the path to the beamtime-folder
