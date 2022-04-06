@@ -1,13 +1,11 @@
 import beamtime.auxillary as aux
 
 import matplotlib.pyplot as plt
-from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,AutoMinorLocator)
-from mpl_toolkits.axes_grid.inset_locator import (inset_axes, InsetPosition, mark_inset)
+from matplotlib.ticker import (MultipleLocator)
 import importlib
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 import matplotlib.lines as mlines
-from cycler import cycler
 import itertools
 
 
