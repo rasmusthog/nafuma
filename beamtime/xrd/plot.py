@@ -54,7 +54,7 @@ def plot_diffractogram(data, options={}):
             default_options['offset_y'] = 0.05
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
-    options['current_offset_y'] = options['offset_y']
+    #options['current_offset_y'] = options['offset_y']
 
     # Convert data['path'] to list to allow iteration over this to accommodate both single and multiple diffractograms
     if not isinstance(data['path'], list):
