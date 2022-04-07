@@ -4,6 +4,7 @@ import itertools
 import numpy as np
 
 import matplotlib.pyplot as plt
+import matplotlib as mpl
 
 
 def test_generate_colours() -> None:
@@ -129,4 +130,52 @@ def test_determine_height() -> None:
     assert (btp.determine_height(format_params=format_params, width=width) - 0.333333333333333) < 10e-7
 
     assert True
+
+
+
+def test_prepare_plot() -> None:
+
+    fig, ax = btp.prepare_plot()
+
+    assert type(fig) == plt.Figure
+    assert fig.get_dpi() == 600
+    assert ax.get_xlim() == (0.0, 1.0)
+
+
+
+def test_adjust_plot() -> None:
+
+    fig, ax = btp.prepare_plot()
+
+    options = {
+        'xlim': (0.0, 2.0),
+        'title': 'Test'
+    }
+
+    fig, ax = btp.adjust_plot(fig, ax, options)
+
+
+    assert ax.get_xlim() == (0.0, 2.0)
+    assert ax.get_title() == 'Test'
+
+
+    
+def test_ipywidgets_update() -> None:
+
+
+
+    def test_func(data, options):
+        test1 = options['test1']
+        test2 = options['test2']
+
+        assert type(data) == dict
+        assert test1 == 1
+        assert test2 == 2
+
+
+
+    data = {}
+    options = {}
+
+    btp.ipywidgets_update(func=test_func, data=data, options=options, test1=1, test2=2)
 

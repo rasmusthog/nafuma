@@ -20,8 +20,15 @@ def prepare_plot(options={}):
     
     format_params will determine the size, aspect ratio, resolution etc. of the figure. Should be modified to conform with any requirements from a journal.'''
 
-    rc_params = options['rc_params']
-    format_params = options['format_params']
+    if 'rc_params' in options.keys():
+        rc_params = options['rc_params']
+    else:
+        rc_params = {}
+
+    if 'format_params' in options.keys():
+        format_params = options['format_params']
+    else:
+        format_params = {}
     
     required_format_params = ['single_column_width', 'double_column_width', 'column_type', 'width_ratio', 'aspect_ratio', 
     'width', 'height', 'compress_width', 'compress_height', 'upscaling_factor', 'dpi',
@@ -80,53 +87,14 @@ def prepare_plot(options={}):
 
         return fig, axes
 
-def prepare_plots(options={}):
-
-    rc_params = options['rc_params']
-    format_params = options['format_params']
-    
-    required_options = ['single_column_width', 'double_column_width', 'column_type', 'width_ratio', 'aspect_ratio', 'compress_width', 'compress_height', 'upscaling_factor', 'dpi']
-
-    default_options = {
-    'single_column_width': 8.3,
-    'double_column_width': 17.1,
-    'column_type': 'single',
-    'width_ratio': '1:1',
-    'aspect_ratio': '1:1',
-    'compress_width': 1,
-    'compress_height': 1,
-    'upscaling_factor': 1.0,
-    'dpi': 600, 
-    }
-    
-    format_params = aux.update_options(format_params, required_options, default_options)
-
-
-    # Reset run commands
-    plt.rcdefaults()
-    
-    # Update run commands if any is passed (will pass an empty dictionary if not passed)
-    update_rc_params(rc_params)
-    
-    width = determine_width(format_params)
-    height = determine_height(format_params, width)
-    width, height = scale_figure(options=format_params, width=width, height=height)
-
-
-    if options['plot_kind'] == 'relative':
-        fig, axes = plt.subplots(nrows=1, ncols=options['number_of_frames'], figsize=(width,height), facecolor='w', dpi=format_params['dpi'])
-
-    elif options['plot_kind'] == 'absolute':
-        fig, axes = plt.subplots(nrows=2, ncols=options['number_of_frames'], figsize=(width,height), gridspec_kw={'height_ratios': [1,5]}, facecolor='w', dpi=format_params['dpi'])
-    
-    return fig, axes
-
 
 def adjust_plot(fig, ax, options):
     ''' A general function to adjust plot according to contents of the options-dictionary '''
     
     required_options = [
     'plot_kind', 
+    'xlabel', 'ylabel',
+    'xunit', 'yunit',
     'hide_x_labels', 'hide_y_labels',
     'hide_x_ticklabels', 'hide_y_ticklabels',
     'hide_x_ticks', 'hide_y_ticks',
@@ -141,6 +109,8 @@ def adjust_plot(fig, ax, options):
 
     default_options = {
         'plot_kind': None, # defaults to None, but should be utilised when requiring special formatting for a particular plot 
+        'xlabel': None, 'ylabel': None,
+        'xunit': None, 'yunit': None,
         'hide_x_labels': False, 'hide_y_labels': False, # Whether the main labels on the x- and/or y-axes should be hidden
         'hide_x_ticklabels': False, 'hide_y_ticklabels': False, # Whether ticklabels on the x- and/or y-axes should be hidden
         'hide_x_ticks': False, 'hide_y_ticks': False, # Whether the ticks on the x- and/or y-axes should be hidden
@@ -303,28 +273,6 @@ def ipywidgets_update(func, data, options={}, **kwargs):
 
     # Call the function with the plot_data and options-dictionaries
     func(data=data, options=options)
-
-
-def update_widgets(options):
-
-    for widget in options['widgets'].values():
-
-        if widget['state'] != options['x_vals']:
-            for arg in widget[f'{options["x_vals"]}_default']:
-                
-                # If new min value is larger than previous max, or new max value is smaller than previous min, set the opposite first
-                if arg == 'min':
-                    if widget[f'{options["x_vals"]}_default']['min'] > getattr(widget['w'], 'max'):
-                        setattr(widget['w'], 'max', widget[f'{options["x_vals"]}_default']['max'])
-                
-                elif arg == 'max':
-                    if widget[f'{options["x_vals"]}_default']['max'] < getattr(widget['w'], 'min'):
-                        setattr(widget['w'], 'min', widget[f'{options["x_vals"]}_default']['min'])
-
-            
-                setattr(widget['w'], arg, widget[f'{options["x_vals"]}_default'][arg])
-            
-            widget['state'] = options['x_vals']
 
 
 
