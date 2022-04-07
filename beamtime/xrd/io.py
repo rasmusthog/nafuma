@@ -149,7 +149,7 @@ def average_images(images):
     image_arrays = []
 
     for image in images:
-        image_array = xrd.io.get_image_array(image)
+        image_array = get_image_array(image)
         image_arrays.append(image_array)
     
     
