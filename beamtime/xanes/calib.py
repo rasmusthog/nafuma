@@ -13,7 +13,7 @@ def rbkerbest():
 ##Better to make a new function that loops through the files, and performing the split_xanes_scan on
 
 
-def split_xanes_scan(root, destination=None, replace=False):
+def split_xanes_scan(filename, destination=None, replace=False):
     #root is the path to the beamtime-folder
     #destination should be the path to the processed data
     

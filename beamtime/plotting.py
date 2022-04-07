@@ -151,9 +151,9 @@ def adjust_plot(fig, ax, options):
 
     
     # FIXME THIS NEEDS REWORK FOR IT TO FUNCTION PROPERLY!
-    if options['xticks']:
-        ax.set_xticks(np.arange(plot_data['start'], plot_data['end']+1))
-        ax.set_xticklabels(options['xticks'])
+    #if options['xticks']:
+    #    ax.set_xticks(np.arange(plot_data['start'], plot_data['end']+1))
+    #    ax.set_xticklabels(options['xticks'])
     # else:
     #     ax.set_xticks(np.arange(plot_data['start'], plot_data['end']+1))
     #     ax.set_xticklabels([x/2 for x in np.arange(plot_data['start'], plot_data['end']+1)])
