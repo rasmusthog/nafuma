@@ -44,7 +44,7 @@ def pre_edge_subtraction(path, options={}):
     #Defining the end of the region used to define the background, thus start of the edge
     #implement widget
     if edge == 'Mn':
-        edge_start = 6.45
+        edge_start = 6.42
     if edge == 'Ni':
         edge_start = 8.3
 
@@ -73,30 +73,44 @@ def pre_edge_subtraction(path, options={}):
     #Plotting the calculated pre-edge background with the region used for the regression   
     if options['print'] == True:
     #Plotting an example of the edge_start region and the fitted background that will later be subtracted
-        fig, (ax1,ax2) = plt.subplots(1,2,figsize=(15,5))
-        df.plot(x = "ZapEnergy",y=filenames[0],ax=ax1) #defining x and y
+        fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(15,5))
+        df.plot(x="ZapEnergy", y=filenames,color="Black",ax=ax1)
+        df_bkgd.plot(x="ZapEnergy", y=filenames,color="Red",ax=ax1)
         plt.axvline(x = max(df_start["ZapEnergy"])) 
         #fig = plt.figure(figsize=(15,15))
-        df_bkgd.plot(x="ZapEnergy", y=filenames[0],color="Red",ax=ax1)
+        df_bkgd.plot(x="ZapEnergy", y=filenames,color="Red",ax=ax2)
         ax1.set_title('Data and fitted background')
+        #Zooming into bacground region to confirm fit and limits looks reasonable
+        df.plot(x = "ZapEnergy",y=filenames,ax=ax2) #defining x and y)
+        ax2.set_xlim([min(df_start["ZapEnergy"]),max(df_start["ZapEnergy"])+0.01])
+        #finding maximum and minimum values in the backgrounds
+        min_values=[]
+        max_values=[]
+        for file in filenames:
+            min_values.append(min(df_start[file]))
+            max_values.append(max(df_start[file]))
+        ax2.set_ylim([min(min_values),max(max_values)])
+        plt.axvline(x = max(df_start["ZapEnergy"]))
+        #ax2.set_xlim([25, 50])
     ###################### Subtracting the pre edge from xmap_roi00   ################
+
     #making a new dataframe to insert the background subtracted intensities
     df_bkgd_sub = pd.DataFrame(df["ZapEnergy"])
-    #inserting the pre_edge-background subtracted original xmap_roi00 data
+    #inserting the background subtracted original xmap_roi00 data
 
     for files in filenames:
         newintensity_calc=df[files]-df_bkgd[files]
         df_bkgd_sub.insert(1,files,newintensity_calc) 
 
     if options['print'] == True:
-        df.plot(x = "ZapEnergy",y=filenames[0], color="Black", ax=ax2, legend=False)
-        plt.axvline(x = max(df_start["ZapEnergy"])) 
-        df_bkgd_sub.plot(x="ZapEnergy", y=filenames[0],color="Red",ax=ax2, legend=False)
-        ax2.set_title('Data and background-subtracted data')
+        df.plot(x = "ZapEnergy",y=filenames, color="Black", ax=ax3, legend=False)
+        #plt.axvline(x = max(df_start["ZapEnergy"])) 
+        df_bkgd_sub.plot(x="ZapEnergy", y=filenames,color="Red",ax=ax3, legend=False)
+        ax3.set_title('Data and background-subtracted data')
 
-    return df_bkgd_sub
+    return df_bkgd_sub,filenames,edge
 
-def post_edge_normalization(df,df_backg_sub,filenames, options={}):
+def post_edge_normalization(path, options={}):
 
     required_options = ['print']
     default_options = {
@@ -104,7 +118,7 @@ def post_edge_normalization(df,df_backg_sub,filenames, options={}):
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
     
-    edge=finding_edge(df)
+    df_bkgd_sub,filenames,edge = pre_edge_subtraction(path)
     #Defining the end of the pre-edge-region for Mn/Ni, thus start of the edge
     #Implement widget
     if edge == 'Mn':
@@ -112,22 +126,26 @@ def post_edge_normalization(df,df_backg_sub,filenames, options={}):
     if edge == 'Ni':
         edge_stop = 8.361
 
-    absolute_difference_function = lambda list_value : abs(list_value - edge_stop) 
-    edge_stop_value = min(df_backg_sub["ZapEnergy"], key=absolute_difference_function) 
-    end_index=df_backg_sub[df_backg_sub["ZapEnergy"]==edge_stop_value].index.values[0] 
+#=============================================================
+    #absolute_difference_function = lambda list_value : abs(list_value - edge_stop) 
+    #edge_stop_value = min(df_bkgd_sub["ZapEnergy"], key=absolute_difference_function) 
+    #end_index=df_bkgd_sub[df_bkgd_sub["ZapEnergy"]==edge_stop_value].index.values[0] 
     #Defining x-range for linear fit
-    df_fix=df_backg_sub
-    df_fix.dropna(inplace=True) #Removing all indexes without any value, as some of the data sets misses the few last data points and fucks up the fit
-    df_end=df_fix[end_index:] #The region of interest for the post edge
-    #print(df_end)
+    #df_fix=df_bkgd_sub
+    #df_fix.dropna(inplace=True) 
+    #df_end=df_fix[end_index:] #The region of interest for the post edge
+    
     #Fitting linear function to the pre-edge using the background corrected intensities to make the post edge fit
-    df_postedge = pd.DataFrame(df["ZapEnergy"])
+ #===============================================================
+    df_end= df_bkgd_sub.loc[df_bkgd_sub["ZapEnergy"] > edge_stop] # new dataframe only containing the post edge -> to be fitted
+    df_end.dropna(inplace=True) #Removing all indexes without any value, as some of the data sets misses the few last data points and fucks up the fit
+    df_postedge = pd.DataFrame(df_bkgd_sub["ZapEnergy"]) #making a new dataframe 
 
     function_post_list=[]
     for files in filenames: 
         d = np.polyfit(df_end["ZapEnergy"],df_end[files],1)
         function_post = np.poly1d(d)
-        y_post=function_post(df["ZapEnergy"])
+        y_post=function_post(df_bkgd_sub["ZapEnergy"]) 
         function_post_list.append(function_post)
         df_postedge.insert(1,files,y_post) #adding a new column with the y-values of the fitted post edge
 
@@ -135,13 +153,13 @@ def post_edge_normalization(df,df_backg_sub,filenames, options={}):
     #print(df_postedge)    
     #Plotting the background subtracted signal with the post-edge regression line and the start point for the linear regression line
     if options['print'] == True:
-        ax = df_backg_sub.plot(x = "ZapEnergy",y=filenames) #defining x and y
-        plt.axvline(x = edge_stop_value) 
+        ax = df_bkgd_sub.plot(x = "ZapEnergy",y=filenames) #defining x and y
+        plt.axvline(x = min(df_end["ZapEnergy"])) 
         fig = plt.figure(figsize=(15,15))
         df_postedge.plot(x="ZapEnergy", y=filenames,color="Green",ax=ax, legend=False)  
         #print(function_post_list)
         #print(function_post)
-        ax = df_backg_sub.plot(x = "ZapEnergy",y=filenames, legend=False) #defining x and y
+        ax = df_bkgd_sub.plot(x = "ZapEnergy",y=filenames, legend=False) #defining x and y
         df_postedge.plot(x="ZapEnergy", y=filenames,color="Green",ax=ax, legend=False)  
-        plt.axvline(x = edge_stop_value) 
+        plt.axvline(x = min(df_end["ZapEnergy"])) 
  
