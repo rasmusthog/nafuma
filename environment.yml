@@ -2,6 +2,7 @@ name: nafuma
 channels:
   - diffpy
   - defaults
+  - conda-forge
 dependencies:
   - ipywidgets
   - seaborn
