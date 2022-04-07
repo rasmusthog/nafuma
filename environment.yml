@@ -1,15 +1,15 @@
-name: beamtime
+name: nafuma
 channels:
-  - conda-forge
   - diffpy
   - defaults
 dependencies:
-  - pandas
-  - numpy
-  - matplotlib
   - ipywidgets
-  - palettable
-  - sympy
   - seaborn
+  - sympy
+  - matplotlib
   - pytest
-prefix: C:\Users\rasmusvt\Anaconda3\envs\beamtime
+  - numpy
+  - pandas
+  - palettable
+  - pyfai
+prefix: C:\Users\rasmusvt\Anaconda3\envs\nafuma
