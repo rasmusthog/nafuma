@@ -9,9 +9,9 @@ import math
 import ipywidgets as widgets
 from IPython.display import display
 
-import beamtime.xrd as xrd
-import beamtime.auxillary as aux
-import beamtime.plotting as btp
+import nafuma.xrd as xrd
+import nafuma.auxillary as aux
+import nafuma.plotting as btp
 
 
 def plot_diffractogram(data, options={}):

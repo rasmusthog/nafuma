@@ -9,7 +9,7 @@ import zipfile
 import xml.etree.ElementTree as ET
 
 
-import beamtime.auxillary as aux
+import nafuma.auxillary as aux
 
 
 def get_image_array(path):

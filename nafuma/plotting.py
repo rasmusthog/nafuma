@@ -1,4 +1,4 @@
-import beamtime.auxillary as aux
+import nafuma.auxillary as aux
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator)

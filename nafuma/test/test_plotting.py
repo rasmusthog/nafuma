@@ -1,4 +1,4 @@
-import beamtime.plotting as btp
+import nafuma.plotting as btp
 from cycler import cycler
 import itertools
 import numpy as np

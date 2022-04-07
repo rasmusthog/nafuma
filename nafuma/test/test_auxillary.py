@@ -1,4 +1,4 @@
-import beamtime.auxillary as aux
+import nafuma.auxillary as aux
 import os
 
 def test_swap_values():
