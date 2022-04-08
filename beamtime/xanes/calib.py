@@ -126,18 +126,7 @@ def post_edge_normalization(path, options={}):
     if edge == 'Ni':
         edge_stop = 8.361
 
-#=============================================================
-    #absolute_difference_function = lambda list_value : abs(list_value - edge_stop) 
-    #edge_stop_value = min(df_bkgd_sub["ZapEnergy"], key=absolute_difference_function) 
-    #end_index=df_bkgd_sub[df_bkgd_sub["ZapEnergy"]==edge_stop_value].index.values[0] 
-    #Defining x-range for linear fit
-    #df_fix=df_bkgd_sub
-    #df_fix.dropna(inplace=True) 
-    #df_end=df_fix[end_index:] #The region of interest for the post edge
-    
-    #Fitting linear function to the pre-edge using the background corrected intensities to make the post edge fit
- #===============================================================
-    df_end= df_bkgd_sub.loc[df_bkgd_sub["ZapEnergy"] > edge_stop] # new dataframe only containing the post edge -> to be fitted
+    df_end= df_bkgd_sub.loc[df_bkgd_sub["ZapEnergy"] > edge_stop] # new dataframe only containing the post edge, where a regression line will be calculated in the for-loop below
     df_end.dropna(inplace=True) #Removing all indexes without any value, as some of the data sets misses the few last data points and fucks up the fit
     df_postedge = pd.DataFrame(df_bkgd_sub["ZapEnergy"]) #making a new dataframe 
 
@@ -149,17 +138,14 @@ def post_edge_normalization(path, options={}):
         function_post_list.append(function_post)
         df_postedge.insert(1,files,y_post) #adding a new column with the y-values of the fitted post edge
 
-    #print(filenames[0])
-    #print(df_postedge)    
     #Plotting the background subtracted signal with the post-edge regression line and the start point for the linear regression line
     if options['print'] == True:
         ax = df_bkgd_sub.plot(x = "ZapEnergy",y=filenames) #defining x and y
         plt.axvline(x = min(df_end["ZapEnergy"])) 
         fig = plt.figure(figsize=(15,15))
         df_postedge.plot(x="ZapEnergy", y=filenames,color="Green",ax=ax, legend=False)  
-        #print(function_post_list)
-        #print(function_post)
         ax = df_bkgd_sub.plot(x = "ZapEnergy",y=filenames, legend=False) #defining x and y
         df_postedge.plot(x="ZapEnergy", y=filenames,color="Green",ax=ax, legend=False)  
         plt.axvline(x = min(df_end["ZapEnergy"])) 
- 
+
+    return df_bkgd_sub, df_postedge
