@@ -1,0 +1,16 @@
+name: nafuma
+channels:
+  - diffpy
+  - defaults
+  - conda-forge
+dependencies:
+  - ipywidgets
+  - seaborn
+  - sympy
+  - matplotlib
+  - pytest
+  - numpy
+  - pandas
+  - palettable
+  - pyfai
+prefix: C:\Users\rasmusvt\Anaconda3\envs\nafuma

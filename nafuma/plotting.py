@@ -1,13 +1,11 @@
-import beamtime.auxillary as aux
+import nafuma.auxillary as aux
 
 import matplotlib.pyplot as plt
-from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,AutoMinorLocator)
-from mpl_toolkits.axes_grid.inset_locator import (inset_axes, InsetPosition, mark_inset)
+from matplotlib.ticker import (MultipleLocator)
 import importlib
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 import matplotlib.lines as mlines
-from cycler import cycler
 import itertools
 
 
@@ -22,8 +20,15 @@ def prepare_plot(options={}):
     
     format_params will determine the size, aspect ratio, resolution etc. of the figure. Should be modified to conform with any requirements from a journal.'''
 
-    rc_params = options['rc_params']
-    format_params = options['format_params']
+    if 'rc_params' in options.keys():
+        rc_params = options['rc_params']
+    else:
+        rc_params = {}
+
+    if 'format_params' in options.keys():
+        format_params = options['format_params']
+    else:
+        format_params = {}
     
     required_format_params = ['single_column_width', 'double_column_width', 'column_type', 'width_ratio', 'aspect_ratio', 
     'width', 'height', 'compress_width', 'compress_height', 'upscaling_factor', 'dpi',
@@ -82,53 +87,14 @@ def prepare_plot(options={}):
 
         return fig, axes
 
-def prepare_plots(options={}):
-
-    rc_params = options['rc_params']
-    format_params = options['format_params']
-    
-    required_options = ['single_column_width', 'double_column_width', 'column_type', 'width_ratio', 'aspect_ratio', 'compress_width', 'compress_height', 'upscaling_factor', 'dpi']
-
-    default_options = {
-    'single_column_width': 8.3,
-    'double_column_width': 17.1,
-    'column_type': 'single',
-    'width_ratio': '1:1',
-    'aspect_ratio': '1:1',
-    'compress_width': 1,
-    'compress_height': 1,
-    'upscaling_factor': 1.0,
-    'dpi': 600, 
-    }
-    
-    format_params = aux.update_options(format_params, required_options, default_options)
-
-
-    # Reset run commands
-    plt.rcdefaults()
-    
-    # Update run commands if any is passed (will pass an empty dictionary if not passed)
-    update_rc_params(rc_params)
-    
-    width = determine_width(format_params)
-    height = determine_height(format_params, width)
-    width, height = scale_figure(options=format_params, width=width, height=height)
-
-
-    if options['plot_kind'] == 'relative':
-        fig, axes = plt.subplots(nrows=1, ncols=options['number_of_frames'], figsize=(width,height), facecolor='w', dpi=format_params['dpi'])
-
-    elif options['plot_kind'] == 'absolute':
-        fig, axes = plt.subplots(nrows=2, ncols=options['number_of_frames'], figsize=(width,height), gridspec_kw={'height_ratios': [1,5]}, facecolor='w', dpi=format_params['dpi'])
-    
-    return fig, axes
-
 
 def adjust_plot(fig, ax, options):
     ''' A general function to adjust plot according to contents of the options-dictionary '''
     
     required_options = [
     'plot_kind', 
+    'xlabel', 'ylabel',
+    'xunit', 'yunit',
     'hide_x_labels', 'hide_y_labels',
     'hide_x_ticklabels', 'hide_y_ticklabels',
     'hide_x_ticks', 'hide_y_ticks',
@@ -143,6 +109,8 @@ def adjust_plot(fig, ax, options):
 
     default_options = {
         'plot_kind': None, # defaults to None, but should be utilised when requiring special formatting for a particular plot 
+        'xlabel': None, 'ylabel': None,
+        'xunit': None, 'yunit': None,
         'hide_x_labels': False, 'hide_y_labels': False, # Whether the main labels on the x- and/or y-axes should be hidden
         'hide_x_ticklabels': False, 'hide_y_ticklabels': False, # Whether ticklabels on the x- and/or y-axes should be hidden
         'hide_x_ticks': False, 'hide_y_ticks': False, # Whether the ticks on the x- and/or y-axes should be hidden
@@ -182,10 +150,10 @@ def adjust_plot(fig, ax, options):
         ax.xaxis.set_minor_locator(MultipleLocator(options['x_tick_locators'][1]))
 
     
-    # THIS NEEDS REWORK FOR IT TO FUNCTION PROPERLY!
-    if options['xticks']:
-        ax.set_xticks(np.arange(plot_data['start'], plot_data['end']+1))
-        ax.set_xticklabels(options['xticks'])
+    # FIXME THIS NEEDS REWORK FOR IT TO FUNCTION PROPERLY!
+    #if options['xticks']:
+    #    ax.set_xticks(np.arange(plot_data['start'], plot_data['end']+1))
+    #    ax.set_xticklabels(options['xticks'])
     # else:
     #     ax.set_xticks(np.arange(plot_data['start'], plot_data['end']+1))
     #     ax.set_xticklabels([x/2 for x in np.arange(plot_data['start'], plot_data['end']+1)])
@@ -307,17 +275,6 @@ def ipywidgets_update(func, data, options={}, **kwargs):
     func(data=data, options=options)
 
 
-def update_widgets(options):
-
-    for widget in options['widgets'].values():
-
-        if widget['state'] != options['x_vals']:
-            for arg in widget[f'{options["x_vals"]}_default']:
-                setattr(widget['w'], arg, widget[f'{options["x_vals"]}_default'][arg])
-            
-            widget['state'] = options['x_vals']
-
-
 
 def determine_width(format_params):
     ''' '''
@@ -366,16 +323,20 @@ def update_rc_params(rc_params):
             plt.rcParams.update({key: rc_params[key]})
 
 
-def generate_colours(palettes):
+def generate_colours(palettes, kind=None):
 
-    # Creates a list of all the colours that is passed in the colour_cycles argument. Then makes cyclic iterables of these. 
-    colour_collection = []
-    for palette in palettes:
-        mod = importlib.import_module("palettable.colorbrewer.%s" % palette[0])
-        colour = getattr(mod, palette[1]).mpl_colors
-        colour_collection = colour_collection + colour
+    if kind == 'single':
+        colour_cycle = itertools.cycle(palettes)
 
-    colour_cycle = itertools.cycle(colour_collection)
+    else:
+        # Creates a list of all the colours that is passed in the colour_cycles argument. Then makes cyclic iterables of these. 
+        colour_collection = []
+        for palette in palettes:
+            mod = importlib.import_module("palettable.colorbrewer.%s" % palette[0])
+            colour = getattr(mod, palette[1]).mpl_colors
+            colour_collection = colour_collection + colour
+
+        colour_cycle = itertools.cycle(colour_collection)
 
 
     return colour_cycle

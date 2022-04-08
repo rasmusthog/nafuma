@@ -5,7 +5,7 @@ import pandas as pd
 import numpy as np
 import math
 
-import beamtime.electrochemistry as ec
+import nafuma.electrochemistry as ec
 
 
 def plot_gc(path, kind, options=None):

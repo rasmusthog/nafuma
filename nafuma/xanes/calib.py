@@ -24,6 +24,7 @@ def finding_edge(df):
         edge='Ni'
         return(edge)
 
+<<<<<<< HEAD:beamtime/xanes/calib.py
 #def pre_edge_subtraction(df,filenames, options={}):
 def test(innmat):
     df_test= xas.io.put_in_dataframe(innmat)
@@ -40,6 +41,11 @@ def pre_edge_subtraction(path, options={}):
     filenames = xas.io.get_filenames(path)
     df= xas.io.put_in_dataframe(path)
     edge=finding_edge(df)
+=======
+def split_xanes_scan(filename, destination=None, replace=False):
+    #root is the path to the beamtime-folder
+    #destination should be the path to the processed data
+>>>>>>> master:nafuma/xanes/calib.py
     
     #Defining the end of the region used to define the background, thus start of the edge
     #implement widget
