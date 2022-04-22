@@ -49,12 +49,42 @@ def plot_gc(data, options=None):
 				cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
 
 
+	update_labels(options)
+	print(options['xunit'])
 
 	fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
 
 	return data['cycles'], fig, ax
 
 
+
+def update_labels(options):
+
+	if 'xlabel' not in options.keys():
+		options['xlabel'] = options['x_vals'].capitalize().replace('_', ' ')
+
+	if 'ylabel' not in options.keys():
+		options['ylabel'] = options['y_vals'].capitalize().replace('_', ' ')
+		
+
+	if 'xunit' not in options.keys():
+		if options['x_vals'] == 'capacity':
+			options['xunit'] = options['units']['capacity']
+		elif options['x_vals'] == 'specific_capacity':
+			options['xunit'] = f"{options['units']['capacity']} {options['units']['mass']}$^{{-1}}$"
+		elif options['x_vals'] == 'time':
+			options['xunit'] = options['units']['time']
+		elif options['x_vals'] == 'ions':
+			options['xunit'] = None
+		
+
+	if 'yunit' not in options.keys():
+		if options['y_vals'] == 'voltage':
+			options['yunit'] = options['units']['voltage']
+
+
+
+		
 	
 def update_cycles_list(cycles, options: dict) -> None:
 
