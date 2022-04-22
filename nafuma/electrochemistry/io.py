@@ -1,39 +1,27 @@
+from email.policy import default
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os
 
+import nafuma.auxillary as aux
+from sympy import re
 
-def read_data(path, kind, options=None):
+def read_data(data, options=None):
 
-	if kind == 'neware':
-		df = read_neware(path)
-		cycles = process_neware_data(df, options=options)
+	if data['kind'] == 'neware':
+		df = read_neware(data['path'])
+		cycles = process_neware_data(df=df, options=options)
 
-	elif kind == 'batsmall':
-		df = read_batsmall(path)
+	elif data['kind'] == 'batsmall':
+		df = read_batsmall(data['path'])
 		cycles = process_batsmall_data(df=df, options=options)
 
-	elif kind == 'biologic':
-		df = read_biologic(path)
+	elif data['kind'] == 'biologic':
+		df = read_biologic(data['path'])
 		cycles = process_biologic_data(df=df, options=options)
 
 	return cycles
-
-def read_batsmall(path):
-	''' Reads BATSMALL-data into a DataFrame.
-
-	Input:
-	path (required): string with path to datafile
-
-	Output:
-	df: pandas DataFrame containing the data as-is, but without additional NaN-columns.'''
-
-	df = pd.read_csv(path, skiprows=2, sep='\t')
-	df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
-
-	return df
-
 
 
 
@@ -42,6 +30,8 @@ def read_neware(path, summary=False):
 	which is the file format the Neware provides for the backup data. In this case it matters if summary is False or not. If file
 	type is .csv, it will just open the datafile and it does not matter if summary is False or not.'''
 	from xlsx2csv import Xlsx2csv
+
+	# FIXME Do a check if a .csv-file already exists even if the .xlsx is passed
 
 	# Convert from .xlsx to .csv to make readtime faster
 	if path.split('.')[-1] == 'xlsx':
@@ -66,6 +56,20 @@ def read_neware(path, summary=False):
 	return df
 
 
+def read_batsmall(path):
+	''' Reads BATSMALL-data into a DataFrame.
+
+	Input:
+	path (required): string with path to datafile
+
+	Output:
+	df: pandas DataFrame containing the data as-is, but without additional NaN-columns.'''
+
+	df = pd.read_csv(path, skiprows=2, sep='\t')
+	df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+
+	return df
+
 
 def read_biologic(path):
 	''' Reads Bio-Logic-data into a DataFrame.
@@ -89,10 +93,6 @@ def read_biologic(path):
 
 
 
-
-
-
-
 def process_batsmall_data(df, options=None):
 	''' Takes BATSMALL-data in the form of a DataFrame and cleans the data up and converts units into desired units.
 	Splits up into individual charge and discharge DataFrames per cycle, and outputs a list where each element is a tuple with the Chg and DChg-data. E.g. cycles[10][0] gives the charge data for the 11th cycle.
@@ -111,26 +111,25 @@ def process_batsmall_data(df, options=None):
 	'''
 
 	required_options = ['splice_cycles', 'molecular_weight', 'reverse_discharge', 'units']
-	default_options = {'splice_cycles': False, 'molecular_weight': None, 'reverse_discharge': False, 'units': None}
+	
+	default_options = {
+		'splice_cycles': False, 
+		'molecular_weight': None, 
+		'reverse_discharge': False, 
+		'units': None}
 
-	if not options:
-		options = default_options
-	else:
-		for option in required_options:
-			if option not in options.keys():
-				options[option] = default_options[option]
 
+	aux.update_options(options=options, required_options=required_options, default_options=default_options)
+	options['kind'] = 'batsmall'
 
 	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
-	new_units = set_units(units=options['units'])
-	old_units = get_old_units(df, kind='batsmall')
-	df = unit_conversion(df=df, new_units=new_units, old_units=old_units, kind='batsmall')
+	set_units(options)
+	options['old_units'] = get_old_units(df, options)
 
-	options['units'] = new_units
-
+	df = unit_conversion(df=df, options=options)
 
 	if options['splice_cycles']:
-		df = splice_cycles(df=df, kind='batsmall')
+		df = splice_cycles(df=df, options=options)
 
 	# Replace NaN with empty string in the Comment-column and then remove all steps where the program changes - this is due to inconsistent values for current  
 	df[["comment"]] = df[["comment"]].fillna(value={'comment': ''})
@@ -173,23 +172,21 @@ def process_batsmall_data(df, options=None):
 		cycles.append((chg_df, dchg_df))
 
 
-
-
 	return cycles
 
 
-def splice_cycles(df, kind):
+def splice_cycles(df, options: dict) -> pd.DataFrame:
+	''' Splices two cycles together - if e.g. one charge cycle are split into several cycles due to change in parameters. 
+	
+	Incomplete, only accomodates BatSmall so far.'''
 
-	if kind == 'batsmall':
+	if options['kind'] == 'batsmall':
 
 		# Creates masks for charge and discharge curves
 		chg_mask = df['current'] >= 0
 		dchg_mask = df['current'] < 0
 
-		# Get the number of cycles in the dataset
-		max_count = df["count"].max()
-
-	# Loop through all the cycling steps, change the current and capacities in the 
+		# Loop through all the cycling steps, change the current and capacities in the 
 		for i in range(df["count"].max()):
 			sub_df = df.loc[df['count'] == i+1]
 			sub_df_chg = sub_df.loc[chg_mask]
@@ -233,7 +230,7 @@ def splice_cycles(df, kind):
 
 
 
-def process_neware_data(df, options=None):
+def process_neware_data(df, options={}):
 
 	""" Takes data from NEWARE in a DataFrame as read by read_neware() and converts units, adds columns and splits into cycles.
 	
@@ -245,25 +242,26 @@ def process_neware_data(df, options=None):
 	molecular_weight: the molar mass (in g mol^-1) of the active material, to calculate the number of ions extracted. Assumes one electron per Li+/Na+-ion """
 	
 	required_options = ['units', 'active_material_weight', 'molecular_weight', 'reverse_discharge', 'splice_cycles']
-	default_options = {'units': None, 'active_material_weight': None, 'molecular_weight': None, 'reverse_discharge': False, 'splice_cycles': None}
+	
+	default_options = {
+		'units': None, 
+		'active_material_weight': None, 
+		'molecular_weight': None, 
+		'reverse_discharge': False, 
+		'splice_cycles': None}
 
-	if not options:
-		options = default_options
-	else:
-		for option in required_options:
-			if option not in options.keys():
-				options[option] = default_options[option]
+
+	aux.update_options(options=options, required_options=required_options, default_options=default_options)
+	options['kind'] = 'neware'
 
 
 	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
-	new_units = set_units(units=options['units'])
-	old_units = get_old_units(df=df, kind='neware')
+	set_units(options=options) # sets options['units']
+	options['old_units'] = get_old_units(df=df, options=options)
 	
-	df = add_columns(df=df, active_material_weight=options['active_material_weight'], molecular_weight=options['molecular_weight'], old_units=old_units, kind='neware')
+	df = add_columns(df=df, options=options) # adds columns to the DataFrame if active material weight and/or molecular weight has been passed in options
 
-	df = unit_conversion(df=df, new_units=new_units, old_units=old_units, kind='neware')
-
-	options['units'] = new_units
+	df = unit_conversion(df=df, options=options) # converts all units from the old units to the desired units
 
 
 	# Creates masks for charge and discharge curves
@@ -288,6 +286,8 @@ def process_neware_data(df, options=None):
 		if chg_df.empty and dchg_df.empty:
 			continue
 
+
+		# Reverses the discharge curve if specified
 		if options['reverse_discharge']:
 			max_capacity = dchg_df['capacity'].max() 
 			dchg_df['capacity'] = np.abs(dchg_df['capacity'] - max_capacity)
@@ -310,33 +310,32 @@ def process_neware_data(df, options=None):
 def process_biologic_data(df, options=None):
 
 	required_options = ['units', 'active_material_weight', 'molecular_weight', 'reverse_discharge', 'splice_cycles']
-	default_options = {'units': None, 'active_material_weight': None, 'molecular_weight': None, 'reverse_discharge': False, 'splice_cycles': None}
+	
+	default_options = {
+		'units': None, 
+		'active_material_weight': None, 
+		'molecular_weight': None, 
+		'reverse_discharge': False, 
+		'splice_cycles': None}
 
-	if not options:
-		options = default_options
-	else:
-		for option in required_options:
-			if option not in options.keys():
-				options[option] = default_options[option]
+
+	aux.update_options(options=options, required_options=required_options, default_options=default_options)
+	options['kind'] = 'biologic'
 
 	# Pick out necessary columns
 	df = df[['Ns changes', 'Ns', 'time/s', 'Ewe/V', 'Energy charge/W.h', 'Energy discharge/W.h', '<I>/mA',  'Capacity/mA.h', 'cycle number']].copy()
 
 	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
-	new_units = set_units(units=options['units'])
-	old_units = get_old_units(df=df, kind='biologic')
+	set_units(options)
+	options['old_units'] = get_old_units(df=df, options=options)
 	
-	df = add_columns(df=df, active_material_weight=options['active_material_weight'], molecular_weight=options['molecular_weight'], old_units=old_units, kind='biologic')
+	df = add_columns(df=df, options=options)
 
-	df = unit_conversion(df=df, new_units=new_units, old_units=old_units, kind='biologic')
-
-	options['units'] = new_units
-
+	df = unit_conversion(df=df, options=options)
 
 	# Creates masks for charge and discharge curves
 	chg_mask = (df['status'] == 1) & (df['status_change'] != 1)
 	dchg_mask = (df['status'] == 2) & (df['status_change'] != 1)
-
 
 
 	# Initiate cycles list
@@ -376,62 +375,62 @@ def process_biologic_data(df, options=None):
 	return cycles
 
 
-def add_columns(df, active_material_weight, molecular_weight, old_units, kind):
+def add_columns(df, options):
 
-	if kind == 'neware':
-		if active_material_weight:
-			df["SpecificCapacity({}/mg)".format(old_units["capacity"])] = df["Capacity({})".format(old_units['capacity'])] / (active_material_weight)
+	if options['kind'] == 'neware':
+		if options['active_material_weight']:
+			df["SpecificCapacity({}/mg)".format(options['old_units']["capacity"])] = df["Capacity({})".format(options['old_units']['capacity'])] / (options['active_material_weight'])
 
-			if molecular_weight:
+			if options['molecular_weight']:
 				faradays_constant = 96485.3365 # [F] = C mol^-1 = As mol^-1
 				seconds_per_hour = 3600 # s h^-1
 				f = faradays_constant / seconds_per_hour * 1000.0 # [f] = mAh mol^-1
 
-				df["IonsExtracted"] = (df["SpecificCapacity({}/mg)".format(old_units['capacity'])]*molecular_weight)*1000/f
+				df["IonsExtracted"] = (df["SpecificCapacity({}/mg)".format(options['old_units']['capacity'])]*options['molecular_weight'])*1000/f
 
 
-	if kind == 'biologic':
-		if active_material_weight:
+	if options['kind'] == 'biologic':
+		if options['active_material_weight']:
 
-			capacity = old_units['capacity'].split('h')[0] + '.h'
+			capacity = options['old_units']['capacity'].split('h')[0] + '.h'
 
 
-			df["SpecificCapacity({}/mg)".format(old_units["capacity"])] = df["Capacity/{}".format(capacity)] / (active_material_weight)
+			df["SpecificCapacity({}/mg)".format(options['old_units']["capacity"])] = df["Capacity/{}".format(capacity)] / (options['active_material_weight'])
 
-			if molecular_weight:
+			if options['molecular_weight']:
 				faradays_constant = 96485.3365 # [F] = C mol^-1 = As mol^-1
 				seconds_per_hour = 3600 # s h^-1
 				f = faradays_constant / seconds_per_hour * 1000.0 # [f] = mAh mol^-1
 
-				df["IonsExtracted"] = (df["SpecificCapacity({}/mg)".format(old_units['capacity'])]*molecular_weight)*1000/f
+				df["IonsExtracted"] = (df["SpecificCapacity({}/mg)".format(options['old_units']['capacity'])]*options['molecular_weight'])*1000/f
 
 	return df
 
 
-def unit_conversion(df, new_units, old_units, kind):
+def unit_conversion(df, options):
 	from . import unit_tables
 
-	if kind == 'batsmall':
+	if options['kind'] == 'batsmall':
 
-		df["TT [{}]".format(old_units["time"])] = df["TT [{}]".format(old_units["time"])] * unit_tables.time()[old_units["time"]].loc[new_units['time']]
-		df["U [{}]".format(old_units["voltage"])] = df["U [{}]".format(old_units["voltage"])] * unit_tables.voltage()[old_units["voltage"]].loc[new_units['voltage']]
-		df["I [{}]".format(old_units["current"])] = df["I [{}]".format(old_units["current"])] * unit_tables.current()[old_units["current"]].loc[new_units['current']]
-		df["C [{}/{}]".format(old_units["capacity"], old_units["mass"])] = df["C [{}/{}]".format(old_units["capacity"], old_units["mass"])] * (unit_tables.capacity()[old_units["capacity"]].loc[new_units["capacity"]] / unit_tables.mass()[old_units["mass"]].loc[new_units["mass"]])
+		df["TT [{}]".format(options['old_units']["time"])] = df["TT [{}]".format(options['old_units']["time"])] * unit_tables.time()[options['old_units']["time"]].loc[options['units']['time']]
+		df["U [{}]".format(options['old_units']["voltage"])] = df["U [{}]".format(options['old_units']["voltage"])] * unit_tables.voltage()[options['old_units']["voltage"]].loc[options['units']['voltage']]
+		df["I [{}]".format(options['old_units']["current"])] = df["I [{}]".format(options['old_units']["current"])] * unit_tables.current()[options['old_units']["current"]].loc[options['units']['current']]
+		df["C [{}/{}]".format(options['old_units']["capacity"], options['old_units']["mass"])] = df["C [{}/{}]".format(options['old_units']["capacity"], options['old_units']["mass"])] * (unit_tables.capacity()[options['old_units']["capacity"]].loc[options['units']["capacity"]] / unit_tables.mass()[options['old_units']["mass"]].loc[options['units']["mass"]])
 
 		df.columns = ['time', 'voltage', 'current', 'count', 'specific_capacity', 'comment']
 
 
-	if kind == 'neware':
-		df['Current({})'.format(old_units['current'])] = df['Current({})'.format(old_units['current'])] * unit_tables.current()[old_units['current']].loc[new_units['current']]
-		df['Voltage({})'.format(old_units['voltage'])] = df['Voltage({})'.format(old_units['voltage'])] * unit_tables.voltage()[old_units['voltage']].loc[new_units['voltage']]
-		df['Capacity({})'.format(old_units['capacity'])] = df['Capacity({})'.format(old_units['capacity'])] * unit_tables.capacity()[old_units['capacity']].loc[new_units['capacity']]
-		df['Energy({})'.format(old_units['energy'])] = df['Energy({})'.format(old_units['energy'])] * unit_tables.energy()[old_units['energy']].loc[new_units['energy']]
-		df['CycleTime({})'.format(new_units['time'])] = df.apply(lambda row : convert_time_string(row['Relative Time(h:min:s.ms)'], unit=new_units['time']), axis=1)
-		df['RunTime({})'.format(new_units['time'])] = df.apply(lambda row : convert_datetime_string(row['Real Time(h:min:s.ms)'], reference=df['Real Time(h:min:s.ms)'].iloc[0], unit=new_units['time']), axis=1)
+	if options['kind'] == 'neware':
+		df['Current({})'.format(options['old_units']['current'])] = df['Current({})'.format(options['old_units']['current'])] * unit_tables.current()[options['old_units']['current']].loc[options['units']['current']]
+		df['Voltage({})'.format(options['old_units']['voltage'])] = df['Voltage({})'.format(options['old_units']['voltage'])] * unit_tables.voltage()[options['old_units']['voltage']].loc[options['units']['voltage']]
+		df['Capacity({})'.format(options['old_units']['capacity'])] = df['Capacity({})'.format(options['old_units']['capacity'])] * unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']]
+		df['Energy({})'.format(options['old_units']['energy'])] = df['Energy({})'.format(options['old_units']['energy'])] * unit_tables.energy()[options['old_units']['energy']].loc[options['units']['energy']]
+		df['CycleTime({})'.format(options['units']['time'])] = df.apply(lambda row : convert_time_string(row['Relative Time(h:min:s.ms)'], unit=options['units']['time']), axis=1)
+		df['RunTime({})'.format(options['units']['time'])] = df.apply(lambda row : convert_datetime_string(row['Real Time(h:min:s.ms)'], reference=df['Real Time(h:min:s.ms)'].iloc[0], unit=options['units']['time']), axis=1)
 		columns = ['status', 'jump', 'cycle', 'steps', 'current', 'voltage', 'capacity', 'energy']
 
-		if 'SpecificCapacity({}/mg)'.format(old_units['capacity']) in df.columns:
-			df['SpecificCapacity({}/mg)'.format(old_units['capacity'])] = df['SpecificCapacity({}/mg)'.format(old_units['capacity'])] * unit_tables.capacity()[old_units['capacity']].loc[new_units['capacity']] / unit_tables.mass()['mg'].loc[new_units["mass"]]
+		if 'SpecificCapacity({}/mg)'.format(options['old_units']['capacity']) in df.columns:
+			df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] = df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] * unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']] / unit_tables.mass()['mg'].loc[options['units']["mass"]]
 			columns.append('specific_capacity')
 
 			if 'IonsExtracted' in df.columns:
@@ -447,18 +446,18 @@ def unit_conversion(df, new_units, old_units, kind):
 
 		df.columns = columns
 
-	if kind == 'biologic':
-		df['time/{}'.format(old_units['time'])] = df["time/{}".format(old_units["time"])] * unit_tables.time()[old_units["time"]].loc[new_units['time']]
-		df["Ewe/{}".format(old_units["voltage"])] = df["Ewe/{}".format(old_units["voltage"])] * unit_tables.voltage()[old_units["voltage"]].loc[new_units['voltage']]
-		df["<I>/{}".format(old_units["current"])] = df["<I>/{}".format(old_units["current"])] * unit_tables.current()[old_units["current"]].loc[new_units['current']]
+	if options['kind'] == 'biologic':
+		df['time/{}'.format(options['old_units']['time'])] = df["time/{}".format(options['old_units']["time"])] * unit_tables.time()[options['old_units']["time"]].loc[options['units']['time']]
+		df["Ewe/{}".format(options['old_units']["voltage"])] = df["Ewe/{}".format(options['old_units']["voltage"])] * unit_tables.voltage()[options['old_units']["voltage"]].loc[options['units']['voltage']]
+		df["<I>/{}".format(options['old_units']["current"])] = df["<I>/{}".format(options['old_units']["current"])] * unit_tables.current()[options['old_units']["current"]].loc[options['units']['current']]
 		
-		capacity = old_units['capacity'].split('h')[0] + '.h'
-		df["Capacity/{}".format(capacity)] = df["Capacity/{}".format(capacity)] * (unit_tables.capacity()[old_units["capacity"]].loc[new_units["capacity"]])
+		capacity = options['old_units']['capacity'].split('h')[0] + '.h'
+		df["Capacity/{}".format(capacity)] = df["Capacity/{}".format(capacity)] * (unit_tables.capacity()[options['old_units']["capacity"]].loc[options['units']["capacity"]])
 
 		columns = ['status_change', 'status', 'time', 'voltage', 'energy_charge', 'energy_discharge', 'current', 'capacity', 'cycle']
 
-		if 'SpecificCapacity({}/mg)'.format(old_units['capacity']) in df.columns:
-			df['SpecificCapacity({}/mg)'.format(old_units['capacity'])] = df['SpecificCapacity({}/mg)'.format(old_units['capacity'])] * unit_tables.capacity()[old_units['capacity']].loc[new_units['capacity']] / unit_tables.mass()['mg'].loc[new_units["mass"]]
+		if 'SpecificCapacity({}/mg)'.format(options['old_units']['capacity']) in df.columns:
+			df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] = df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] * unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']] / unit_tables.mass()['mg'].loc[options['units']["mass"]]
 			columns.append('specific_capacity')
 
 			if 'IonsExtracted' in df.columns:
@@ -469,38 +468,43 @@ def unit_conversion(df, new_units, old_units, kind):
 	return df
 
 
-def set_units(units=None):
+def set_units(options: dict) -> None:
 	
 	# Complete the list of units - if not all are passed, then default value will be used
 	required_units = ['time', 'current', 'voltage', 'capacity', 'mass', 'energy', 'specific_capacity']
-	default_units = {'time': 'h', 'current': 'mA', 'voltage': 'V', 'capacity': 'mAh', 'mass': 'g', 'energy': 'mWh', 'specific_capacity': None}
-
-	if not units:
-		units = default_units
-
-	if units:
-		for unit in required_units:
-			if unit not in units.keys():
-				units[unit] = default_units[unit]
-
-	units['specific_capacity'] = r'{} {}'.format(units['capacity'], units['mass']) + '$^{-1}$'
-
-
-	return units
-
-
-
-def get_old_units(df, kind):
 	
-	if kind=='batsmall':
+	default_units = {
+		'time': 'h', 
+		'current': 'mA', 
+		'voltage': 'V', 
+		'capacity': 'mAh', 
+		'mass': 'g', 
+		'energy': 'mWh', 
+		'specific_capacity': None}
+
+	if not options['units']:
+		options['units'] = default_units
+
+
+	aux.update_options(options=options['units'], required_options=required_units, default_options=default_units)
+
+	options['units']['specific_capacity'] = r'{} {}'.format(options['units']['capacity'], options['units']['mass']) + '$^{-1}$'
+
+
+
+def get_old_units(df: pd.DataFrame, options: dict) -> dict:
+	''' Reads a DataFrame with cycling data and determines which units have been used and returns these in a dictionary'''
+	
+	if options['kind'] == 'batsmall':
+
 		time = df.columns[0].split()[-1].strip('[]')
 		voltage = df.columns[1].split()[-1].strip('[]')
 		current = df.columns[2].split()[-1].strip('[]')
 		capacity, mass = df.columns[4].split()[-1].strip('[]').split('/')
 		old_units = {'time': time, 'current': current, 'voltage': voltage, 'capacity': capacity, 'mass': mass}
 
-	if kind=='neware':
-		
+	if options['kind']=='neware':
+
 		for column in df.columns:
 			if 'Voltage' in column:
 				voltage = column.split('(')[-1].strip(')')
@@ -514,7 +518,7 @@ def get_old_units(df, kind):
 		old_units = {'voltage': voltage, 'current': current, 'capacity': capacity, 'energy': energy}
 
 
-	if kind=='biologic':
+	if options['kind'] == 'biologic':
 
 		for column in df.columns:
 			if 'time' in column:
@@ -530,8 +534,6 @@ def get_old_units(df, kind):
 
 		old_units = {'voltage': voltage, 'current': current, 'capacity': capacity, 'energy': energy, 'time': time}
 	
-
-
 	return old_units
 
 def convert_time_string(time_string, unit='ms'):

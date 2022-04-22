@@ -6,58 +6,57 @@ import numpy as np
 import math
 
 import nafuma.electrochemistry as ec
+import nafuma.plotting as btp
+import nafuma.auxillary	as aux
 
 
-def plot_gc(path, kind, options=None):
-
-	# Prepare plot, and read and process data
-	fig, ax = prepare_gc_plot(options=options)
-	cycles = ec.io.read_data(path=path, kind=kind, options=options)
+def plot_gc(data, options=None):
 
 
 	# Update options
-	required_options = ['x_vals', 'y_vals', 'which_cycles', 'chg', 'dchg', 'colours', 'differentiate_charge_discharge', 'gradient']
-	default_options = {'x_vals': 'capacity', 'y_vals': 'voltage', 'which_cycles': 'all', 'chg': True, 'dchg': True, 'colours': None, 'differentiate_charge_discharge': True, 'gradient': False}
+	required_options = ['x_vals', 'y_vals', 'which_cycles', 'charge', 'discharge', 'colours', 'differentiate_charge_discharge', 'gradient', 'rc_params', 'format_params']
+	
+	default_options = {
+		'x_vals': 'capacity', 'y_vals': 'voltage', 
+		'which_cycles': 'all', 
+		'charge': True, 'discharge': True, 
+		'colours': None, 
+		'differentiate_charge_discharge': True, 
+		'gradient': False, 
+		'rc_params': {},
+		'format_params': {}}
 
-	options = update_options(options=options, required_options=required_options, default_options=default_options)
+	options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+	
+	# Prepare plot, and read and process data
+	
+	fig, ax = btp.prepare_plot(options=options)
+	data['cycles'] = ec.io.read_data(data=data, options=options)
 
 	# Update list of cycles to correct indices
-	update_cycles_list(cycles=cycles, options=options)
+	update_cycles_list(cycles=data['cycles'], options=options)
 
-	colours = generate_colours(cycles=cycles, options=options)
+	colours = generate_colours(cycles=data['cycles'], options=options)
 
 
-	for i, cycle in enumerate(cycles):
+	for i, cycle in enumerate(data['cycles']):
 		if i in options['which_cycles']:
-			if options['chg']:
+			if options['charge']:
 				cycle[0].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][0])
 
-			if options['dchg']:
+			if options['discharge']:
 				cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
 
 
 
-	fig, ax = prettify_gc_plot(fig=fig, ax=ax, options=options)
+	fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
 
-	return cycles, fig, ax
+	return data['cycles'], fig, ax
 
 
-def update_options(options, required_options, default_options):
-
-	if not options:
-		options = default_options
 	
-	else:
-		for option in required_options:
-			if option not in options.keys():
-				options[option] = default_options[option]
-
-	return options
-	
-def update_cycles_list(cycles, options):
-
-	if not options:
-		options['which_cycles']
+def update_cycles_list(cycles, options: dict) -> None:
 
 	if options['which_cycles'] == 'all':
 		options['which_cycles'] = [i for i in range(len(cycles))]
@@ -81,52 +80,6 @@ def update_cycles_list(cycles, options):
 		options['which_cycles'] = [i-1 for i in range(which_cycles[0], which_cycles[1]+1)]
 
 
-	return options
-
-
-def prepare_gc_plot(options=None):
-
-
-	# First take care of the options for plotting - set any values not specified to the default values
-	required_options = ['columns', 'width', 'height', 'format', 'dpi',  'facecolor']
-	default_options = {'columns': 1, 'width': 14, 'format': 'golden_ratio', 'dpi': None, 'facecolor': 'w'}
-
-	# If none are set at all, just pass the default_options
-	if not options:
-		options = default_options
-		options['height'] = options['width'] * (math.sqrt(5) - 1) / 2
-		options['figsize'] = (options['width'], options['height'])
-	
-	
-	# If options is passed, go through to fill out the rest. 
-	else:
-		# Start by setting the width:
-		if 'width' not in options.keys():
-			options['width'] = default_options['width']
-
-		# Then set height - check options for format. If not given, set the height to the width scaled by the golden ratio - if the format is square, set the same. This should possibly allow for the tweaking of custom ratios later.
-		if 'height' not in options.keys():
-			if 'format' not in options.keys():
-				options['height'] = options['width'] * (math.sqrt(5) - 1) / 2
-			elif options['format'] == 'square':
-				options['height'] = options['width']
-
-		options['figsize'] = (options['width'], options['height'])
-
-		# After height and width are set, go through the rest of the options to make sure that all the required options are filled
-		for option in required_options:
-			if option not in options.keys():
-				options[option] = default_options[option]
-
-	fig, ax = plt.subplots(figsize=(options['figsize']), dpi=options['dpi'], facecolor=options['facecolor'])
-
-	linewidth = 1*options['columns']
-	axeswidth = 3*options['columns']
-
-	plt.rc('lines', linewidth=linewidth)
-	plt.rc('axes', linewidth=axeswidth)
-
-	return fig, ax
 
 
 def prettify_gc_plot(fig, ax, options=None):
@@ -166,7 +119,7 @@ def prettify_gc_plot(fig, ax, options=None):
 		'title': None 	
 	}
 
-	update_options(options, required_options, default_options)
+	aux.update_options(options, required_options, default_options)
 
 
 	##################################################################
