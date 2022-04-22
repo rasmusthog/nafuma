@@ -64,7 +64,10 @@ def plot_gc(data, options=None):
 				cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
 
 
-	update_labels(options)
+	if options['interactive_session_active']:
+		update_labels(options, force=True)
+	else:
+		update_labels(options)
 
 	fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
 
@@ -78,7 +81,8 @@ def plot_gc_interactive(data, options):
 
 	w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(plot_gc), data=widgets.fixed(data), options=widgets.fixed(options),
 	charge=widgets.ToggleButton(value=True),
-	discharge=widgets.ToggleButton(value=True)
+	discharge=widgets.ToggleButton(value=True),
+	x_vals=widgets.Dropdown(options=['specific_capacity', 'capacity', 'ions', 'voltage', 'time', 'energy'], value='specific_capacity', description='X-values')
 	)
 
 	options['widget'] = w
@@ -86,16 +90,16 @@ def plot_gc_interactive(data, options):
 	display(w)
 
 
-def update_labels(options):
+def update_labels(options, force=False):
 
-	if 'xlabel' not in options.keys():
+	if 'xlabel' not in options.keys() or force:
 		options['xlabel'] = options['x_vals'].capitalize().replace('_', ' ')
 
-	if 'ylabel' not in options.keys():
+	if 'ylabel' not in options.keys() or force:
 		options['ylabel'] = options['y_vals'].capitalize().replace('_', ' ')
 		
 
-	if 'xunit' not in options.keys():
+	if 'xunit' not in options.keys() or force:
 		if options['x_vals'] == 'capacity':
 			options['xunit'] = options['units']['capacity']
 		elif options['x_vals'] == 'specific_capacity':
@@ -106,7 +110,7 @@ def update_labels(options):
 			options['xunit'] = None
 		
 
-	if 'yunit' not in options.keys():
+	if 'yunit' not in options.keys() or force:
 		if options['y_vals'] == 'voltage':
 			options['yunit'] = options['units']['voltage']
 
