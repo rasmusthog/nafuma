@@ -5,40 +5,55 @@ import pandas as pd
 import numpy as np
 import math
 
+import ipywidgets as widgets
+from IPython.display import display
+
 import nafuma.electrochemistry as ec
 import nafuma.plotting as btp
 import nafuma.auxillary	as aux
+
+
 
 
 def plot_gc(data, options=None):
 
 
 	# Update options
-	required_options = ['x_vals', 'y_vals', 'which_cycles', 'charge', 'discharge', 'colours', 'differentiate_charge_discharge', 'gradient', 'rc_params', 'format_params']
-	
+	required_options = ['x_vals', 'y_vals', 'which_cycles', 'charge', 'discharge', 'colours', 'differentiate_charge_discharge', 'gradient', 'interactive', 'interactive_session_active', 'rc_params', 'format_params']	
 	default_options = {
 		'x_vals': 'capacity', 'y_vals': 'voltage', 
 		'which_cycles': 'all', 
 		'charge': True, 'discharge': True, 
 		'colours': None, 
 		'differentiate_charge_discharge': True, 
-		'gradient': False, 
+		'gradient': False,
+		'interactive': False,
+		'interactive_session_active': False, 
 		'rc_params': {},
 		'format_params': {}}
 
 	options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
 	
-	# Prepare plot, and read and process data
+
 	
-	fig, ax = btp.prepare_plot(options=options)
-	data['cycles'] = ec.io.read_data(data=data, options=options)
+	if not 'cycles' in data.keys():
+		data['cycles'] = ec.io.read_data(data=data, options=options)
 
 	# Update list of cycles to correct indices
 	update_cycles_list(cycles=data['cycles'], options=options)
 
 	colours = generate_colours(cycles=data['cycles'], options=options)
 
+	if options['interactive']:
+		options['interactive'], options['interactive_session_active'] = False, True
+		plot_gc_interactive(data=data, options=options)
+		return
+
+
+	# Prepare plot, and read and process data
+	
+	fig, ax = btp.prepare_plot(options=options)
 
 	for i, cycle in enumerate(data['cycles']):
 		if i in options['which_cycles']:
@@ -50,12 +65,25 @@ def plot_gc(data, options=None):
 
 
 	update_labels(options)
-	print(options['xunit'])
 
 	fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
 
-	return data['cycles'], fig, ax
+	#if options['interactive_session_active']:
+	
 
+	return data['cycles'], fig, ax 
+
+
+def plot_gc_interactive(data, options):
+
+	w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(plot_gc), data=widgets.fixed(data), options=widgets.fixed(options),
+	charge=widgets.ToggleButton(value=True),
+	discharge=widgets.ToggleButton(value=True)
+	)
+
+	options['widget'] = w
+
+	display(w)
 
 
 def update_labels(options):
