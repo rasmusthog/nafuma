@@ -76,13 +76,13 @@ def read_biologic(path):
 	Output:
 	df: pandas DataFrame containing the data as-is, but without additional NaN-columns.'''
 
-	with open(path, 'r') as f:
+	with open(path, 'rb') as f:
 		lines = f.readlines()
 
 	header_lines = int(lines[1].split()[-1]) - 1
 	
 
-	df = pd.read_csv(path, sep='\t', skiprows=header_lines)
+	df = pd.read_csv(path, sep='\t', skiprows=header_lines, encoding='cp1252')
 	df.dropna(inplace=True, axis=1)
 
 	return df

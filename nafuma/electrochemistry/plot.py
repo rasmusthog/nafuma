@@ -161,7 +161,7 @@ def prettify_gc_plot(fig, ax, options=None):
 		'positions': {'xaxis': 'bottom', 'yaxis': 'left'},
 		'x_vals': 'specific_capacity', 'y_vals': 'voltage',
 		'xlabel': None, 'ylabel': None,
-		'units': None,
+		'units': {'capacity': 'mAh', 'specific_capacity': r'mAh g$^{-1}$', 'time': 's', 'current': 'mA', 'energy': 'mWh', 'mass': 'g', 'voltage': 'V'},
 		'sizes': None,
 		'title': None 	
 	}
