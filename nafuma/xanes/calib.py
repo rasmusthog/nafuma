@@ -2,9 +2,11 @@ import pandas as pd
 import numpy as np
 import os
 import matplotlib.pyplot as plt
-import beamtime.auxillary as aux
-import beamtime.xanes as xas
-import beamtime.xanes.io as io
+import nafuma.auxillary as aux
+import nafuma.xanes as xas
+import nafuma.xanes.io as io
+from scipy.signal import savgol_filter
+
 def rbkerbest():
     print("ROSENBORG!<3")
 
@@ -24,11 +26,10 @@ def finding_edge(df):
         edge='Ni'
         return(edge)
 
-<<<<<<< HEAD:beamtime/xanes/calib.py
 #def pre_edge_subtraction(df,filenames, options={}):
 def test(innmat):
     df_test= xas.io.put_in_dataframe(innmat)
-    print(df_test)
+    #print(df_test)
 
 def pre_edge_subtraction(path, options={}):
     required_options = ['print','troubleshoot']
@@ -41,11 +42,6 @@ def pre_edge_subtraction(path, options={}):
     filenames = xas.io.get_filenames(path)
     df= xas.io.put_in_dataframe(path)
     edge=finding_edge(df)
-=======
-def split_xanes_scan(filename, destination=None, replace=False):
-    #root is the path to the beamtime-folder
-    #destination should be the path to the processed data
->>>>>>> master:nafuma/xanes/calib.py
     
     #Defining the end of the region used to define the background, thus start of the edge
     #implement widget
@@ -154,4 +150,45 @@ def post_edge_normalization(path, options={}):
         df_postedge.plot(x="ZapEnergy", y=filenames,color="Green",ax=ax, legend=False)  
         plt.axvline(x = min(df_end["ZapEnergy"])) 
 
-    return df_bkgd_sub, df_postedge
+    return df_bkgd_sub, df_postedge, filenames, edge
+
+def smoothing(path, options={}):
+    required_options = ['print','window_length','polyorder']
+    default_options = {
+        'print': False,
+        'window_length': 3,
+        'polyorder': 2
+    }
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+    df_bkgd_sub, df_postedge, filenames, edge = post_edge_normalization(path)
+    #================= SMOOTHING
+    df_smooth = pd.DataFrame(df_bkgd_sub["ZapEnergy"])
+    df_default = pd.DataFrame(df_bkgd_sub["ZapEnergy"])
+    #df_smooth[filenames] = df_bkgd_sub.iloc[:,2].rolling(window=rolling_av).mean()
+    #df_smooth[filenames] = df_smooth[filenames].shift(-int((rolling_av)/2))
+    for filename in filenames:
+        x=savgol_filter(df_bkgd_sub[filename], options['window_length'],options['polyorder'])
+        df_smooth[filename] = x
+        x_default=savgol_filter(df_bkgd_sub[filename],default_options['window_length'],default_options['polyorder'])
+        df_default[filename] = x_default
+    
+    if options['print'] == True:
+        fig, (ax1,ax2) = plt.subplots(1,2,figsize=(15,5))
+        x_range_zoom=[6.54,6.55] #make into widget
+        y_range_zoom=[20000,80000] #make into widget
+
+        df_bkgd_sub.plot(x = "ZapEnergy",y=filenames, ax=ax1, color="Red") 
+        df_smooth.plot(x = "ZapEnergy",y=filenames, ax=ax1, color="Blue")
+        ax1.set_xlim(x_range_zoom)
+        ax1.set_ylim(y_range_zoom)
+        ax1.set_title("Smoothed curve (blue) vs data (red) used for further analysis")
+
+        df_bkgd_sub.plot(x = "ZapEnergy",y=filenames, ax=ax2, color="Red") 
+        df_default.plot(x = "ZapEnergy",y=filenames, ax=ax2, color="Blue") 
+        ax2.set_xlim(x_range_zoom)
+        ax2.set_ylim(y_range_zoom)
+        ax2.set_title("Smoothed curve (blue) vs data (red) using default window_length and polyorder")
+    
+
+
