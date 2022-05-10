@@ -75,6 +75,9 @@ def plot_diffractogram(data, options={}):
             data['diffractogram'][index] = diffractogram
             data['wavelength'][index] = wavelength
 
+            # FIXME This is a quick fix as the image is not reloaded when passing multiple beamline datasets
+            data['image'] = None
+
         # Sets the xlim if this has not bee specified
         if not options['xlim']:
             options['xlim'] = [data['diffractogram'][0][options['x_vals']].min(), data['diffractogram'][0][options['x_vals']].max()]

@@ -59,7 +59,7 @@ def integrate_1d(data, options={}, index=0):
     
 
     # Get image array from filename if not passed
-    if 'image' not in data.keys():
+    if 'image' not in data.keys() or not data['image']:
         data['image'] = get_image_array(data['path'][index])
     
     # Instanciate the azimuthal integrator from pyFAI from the calibrant (.poni-file)
