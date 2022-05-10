@@ -178,19 +178,17 @@ def process_batsmall_data(df, options=None):
 def splice_cycles(df, options: dict) -> pd.DataFrame:
 	''' Splices two cycles together - if e.g. one charge cycle are split into several cycles due to change in parameters. 
 	
-	Incomplete, only accomodates BatSmall so far.'''
+	Incomplete, only accomodates BatSmall so far, and only for charge.'''
 
 	if options['kind'] == 'batsmall':
 
 		# Creates masks for charge and discharge curves
 		chg_mask = df['current'] >= 0
-		dchg_mask = df['current'] < 0
 
 		# Loop through all the cycling steps, change the current and capacities in the 
 		for i in range(df["count"].max()):
 			sub_df = df.loc[df['count'] == i+1]
 			sub_df_chg = sub_df.loc[chg_mask]
-			#sub_df_dchg = sub_df.loc[dchg_mask]
 
 			# get indices where the program changed
 			chg_indices = sub_df_chg[sub_df_chg["comment"].str.contains("program")==True].index.to_list()
@@ -202,30 +200,13 @@ def splice_cycles(df, options: dict) -> pd.DataFrame:
 	
 			if chg_indices:
 				last_chg =  chg_indices.pop()
-			
-
-			#dchg_indices = sub_df_dchg[sub_df_dchg["comment"].str.contains("program")==True].index.to_list()
-			#if dchg_indices:
-			#	del dchg_indices[0]
-
-
-			
+					
 			if chg_indices:
 				for i in chg_indices:
 					add = df['specific_capacity'].iloc[i-1]
 					df['specific_capacity'].iloc[i:last_chg] = df['specific_capacity'].iloc[i:last_chg] + add
 
-			#if dchg_indices:
-		#		for i in dchg_indices:
-			#		add = df['specific_capacity'].iloc[i-1]
-			#		df['specific_capacity'].iloc[i:last_dchg] = df['specific_capacity'].iloc[i:last_dchg] + add
-
-
-
-
 	return df
-
-
 
 
 
