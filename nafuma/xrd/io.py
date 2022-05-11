@@ -326,6 +326,39 @@ def read_xy(data, options={}, index=0):
     return diffractogram, wavelength
 
 
+
+
+def strip_headers_from_xy(path: str, filename=None) -> None:
+    ''' Strips headers from a .xy-file'''
+
+
+    xy = []
+    with open(path, 'r') as f:
+        lines = f.readlines()
+
+        headerlines = 0
+        for line in lines:
+            if line[0] == '#':
+                headerlines += 1
+            else:
+                xy.append(line)
+
+    
+    if not filename:
+        ext = path.split('.')[-1]
+        filename = path.split(f'.{ext}')[0] + f'_noheaders.{ext}'
+
+        print(filename)
+    
+    with open(filename, 'w') as f:
+        for line in xy:
+            f.write(line)
+
+
+
+
+
+
 def read_data(data, options={}, index=0):
 
     beamline_extensions = ['mar3450', 'edf', 'cbf']
