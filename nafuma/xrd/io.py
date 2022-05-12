@@ -62,6 +62,7 @@ def integrate_1d(data, options={}, index=0):
     if 'image' not in data.keys() or not data['image']:
         data['image'] = get_image_array(data['path'][index])
     
+
     # Instanciate the azimuthal integrator from pyFAI from the calibrant (.poni-file)
     ai = pyFAI.load(data['calibrant'])
 
@@ -71,6 +72,9 @@ def integrate_1d(data, options={}, index=0):
     # Make save_folder if this does not exist already
     if not os.path.isdir(options['extract_folder']):
         os.makedirs(options['extract_folder'])
+
+    if not os.path.isdir(options['save_folder']):
+        os.makedirs(options['save_folder'])
 
 
     res = ai.integrate1d(data['image'], options['nbins'], unit=options['unit'], filename=filename)
@@ -348,7 +352,6 @@ def strip_headers_from_xy(path: str, filename=None) -> None:
         ext = path.split('.')[-1]
         filename = path.split(f'.{ext}')[0] + f'_noheaders.{ext}'
 
-        print(filename)
     
     with open(filename, 'w') as f:
         for line in xy:
