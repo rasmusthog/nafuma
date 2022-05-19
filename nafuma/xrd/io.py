@@ -80,7 +80,8 @@ def integrate_1d(data, options={}, index=0):
     res = ai.integrate1d(data['image'], options['nbins'], unit=options['unit'], filename=filename)
 
     data['path'][index] = filename
-    diffractogram, wavelength = read_xy(data=data, options=options, index=index)
+    diffractogram, _ = read_xy(data=data, options=options, index=index)
+    wavelength = find_wavelength_from_poni(path=data['calibrant'])
 
     if not options['save']:
         os.remove(filename)
@@ -282,8 +283,12 @@ def read_brml(data, options={}, index=0):
 
     #if 'wavelength' not in data.keys():
     # Find wavelength
-    for chain in root.findall('./FixedInformation/Instrument/PrimaryTracks/TrackInfoData/MountedOptics/InfoData/Tube/WaveLengthAlpha1'):
-        wavelength = float(chain.attrib['Value'])
+    
+    if not data['wavelength'][index]:
+        for chain in root.findall('./FixedInformation/Instrument/PrimaryTracks/TrackInfoData/MountedOptics/InfoData/Tube/WaveLengthAlpha1'):
+            wavelength = float(chain.attrib['Value'])
+    else:
+        wavelength = data['wavelength'][index]
 
 
     diffractogram = pd.DataFrame(diffractogram)
@@ -306,7 +311,11 @@ def read_xy(data, options={}, index=0):
     
     #if 'wavelength' not in data.keys():
     # Get wavelength from scan
-    wavelength = find_wavelength_from_xy(path=data['path'][index])
+
+    if not data['wavelength'][index]:
+        wavelength = find_wavelength_from_xy(path=data['path'][index])
+    else:
+        wavelength = data['wavelength'][index]
 
     with open(data['path'][index], 'r') as f:
         position = 0
@@ -378,7 +387,7 @@ def read_data(data, options={}, index=0):
 
 
 
-
+    
     if options['offset'] or options['normalise']:
         # Make copy of the original intensities before any changes are made through normalisation or offset, to easily revert back if need to update.
         diffractogram['I_org'] = diffractogram['I']
@@ -387,6 +396,7 @@ def read_data(data, options={}, index=0):
         diffractogram = apply_offset(diffractogram, wavelength, index, options)
 
 
+    
     diffractogram = translate_wavelengths(data=diffractogram, wavelength=wavelength)
 
     return diffractogram, wavelength
@@ -506,7 +516,7 @@ def translate_wavelengths(data: pd.DataFrame, wavelength: float, to_wavelength=N
 
     data['2th_cuka'] = np.NAN
 
-    data['2th_cuka'].loc[data['2th'] <= max_2th_cuka] = 2*np.arcsin(cuka/wavelength * np.sin((data['2th']/2) * np.pi/180)) * 180/np.pi
+    data['2th_cuka'].loc[data['2th'] <= max_2th_cuka] = 2*np.arcsin(cuka/wavelength * np.sin((data['2th'].loc[data['2th'] <= max_2th_cuka]/2) * np.pi/180)) * 180/np.pi
 
     # Translate to MoKalpha
     moka = 0.71073 # Å
@@ -518,7 +528,7 @@ def translate_wavelengths(data: pd.DataFrame, wavelength: float, to_wavelength=N
 
     data['2th_moka'] = np.NAN
 
-    data['2th_moka'].loc[data['2th'] <= max_2th_moka] = 2*np.arcsin(moka/wavelength * np.sin((data['2th']/2) * np.pi/180)) * 180/np.pi
+    data['2th_moka'].loc[data['2th'] <= max_2th_moka] = 2*np.arcsin(moka/wavelength * np.sin((data['2th'].loc[data['2th'] <= max_2th_moka]/2) * np.pi/180)) * 180/np.pi
     
     
     # Convert to other parameters
@@ -537,7 +547,7 @@ def translate_wavelengths(data: pd.DataFrame, wavelength: float, to_wavelength=N
 
         
         data['2th'] = np.NAN
-        data['2th'].loc[data['2th_cuka'] <= max_2th] = 2*np.arcsin(to_wavelength/cuka * np.sin((data['2th_cuka']/2) * np.pi/180)) * 180/np.pi 
+        data['2th'].loc[data['2th_cuka'] <= max_2th] = 2*np.arcsin(to_wavelength/cuka * np.sin((data['2th_cuka'].loc[data['2th_cuka'] <= max_2th]/2) * np.pi/180)) * 180/np.pi 
 
 
 
@@ -564,6 +574,22 @@ def find_wavelength_from_xy(path):
             elif 'Wavelength' in line:
                 wavelength = float(line.split()[2])*10**10
 
+            else:
+                wavelength = None
+
+
+
+    return wavelength
+
+
+def find_wavelength_from_poni(path):
+
+    with open(path, 'r') as f:
+        lines = f.readlines()
+
+        for line in lines:
+            if 'Wavelength' in line:
+                wavelength = float(line.split()[-1])*10**10
 
 
     return wavelength
