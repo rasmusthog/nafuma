@@ -13,7 +13,6 @@ import nafuma.xrd as xrd
 import nafuma.auxillary as aux
 import nafuma.plotting as btp
 
-
 def plot_diffractogram(data, options={}):
     ''' Plots a diffractogram.
     
@@ -67,13 +66,23 @@ def plot_diffractogram(data, options={}):
     if not 'diffractogram' in data.keys():
         # Initialise empty list for diffractograms and wavelengths
         data['diffractogram'] = [None for _ in range(len(data['path']))]
-        data['wavelength'] = [None for _ in range(len(data['path']))]
+        
+        # If wavelength is not manually passed it should be automatically gathered from the .xy-file
+        if 'wavelength' not in data.keys():
+            data['wavelength'] = [None for _ in range(len(data['path']))]
+        else:
+            # If only a single value is passed it should be set to be the same for all diffractograms passed
+            if not isinstance(data['wavelength'], list):
+                data['wavelength'] = [data['wavelength'] for _ in range(len(data['path']))] 
 
         for index in range(len(data['path'])):
             diffractogram, wavelength = xrd.io.read_data(data=data, options=options, index=index)
             
             data['diffractogram'][index] = diffractogram
             data['wavelength'][index] = wavelength
+
+            # FIXME This is a quick fix as the image is not reloaded when passing multiple beamline datasets
+            data['image'] = None
 
         # Sets the xlim if this has not bee specified
         if not options['xlim']:
@@ -114,7 +123,7 @@ def plot_diffractogram(data, options={}):
             options['reflections_data'] = [options['reflections_data']]
 
     # Determine number of subplots and height ratios between them
-    if len(options['reflections_data']) >= 1:
+    if options['reflections_data'] and len(options['reflections_data']) >= 1:
         options = determine_grid_layout(options=options)
 
 
@@ -331,10 +340,10 @@ def plot_diffractogram_interactive(data, options):
             'heatmap_default':  {'min': xminmax['heatmap'][0],      'max': xminmax['heatmap'][1],       'value': [xminmax['heatmap'][0],        xminmax['heatmap'][1]],         'step': 10}
         },
         'ylim': { 
-            'w': widgets.FloatRangeSlider(value=[yminmax['start'][2], yminmax['start'][3]], min=yminmax['start'][0], max=yminmax['start'][1], step=0.5, layout=widgets.Layout(width='95%')),
+            'w': widgets.FloatRangeSlider(value=[yminmax['start'][2], yminmax['start'][3]], min=yminmax['start'][0], max=yminmax['start'][1], step=0.01, layout=widgets.Layout(width='95%')),
             'state': 'heatmap' if options['heatmap'] else 'diff',
-            'diff_default':     {'min': yminmax['diff'][0],         'max': yminmax['diff'][1],          'value': [yminmax['diff'][2],           yminmax['diff'][3]],            'step': 0.1},
-            'heatmap_default':  {'min': yminmax['heatmap'][0],      'max': yminmax['heatmap'][1],       'value': [yminmax['heatmap'][0],        yminmax['heatmap'][1]],         'step': 0.1}
+            'diff_default':     {'min': yminmax['diff'][0],         'max': yminmax['diff'][1],          'value': [yminmax['diff'][2],           yminmax['diff'][3]],            'step': 0.01},
+            'heatmap_default':  {'min': yminmax['heatmap'][0],      'max': yminmax['heatmap'][1],       'value': [yminmax['heatmap'][0],        yminmax['heatmap'][1]],         'step': 0.01}
         }
     }
 
@@ -356,7 +365,12 @@ def plot_diffractogram_interactive(data, options):
         w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(plot_diffractogram), data=widgets.fixed(data), options=widgets.fixed(options), 
         scatter=widgets.ToggleButton(value=False), 
         line=widgets.ToggleButton(value=True),
-        xlim=options['widgets']['xlim']['w'])
+        heatmap=widgets.ToggleButton(value=options['heatmap']),
+        x_vals=widgets.Dropdown(options=['2th', 'd', '1/d', 'q', 'q2', 'q4', '2th_cuka', '2th_moka'], value='2th', description='X-values'),
+        xlim=options['widgets']['xlim']['w'],
+        ylim=options['widgets']['ylim']['w'],
+        offset_y=widgets.BoundedFloatText(value=options['offset_y'], min=-5, max=5, step=0.01, description='offset_y'),
+        offset_x=widgets.BoundedFloatText(value=options['offset_x'], min=-1, max=1, step=0.01, description='offset_x'))
     
     
     options['widget'] = w
