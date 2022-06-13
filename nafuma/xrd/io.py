@@ -40,12 +40,13 @@ def integrate_1d(data, options={}, index=0):
     df: DataFrame contianing 1D diffractogram if option 'return' is True
     ''' 
 
-    required_options = ['unit', 'nbins', 'save', 'save_filename', 'save_extension', 'save_folder', 'overwrite', 'extract_folder']
+    required_options = ['unit', 'npt', 'save', 'save_filename', 'save_extension', 'save_folder', 'overwrite', 'extract_folder', 'error_model']
 
     default_options = {
         'unit': '2th_deg', 
-        'nbins': 3000,
+        'npt': 3000,
         'extract_folder': 'tmp',
+        'error_model': None,
         'save': False,
         'save_filename': None,
         'save_extension': '_integrated.xy',
@@ -61,6 +62,13 @@ def integrate_1d(data, options={}, index=0):
     # Get image array from filename if not passed
     if 'image' not in data.keys() or not data['image']:
         data['image'] = get_image_array(data['path'][index])
+
+
+    # Load mask
+    if 'mask' in data.keys():
+        mask = get_image_array(data['mask'])
+    else:
+        mask = None
     
 
     # Instanciate the azimuthal integrator from pyFAI from the calibrant (.poni-file)
@@ -76,8 +84,10 @@ def integrate_1d(data, options={}, index=0):
     if not os.path.isdir(options['save_folder']):
         os.makedirs(options['save_folder'])
 
+    
 
-    res = ai.integrate1d(data['image'], options['nbins'], unit=options['unit'], filename=filename)
+
+    res = ai.integrate1d(data['image'], npt=options['npt'], mask=mask, error_model=options['error_model'], unit=options['unit'], filename=filename)
 
     data['path'][index] = filename
     diffractogram, _ = read_xy(data=data, options=options, index=index)
@@ -312,7 +322,7 @@ def read_xy(data, options={}, index=0):
     #if 'wavelength' not in data.keys():
     # Get wavelength from scan
 
-    if not data['wavelength'][index]:
+    if not 'wavelength' in data.keys() or data['wavelength'][index]:
         wavelength = find_wavelength_from_xy(path=data['path'][index])
     else:
         wavelength = data['wavelength'][index]
