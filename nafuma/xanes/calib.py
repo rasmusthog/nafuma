@@ -7,18 +7,12 @@ import nafuma.xanes as xas
 import nafuma.xanes.io as io
 from scipy.signal import savgol_filter
 
-def rbkerbest():
-    print("ROSENBORG!<3")
-
-#def split_xanes_scan(filename, destination=None):
-
- #   with open(filename, 'r') as f:
-
 
 ##Better to make a new function that loops through the files, and performing the split_xanes_scan on
 
-#Tryiung to make a function that can decide which edge it is based on the first ZapEnergy-value
+#Trying to make a function that can decide which edge it is based on the first ZapEnergy-value
 def finding_edge(df):
+    #FIXME add Fe and Co
     if 5.9 < df["ZapEnergy"][0] < 6.5:
         edge='Mn'
         return(edge)
@@ -26,12 +20,8 @@ def finding_edge(df):
         edge='Ni'
         return(edge)
 
-#def pre_edge_subtraction(df,filenames, options={}):
-def test(innmat):
-    df_test= xas.io.put_in_dataframe(innmat)
-    #print(df_test)
-
 def pre_edge_subtraction(path, options={}):
+    #FIXME add log-file instead of the troubleshoot-option
     required_options = ['print','troubleshoot']
     default_options = {
         'print': False,
@@ -46,7 +36,7 @@ def pre_edge_subtraction(path, options={}):
     #Defining the end of the region used to define the background, thus start of the edge
     
     #######================================================================================================================================================
-    #Trying to implement automatical region determination based on an estimate of the edge shift
+    #FIXME Trying to implement automatical region determination based on an estimate of the edge shift
     #print(df)
     #estimated_edge_shift, df_diff, df_diff_max = find_pos_maxdiff(df, filenames,options=options)
 
@@ -122,8 +112,8 @@ def pre_edge_subtraction(path, options={}):
 
     return df_bkgd_sub,filenames,edge
 
-def post_edge_normalization(path, options={}):
-
+def post_edge_fit(path, options={}):
+    #FIXME should be called "fitting post edge" (normalization is not done here, need edge shift position)
     required_options = ['print']
     default_options = {
         'print': False
@@ -132,7 +122,7 @@ def post_edge_normalization(path, options={}):
     
     df_bkgd_sub,filenames,edge = pre_edge_subtraction(path, options=options)
     #Defining the end of the pre-edge-region for Mn/Ni, thus start of the edge
-    #Implement widget
+    #FIXME Use rought edge shift estimate, add X eV as first guess, have an option to adjust this value with widget
     if edge == 'Mn':
         edge_stop = 6.565
     if edge == 'Ni':
@@ -171,7 +161,7 @@ def smoothing(path, options={}):
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
-    df_bkgd_sub, df_postedge, filenames, edge = post_edge_normalization(path,options=options)
+    df_bkgd_sub, df_postedge, filenames, edge = post_edge_fit(path,options=options)
     #================= SMOOTHING
     df_smooth = pd.DataFrame(df_bkgd_sub["ZapEnergy"])
     df_default = pd.DataFrame(df_bkgd_sub["ZapEnergy"])
