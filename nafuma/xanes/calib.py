@@ -33,7 +33,68 @@ def find_element(data: dict) -> str:
         
     return(edge)
 
-def pre_edge_subtraction(path, options={}):
+
+
+def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
+    from datetime import datetime
+
+    # FIXME Add log-file
+
+    required_options = ['edge_start', 'log', 'troubleshoot']
+    default_options = {
+        'edge_start': None,
+        'log': False,
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S.log")}_pre_edge_fit.log',
+        'save_fit': False,
+        'save_folder': './'
+    }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+    if options['log']:
+        aux.write_log(message='Starting pre edge fit', options=options)
+
+
+
+    # FIXME Implement with finding accurate edge position
+    # Find the cutoff point at which the edge starts - everything to the LEFT of this point will be used in the pre edge function fit
+    if not options['edge_start']:
+        edge_starts = {
+            'Mn': 6.42,
+            'Fe': 7.11,
+            'Co': 7.705,
+            'Ni': 8.3        
+        }
+
+        edge_start = edge_starts[data['edge']]
+
+    # Making a dataframe only containing the rows that are included in the background subtraction (points lower than where the edge start is defined)
+    pre_edge_data = data['xanes_data'].loc[data['xanes_data']["ZapEnergy"] < edge_start]
+        
+    # Making a new dataframe, with only the ZapEnergies as the first column -> will be filled to include the background data
+    pre_edge_fit_data = pd.DataFrame(data['xanes_data']["ZapEnergy"])
+
+    for filename in data['path']:
+        if options['log']:
+            aux.write_log(message=f'Fitting background on {filename}', options=options)
+
+        #Fitting linear function to the background
+        params = np.polyfit(pre_edge_data["ZapEnergy"],pre_edge_data[filename],1)
+        fit_function = np.poly1d(params)
+        
+        #making a list, y_pre,so the background will be applied to all ZapEnergy-values
+        background=fit_function(pre_edge_fit_data["ZapEnergy"])
+            
+        #adding a new column in df_background with the y-values of the background
+        pre_edge_fit_data.insert(1,filename,background) 
+        
+        if options['log']:
+            aux.write_log(message=f'Pre edge fitting done.', options=options)   
+
+    return pre_edge_fit_data
+
+
+def pre_edge_subtraction(data: dict, options={}):
     #FIXME add log-file instead of the troubleshoot-option
     required_options = ['print','troubleshoot']
     default_options = {
