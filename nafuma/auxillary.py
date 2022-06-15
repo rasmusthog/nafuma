@@ -53,3 +53,22 @@ def floor(a, roundto=1):
     a = np.floor(a*fac) / fac
 
     return a
+
+
+
+def write_log(message, options={}):
+    from datetime import datetime
+
+    required_options = ['logfile']
+    default_options = {
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S.log")}'
+    }
+
+    options = update_options(options=options, required_options=required_options, default_options=default_options)
+
+    now = datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+    message = f'{now} {message} \n'
+
+
+    with open(options['logfile'], 'a') as f:
+        f.write(message)
