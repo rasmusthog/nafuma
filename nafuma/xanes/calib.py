@@ -11,14 +11,27 @@ from scipy.signal import savgol_filter
 ##Better to make a new function that loops through the files, and performing the split_xanes_scan on
 
 #Trying to make a function that can decide which edge it is based on the first ZapEnergy-value
-def finding_edge(df):
-    #FIXME add Fe and Co
-    if 5.9 < df["ZapEnergy"][0] < 6.5:
-        edge='Mn'
-        return(edge)
-    if 8.0 < df["ZapEnergy"][0] < 8.6:
-        edge='Ni'
-        return(edge)
+def find_element(data: dict) -> str:
+    ''' Takes the data dictionary and determines based on the start value of the ZapEnergy-column which element the edge is from.'''
+
+    element_energy_intervals = {
+        'Mn': [5.9, 6.5],
+        'Fe': [7.0, 7.2],
+        'Co': [7.6, 7.8],
+        'Ni': [8.0, 8.6]
+    }
+
+    if element_energy_intervals['Mn'][0]    < data['xanes_data']["ZapEnergy"][0] < element_energy_intervals['Mn'][1]:
+        edge = 'Mn'
+    elif element_energy_intervals['Co'][0]  < data['xanes_data']["ZapEnergy"][0] < element_energy_intervals['Fe'][1]:
+        edge = 'Fe'
+    elif element_energy_intervals['Co'][0]  < data['xanes_data']["ZapEnergy"][0] < element_energy_intervals['Co'][1]:
+        edge = 'Co'   
+    elif element_energy_intervals['Ni'][0]  < data['xanes_data']["ZapEnergy"][0] < element_energy_intervals['Ni'][1]:
+        edge = 'Ni'
+        
+        
+    return(edge)
 
 def pre_edge_subtraction(path, options={}):
     #FIXME add log-file instead of the troubleshoot-option
@@ -31,7 +44,7 @@ def pre_edge_subtraction(path, options={}):
 
     filenames = xas.io.get_filenames(path)
     df= xas.io.put_in_dataframe(path)
-    edge=finding_edge(df)
+    edge=find_element(df)
     
     #Defining the end of the region used to define the background, thus start of the edge
     
