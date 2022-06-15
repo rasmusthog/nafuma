@@ -356,4 +356,30 @@ def finding_e0(path, options={}):
     print("Edge shift estimated by the double differential zero-point is "+str(round(edge_shift_doublediff,5)))
     if options['print'] == True:
         ax4.axvline(x=edge_shift_doublediff,color="green")
+
+    return df_smooth, filenames, edge_shift_diff
+
+def normalization(data,options={}):
+    required_options = ['print']
+    default_options = {
+        'print': False,
+    }
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+    #Finding the normalization constant µ_0(E_0), by subtracting the value of the pre-edge-line from the value of the post-edge line at e0
+    normalization_constant=post_edge_fit_function(e0) - pre_edge_fit_function(e0)
     
+    #subtracting background (as in pre_edge_subtraction)
+
+    #dividing the background-subtracted data with the normalization constant
+
+    
+def flattening(data,options={}):
+    #only picking out zapenergy-values higher than edge position (edge pos and below remains untouched)
+    df_e0_and_above=df.loc[df['ZapEnergy'] > edge_shift_diff]
+
+    flattened_data = post_edge_fit_function(df_e0_and_above['ZapEnergy']) - pre_edge_fit_function(df_e0_and_above['ZapEnergy'])
+
+    #make a new dataframe with flattened values
+
+
