@@ -2,6 +2,8 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import numpy as np
+import nafuma.auxillary as aux 
+
 
 def split_xanes_scan(root, destination=None, replace=False):
     #root is the path to the beamtime-folder
@@ -105,8 +107,51 @@ def get_filenames(path):
     
     return filenames
 
-def put_in_dataframe(path):
-    filenames = get_filenames(path) 
+
+
+def read_data(data: dict, options={}) -> pd.DataFrame:
+
+    required_options = []
+    default_options = {
+
+    }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+    columns = ['ZapEnergy']
+
+    # Initialise DataFrame with only ZapEnergy-column
+    xanes_data = pd.read_csv(data['path'][0])[['ZapEnergy']]
+
+    for filename in data['path']:
+        columns.append(filename)
+
+        scan_data = pd.read_csv(filename)
+        scan_data = scan_data[[determine_active_roi(scan_data)]]
+        xanes_data.insert(1, filename, scan_data)
+
+
+    return xanes_data
+
+
+
+
+
+def determine_active_roi(scan_data):
+    
+    #Trying to pick the roi with the highest difference between maximum and minimum intensity --> biggest edge shift
+    if max(scan_data["xmap_roi00"])-min(scan_data["xmap_roi00"])>max(scan_data["xmap_roi01"])-min(scan_data["xmap_roi01"]):
+        active_roi = 'xmap_roi00'
+    else: 
+        active_roi = 'xmap_roi01'
+    
+    return active_roi
+
+
+
+
+def put_into_dataframe(data: dict, options={}) -> pd.DataFrame:
+    filenames = get_filenames(data) 
 
     #making the column names to be used in the dataframe, making sure the first column is the ZapEnergy
     column_names = ["ZapEnergy"]
