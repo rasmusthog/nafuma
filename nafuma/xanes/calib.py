@@ -6,6 +6,7 @@ import nafuma.auxillary as aux
 import nafuma.xanes as xas
 import nafuma.xanes.io as io
 from scipy.signal import savgol_filter
+from datetime import datetime
 
 
 ##Better to make a new function that loops through the files, and performing the split_xanes_scan on
@@ -36,7 +37,7 @@ def find_element(data: dict) -> str:
 
 
 def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
-    from datetime import datetime
+
 
     # FIXME Add log-file
 
@@ -68,15 +69,17 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
 
         edge_start = edge_starts[data['edge']]
 
+    # FIXME There should be an option to specify the interval in which to fit the background - now it is taking everything to the left of edge_start parameter, but if there are some artifacts in this area, it should be possible to
+    # limit the interval
     # Making a dataframe only containing the rows that are included in the background subtraction (points lower than where the edge start is defined)
     pre_edge_data = data['xanes_data'].loc[data['xanes_data']["ZapEnergy"] < edge_start]
         
     # Making a new dataframe, with only the ZapEnergies as the first column -> will be filled to include the background data
     pre_edge_fit_data = pd.DataFrame(data['xanes_data']["ZapEnergy"])
 
-    for filename in data['path']:
+    for i, filename in enumerate(data['path']):
         if options['log']:
-            aux.write_log(message=f'Fitting background on {filename}', options=options)
+            aux.write_log(message=f'Fitting background on {filename} ({i} / {len(data["path"])}', options=options)
 
         #Fitting linear function to the background
         params = np.polyfit(pre_edge_data["ZapEnergy"],pre_edge_data[filename],1)
@@ -88,13 +91,50 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
         #adding a new column in df_background with the y-values of the background
         pre_edge_fit_data.insert(1,filename,background) 
         
-        if options['log']:
-            aux.write_log(message=f'Pre edge fitting done.', options=options)   
+        if options['save_fit']:
+            if not os.path.isdir(options['save_folder']):
+                os.makedirs(options['save_folder'])
+
+            dst = os.path.join(options['save_folder'], filename) + '.png'
+
+            fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,5))
+            data['xanes_data'].plot(x='ZapEnergy', y=filename, color='black', ax=ax1)
+            pre_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax1)
+            ax1.axvline(x = max(pre_edge_data['ZapEnergy']), ls='--')
+            ax1.set_title(f'{os.path.basename(filename)} - Full view', size=20)
+
+            data['xanes_data'].plot(x='ZapEnergy', y=filename, color='black', ax=ax2)
+            pre_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax2)
+            ax2.axvline(x = max(pre_edge_data['ZapEnergy']), ls='--')
+            ax2.set_xlim([min(pre_edge_data['ZapEnergy']), max(pre_edge_data['ZapEnergy'])])
+            ax2.set_ylim([min(pre_edge_data[filename]), max(pre_edge_data[filename])])
+            ax2.set_title(f'{os.path.basename(filename)} - Fit region', size=20)
+
+
+            plt.savefig(dst)
+            plt.close()
+
+
+    if options['log']:
+        aux.write_log(message=f'Pre edge fitting done.', options=options)   
 
     return pre_edge_fit_data
 
 
+
 def pre_edge_subtraction(data: dict, options={}):
+
+    required_options = ['log', 'logfile']
+    default_options = {
+        'log': False,
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S.log")}_pre_edge_subtraction.log',
+    }
+
+
+
+
+
+def pre_edge_subtraction_legacy(data: dict, options={}):
     #FIXME add log-file instead of the troubleshoot-option
     required_options = ['print','troubleshoot']
     default_options = {
