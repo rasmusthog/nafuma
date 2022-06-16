@@ -68,7 +68,7 @@ def write_log(message, options={}):
     options = update_options(options=options, required_options=required_options, default_options=default_options)
 
     now = datetime.now().strftime('%Y/%m/%d %H:%M:%S')
-    message = f'{now} {message} \n'
+    message = f'[{now}] {message} \n'
 
 
     with open(options['logfile'], 'a') as f:
@@ -76,13 +76,13 @@ def write_log(message, options={}):
 
 
 #Function that "collects" all the files in a folder, only accepting .dat-files from xanes-measurements
-def get_filenames(path, ext):
+def get_filenames(path, ext, filter=''):
     ''' Collects all filenames from specified path with a specificed extension
     
     Input:
     path: path to find all filenames (relative or absolute)
     ext: extension (including ".")'''
  
-    filenames = [os.path.join(path, filename) for filename in os.listdir(path) if os.path.isfile(os.path.join(path, filename)) and filename.endswith(ext)] 
+    filenames = [os.path.join(path, filename) for filename in os.listdir(path) if os.path.isfile(os.path.join(path, filename)) and filename.endswith(ext) and filter in filename] 
         
     return filenames
