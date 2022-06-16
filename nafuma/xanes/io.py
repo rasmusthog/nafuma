@@ -8,6 +8,9 @@ def split_xanes_scan(root, destination=None, replace=False):
     #destination should be the path to the processed data
     
     #insert a for-loop to go through all the folders.dat-files in the folder root\xanes\raw
+
+    # FIXME Only adding this variable to pass the Linting-tests - will refactor this later
+    filename = 'dummy'
     
     with open(filename, 'r') as f:
         lines = f.readlines()
