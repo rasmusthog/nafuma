@@ -89,27 +89,14 @@ def split_xanes_scan(root, destination=None, replace=False):
             df.to_csv('{}_{}_{}.dat'.format(filename.split('.')[0], edge_actual, count))
 
 
-#Function that "collects" all the files in a folder, only accepting .dat-files from xanes-measurements
-def get_filenames(path):
-    
-    
-    cwd = os.getcwd()
-    
-    # Change into path provided
-    os.chdir(path)
-    
-    filenames = [os.path.join(path, filename) for filename in os.listdir() if os.path.isfile(filename) and filename[-4:] == '.dat'] #changed
-    
-    
-    
-    # Change directory back to where you ran the script from
-    os.chdir(cwd)
-    
-    return filenames
+
 
 
 
 def read_data(data: dict, options={}) -> pd.DataFrame:
+
+
+    # FIXME Handle the case when dataseries are not the same size
 
     required_options = []
     default_options = {
@@ -138,6 +125,8 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
 
 
 def determine_active_roi(scan_data):
+
+    # FIXME For Co-edge, this gave a wrong scan
     
     #Trying to pick the roi with the highest difference between maximum and minimum intensity --> biggest edge shift
     if max(scan_data["xmap_roi00"])-min(scan_data["xmap_roi00"])>max(scan_data["xmap_roi01"])-min(scan_data["xmap_roi01"]):
@@ -146,51 +135,3 @@ def determine_active_roi(scan_data):
         active_roi = 'xmap_roi01'
     
     return active_roi
-
-
-
-
-def put_into_dataframe(data: dict, options={}) -> pd.DataFrame:
-    filenames = get_filenames(data) 
-
-    #making the column names to be used in the dataframe, making sure the first column is the ZapEnergy
-    column_names = ["ZapEnergy"]
-
-    for i in range(len(filenames)):
-        column_names.append(filenames[i])
-
-    #Taking the first file in the folder and extracting ZapEnergies and intensity from that (only need the intensity from the rest)
-    first = pd.read_csv(filenames[0], skiprows=0)
-
-    #Making a data frame with the correct columns, and will fill inn data afterwards
-    df = pd.DataFrame(columns = column_names)
-    #First putting in the 2theta-values
-    df["ZapEnergy"]=first["ZapEnergy"]
-
-    #filling in the intensities from all files into the corresponding column in the dataframe
-    for i in range(len(filenames)):
-        df2 = pd.read_csv(filenames[i])
-        df2 = df2.drop(['Mon','Det1','Det2','Det3','Det4','Det5', 'Det6','Ion1'], axis=1) #, axis=1)
-        df2 = df2.drop(['MonEx','Ion2','Htime','MusstEnc1','MusstEnc3','MusstEnc4', 'TwoTheta', 'ZCryo'], axis=1)
-        df2 = df2.drop(['ZBlower1', 'ZBlower2', 'ZSrcur'], axis=1)#, axis=19) #removing the sigma at this point
-        
-    ##############     THIS PART PICKS OUT WHICH ROI IS OF INTEREST, BUT MUST BE FIXED IF LOOKING AT THREE EDGES (roi00,roi01,roi02)    #####################
-        if 'xmap_roi01' in df2.columns: 
-            #Trying to pick the roi with the highest difference between maximum and minimum intensity --> biggest edge shift
-            if max(df2["xmap_roi00"])-min(df2["xmap_roi00"])>max(df2["xmap_roi01"])-min(df2["xmap_roi01"]):
-                df[filenames[i]]=df2["xmap_roi00"] #forMn
-            else: 
-                df[filenames[i]]=df2["xmap_roi01"] #forNi
-        else:
-            df[filenames[i]]=df2["xmap_roi00"]
-    ###############################################################################################
-
-        i=i+1
-
-
-    #print(df)
-    #If I want to make a csv-file of the raw data. Decided that was not necessary:
-    #df.to_csv('static-Mn-edge.csv') #writing it to a csv, first row is datapoint (index), second column is 2theta, and from there the scans starts
-
-
-    return df
