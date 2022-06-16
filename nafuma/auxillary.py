@@ -1,5 +1,6 @@
 import json
 import numpy as np
+import os
 
 def update_options(options, required_options, default_options):
     ''' Takes a dictionary of options along with a list of required options and dictionary of default options, and sets all keyval-pairs of options that is not already defined to the default values'''
@@ -72,3 +73,16 @@ def write_log(message, options={}):
 
     with open(options['logfile'], 'a') as f:
         f.write(message)
+
+
+#Function that "collects" all the files in a folder, only accepting .dat-files from xanes-measurements
+def get_filenames(path, ext):
+    ''' Collects all filenames from specified path with a specificed extension
+    
+    Input:
+    path: path to find all filenames (relative or absolute)
+    ext: extension (including ".")'''
+ 
+    filenames = [os.path.join(path, filename) for filename in os.listdir(path) if os.path.isfile(os.path.join(path, filename)) and filename.endswith(ext)] 
+        
+    return filenames
