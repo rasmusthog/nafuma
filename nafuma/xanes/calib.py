@@ -22,13 +22,13 @@ def find_element(data: dict) -> str:
         'Ni': [8.0, 8.6]
     }
 
-    if element_energy_intervals['Mn'][0]    < data['xanes_data']["ZapEnergy"][0] < element_energy_intervals['Mn'][1]:
+    if (element_energy_intervals['Mn'][0] < data['xanes_data_original']["ZapEnergy"].iloc[0]) & (data['xanes_data_original']["ZapEnergy"].iloc[0] < element_energy_intervals['Mn'][1]):
         edge = 'Mn'
-    elif element_energy_intervals['Co'][0]  < data['xanes_data']["ZapEnergy"][0] < element_energy_intervals['Fe'][1]:
+    elif (element_energy_intervals['Fe'][0] < data['xanes_data_original']["ZapEnergy"].iloc[0]) & (data['xanes_data_original']["ZapEnergy"].iloc[0] < element_energy_intervals['Fe'][1]):
         edge = 'Fe'
-    elif element_energy_intervals['Co'][0]  < data['xanes_data']["ZapEnergy"][0] < element_energy_intervals['Co'][1]:
+    elif (element_energy_intervals['Co'][0] < data['xanes_data_original']["ZapEnergy"].iloc[0]) & (data['xanes_data_original']["ZapEnergy"].iloc[0] < element_energy_intervals['Co'][1]):
         edge = 'Co'   
-    elif element_energy_intervals['Ni'][0]  < data['xanes_data']["ZapEnergy"][0] < element_energy_intervals['Ni'][1]:
+    elif (element_energy_intervals['Ni'][0] < data['xanes_data_original']["ZapEnergy"].iloc[0]) & (data['xanes_data_original']["ZapEnergy"].iloc[0] < element_energy_intervals['Ni'][1]):
         edge = 'Ni'
         
         
@@ -45,7 +45,7 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
     default_options = {
         'edge_start': None,
         'log': False,
-        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S.log")}_pre_edge_fit.log',
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_pre_edge_fit.log',
         'save_plots': False,
         'save_folder': './'
     }
@@ -62,11 +62,12 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
     if not options['edge_start']:
         edge_starts = {
             'Mn': 6.42,
-            'Fe': 7.11,
+            'Fe': 7.09,
             'Co': 7.705,
             'Ni': 8.3        
         }
 
+        data['edge'] = find_element(data)
         edge_start = edge_starts[data['edge']]
 
     # FIXME There should be an option to specify the interval in which to fit the background - now it is taking everything to the left of edge_start parameter, but if there are some artifacts in this area, it should be possible to
@@ -79,7 +80,7 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
 
     for i, filename in enumerate(data['path']):
         if options['log']:
-            aux.write_log(message=f'Fitting background on {filename} ({i} / {len(data["path"])}', options=options)
+            aux.write_log(message=f'Fitting background on {os.path.basename(filename)} ({i+1} / {len(data["path"])})', options=options)
 
         #Fitting linear function to the background
         params = np.polyfit(pre_edge_data["ZapEnergy"],pre_edge_data[filename],1)
@@ -95,15 +96,15 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
             if not os.path.isdir(options['save_folder']):
                 os.makedirs(options['save_folder'])
 
-            dst = os.path.join(options['save_folder'], filename) + '_pre_edge_fit.png'
+            dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_pre_edge_fit.png'
 
             fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,5))
-            data['xanes_data'].plot(x='ZapEnergy', y=filename, color='black', ax=ax1)
+            data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax1)
             pre_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax1)
             ax1.axvline(x = max(pre_edge_data['ZapEnergy']), ls='--')
             ax1.set_title(f'{os.path.basename(filename)} - Full view', size=20)
 
-            data['xanes_data'].plot(x='ZapEnergy', y=filename, color='black', ax=ax2)
+            data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax2)
             pre_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax2)
             ax2.axvline(x = max(pre_edge_data['ZapEnergy']), ls='--')
             ax2.set_xlim([min(pre_edge_data['ZapEnergy']), max(pre_edge_data['ZapEnergy'])])
@@ -111,7 +112,7 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
             ax2.set_title(f'{os.path.basename(filename)} - Fit region', size=20)
 
 
-            plt.savefig(dst)
+            plt.savefig(dst, transparent=False)
             plt.close()
 
 
