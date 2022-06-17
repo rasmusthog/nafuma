@@ -1,5 +1,6 @@
 import json
 import numpy as np
+import os
 
 def update_options(options, required_options, default_options):
     ''' Takes a dictionary of options along with a list of required options and dictionary of default options, and sets all keyval-pairs of options that is not already defined to the default values'''
@@ -53,3 +54,35 @@ def floor(a, roundto=1):
     a = np.floor(a*fac) / fac
 
     return a
+
+
+
+def write_log(message, options={}):
+    from datetime import datetime
+
+    required_options = ['logfile']
+    default_options = {
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S.log")}'
+    }
+
+    options = update_options(options=options, required_options=required_options, default_options=default_options)
+
+    now = datetime.now().strftime('%Y/%m/%d %H:%M:%S')
+    message = f'[{now}] {message} \n'
+
+
+    with open(options['logfile'], 'a') as f:
+        f.write(message)
+
+
+#Function that "collects" all the files in a folder, only accepting .dat-files from xanes-measurements
+def get_filenames(path, ext, filter=''):
+    ''' Collects all filenames from specified path with a specificed extension
+    
+    Input:
+    path: path to find all filenames (relative or absolute)
+    ext: extension (including ".")'''
+ 
+    filenames = [os.path.join(path, filename) for filename in os.listdir(path) if os.path.isfile(os.path.join(path, filename)) and filename.endswith(ext) and filter in filename] 
+        
+    return filenames

@@ -6,111 +6,190 @@ import nafuma.auxillary as aux
 import nafuma.xanes as xas
 import nafuma.xanes.io as io
 from scipy.signal import savgol_filter
+from datetime import datetime
 
 
 ##Better to make a new function that loops through the files, and performing the split_xanes_scan on
 
 #Trying to make a function that can decide which edge it is based on the first ZapEnergy-value
-def finding_edge(df):
-    #FIXME add Fe and Co
-    if 5.9 < df["ZapEnergy"][0] < 6.5:
-        edge='Mn'
-        return(edge)
-    if 8.0 < df["ZapEnergy"][0] < 8.6:
-        edge='Ni'
-        return(edge)
+def find_element(data: dict, index=0) -> str:
+    ''' Takes the data dictionary and determines based on the start value of the ZapEnergy-column which element the edge is from.'''
 
-def pre_edge_subtraction(path, options={}):
-    #FIXME add log-file instead of the troubleshoot-option
-    required_options = ['print','troubleshoot']
+    element_energy_intervals = {
+        'Mn': [5.9, 6.5],
+        'Fe': [7.0, 7.2],
+        'Co': [7.6, 7.8],
+        'Ni': [8.0, 8.6]
+    }
+
+    if (element_energy_intervals['Mn'][0] < data['xanes_data_original']["ZapEnergy"].iloc[index]) & (data['xanes_data_original']["ZapEnergy"].iloc[index] < element_energy_intervals['Mn'][1]):
+        edge = 'Mn'
+    elif (element_energy_intervals['Fe'][0] < data['xanes_data_original']["ZapEnergy"].iloc[index]) & (data['xanes_data_original']["ZapEnergy"].iloc[index] < element_energy_intervals['Fe'][1]):
+        edge = 'Fe'
+    elif (element_energy_intervals['Co'][0] < data['xanes_data_original']["ZapEnergy"].iloc[index]) & (data['xanes_data_original']["ZapEnergy"].iloc[index] < element_energy_intervals['Co'][1]):
+        edge = 'Co'   
+    elif (element_energy_intervals['Ni'][0] < data['xanes_data_original']["ZapEnergy"].iloc[index]) & (data['xanes_data_original']["ZapEnergy"].iloc[index] < element_energy_intervals['Ni'][1]):
+        edge = 'Ni'
+        
+        
+    return(edge)
+
+
+
+def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
+
+
+    # FIXME Add log-file
+
+    required_options = ['edge_start', 'log', 'logfile', 'save_plots', 'save_folder']
+    default_options = {
+        'edge_start': None,
+        'log': False,
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_pre_edge_fit.log',
+        'save_plots': False,
+        'save_folder': './'
+    }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+    if options['log']:
+        aux.write_log(message='Starting pre edge fit', options=options)
+
+
+
+    # FIXME Implement with finding accurate edge position
+    # FIXME Allow specification of start of pre-edge area
+    # Find the cutoff point at which the edge starts - everything to the LEFT of this point will be used in the pre edge function fit
+    if not options['edge_start']:
+        pre_edge_limit_offsets = {
+            'Mn': 0.03,
+            'Fe': 0.03,
+            'Co': 0.03,
+            'Ni': 0.03        
+        }
+
+        data['edge'] = find_element(data)
+
+        edge_position = estimate_edge_position(data, options, index=0)
+        pre_edge_limit = edge_position - pre_edge_limit_offsets[data['edge']]
+
+    # FIXME There should be an option to specify the interval in which to fit the background - now it is taking everything to the left of edge_start parameter, but if there are some artifacts in this area, it should be possible to
+    # limit the interval
+    # Making a dataframe only containing the rows that are included in the background subtraction (points lower than where the edge start is defined)
+    pre_edge_data = data['xanes_data_original'].loc[data['xanes_data_original']["ZapEnergy"] < pre_edge_limit]
+        
+    # Making a new dataframe, with only the ZapEnergies as the first column -> will be filled to include the background data
+    pre_edge_fit_data = pd.DataFrame(data['xanes_data_original']["ZapEnergy"])
+
+    for i, filename in enumerate(data['path']):
+        if options['log']:
+            aux.write_log(message=f'Fitting background on {os.path.basename(filename)} ({i+1} / {len(data["path"])})', options=options)
+
+        #Fitting linear function to the background
+        params = np.polyfit(pre_edge_data["ZapEnergy"],pre_edge_data[filename],1)
+        fit_function = np.poly1d(params)
+        
+        #making a list, y_pre,so the background will be applied to all ZapEnergy-values
+        background=fit_function(pre_edge_fit_data["ZapEnergy"])
+            
+        #adding a new column in df_background with the y-values of the background
+        pre_edge_fit_data.insert(1,filename,background) 
+        
+        if options['save_plots']:
+            if not os.path.isdir(options['save_folder']):
+                os.makedirs(options['save_folder'])
+
+            dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_pre_edge_fit.png'
+
+            fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,5))
+            data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax1)
+            pre_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax1)
+            ax1.axvline(x = max(pre_edge_data['ZapEnergy']), ls='--')
+            ax1.set_title(f'{os.path.basename(filename)} - Full view', size=20)
+
+            data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax2)
+            pre_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax2)
+            ax2.axvline(x = max(pre_edge_data['ZapEnergy']), ls='--')
+            ax2.set_xlim([min(pre_edge_data['ZapEnergy']), max(pre_edge_data['ZapEnergy'])])
+            ax2.set_ylim([min(pre_edge_data[filename]), max(pre_edge_data[filename])])
+            ax2.set_title(f'{os.path.basename(filename)} - Fit region', size=20)
+
+
+            plt.savefig(dst, transparent=False)
+            plt.close()
+
+
+    if options['log']:
+        aux.write_log(message=f'Pre edge fitting done.', options=options)   
+
+    return pre_edge_fit_data
+
+
+
+def pre_edge_subtraction(data: dict, options={}):
+
+    required_options = ['log', 'logfile', 'save_plots', 'save_folder']
+    default_options = {
+        'log': False,
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S.log")}_pre_edge_subtraction.log',
+        'save_plots': False,
+        'save_folder': './'
+    }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+    if options['log']:
+        aux.write_log(message='Starting pre edge subtraction', options=options)
+
+    xanes_data_bkgd_subtracted = pd.DataFrame(data['xanes_data_original']["ZapEnergy"])
+
+    for i, filename in enumerate(data['path']):
+        if options['log']:
+            aux.write_log(message=f'Subtracting background on {filename} ({i} / {len(data["path"])}', options=options)
+
+        xanes_data_bkgd_subtracted.insert(1, filename, data['xanes_data_original'][filename] - data['pre_edge_fit_data'][filename])
+
+        if options['save_plots']:
+                if not os.path.isdir(options['save_folder']):
+                    os.makedirs(options['save_folder'])
+
+                dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_pre_edge_subtraction.png'
+
+                fig, ax = plt.subplots(figsize=(10,5))
+                data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax)
+                xanes_data_bkgd_subtracted.plot(x='ZapEnergy', y=filename, color='red', ax=ax)
+                ax.set_title(f'{os.path.basename(filename)} - After subtraction', size=20)
+
+                plt.savefig(dst)
+                plt.close()
+
+    return xanes_data_bkgd_subtracted
+
+
+def estimate_edge_position(data: dict, options={}, index=0):
+    #a dataset is differentiated to find a first estimate of the edge shift to use as starting point. 
+    required_options = ['print','periods']
     default_options = {
         'print': False,
-        'troubleshoot': False
+        'periods': 2, #Periods needs to be an even number for the shifting of values to work properly
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
-    filenames = xas.io.get_filenames(path)
-    df= xas.io.put_in_dataframe(path)
-    edge=finding_edge(df)
-    
-    #Defining the end of the region used to define the background, thus start of the edge
-    
-    #######================================================================================================================================================
-    #FIXME Trying to implement automatical region determination based on an estimate of the edge shift
-    #print(df)
-    #estimated_edge_shift, df_diff, df_diff_max = find_pos_maxdiff(df, filenames,options=options)
+    #making new dataframe to keep the differentiated data
+    df_diff = pd.DataFrame(data['xanes_data_original']["ZapEnergy"])
+    df_diff[data['path'][index]]=data['xanes_data_original'][data['path'][index]].diff(periods=options['periods'])
 
-    #print(estimated_edge_shift)
-    #estimated_edge_shift
-    ###=========================================================================================================================================================================
-    #implement widget
-    if edge == 'Mn':
-        edge_start = 6.42
-        #edge_start = estimated_edge_shift
-    if edge == 'Ni':
-        edge_start = 8.3
+    #shifting column values up so that average differential fits right between the points used in the calculation
+    df_diff[data['path'][index]]=df_diff[data['path'][index]].shift(-int(options['periods']/2))
+    df_diff_max = df_diff[data['path'][index]].dropna().max()
+    estimated_edge_shift =df_diff.loc[df_diff[data['path'][index]] == df_diff_max,'ZapEnergy'].values[0]
 
-    #making a dataframe only containing the rows that are included in the background subtraction (points lower than where the edge start is defined)
-    df_start=df.loc[df["ZapEnergy"] < edge_start]
-        
-    #Making a new dataframe, with only the ZapEnergies as the first column -> will be filled to include the background data
-    df_bkgd = pd.DataFrame(df["ZapEnergy"])
+    # FIXME Add logging option to see the result
 
-    for files in filenames:
+    if options['log']:
+        aux.write_log(message=f'Estimated edge shift for determination of pre-edge area is: {estimated_edge_shift} keV', options=options)
 
-    #Fitting linear function to the background
-        d = np.polyfit(df_start["ZapEnergy"],df_start[files],1)
-        function_bkgd = np.poly1d(d)
-        
-    #making a list, y_pre,so the background will be applied to all ZapEnergy-values
-        y_bkgd=function_bkgd(df["ZapEnergy"])
-        
-    #adding a new column in df_background with the y-values of the background
-        df_bkgd.insert(1,files,y_bkgd) 
-    
-        
-        if options['troubleshoot'] == True:
-        ###     FOR FIGURING OUT WHERE IT GOES WRONG/WHICH FILE IS CORRUPT
-            ax = df.plot(x = "ZapEnergy",y=files)  
-    #Plotting the calculated pre-edge background with the region used for the regression   
-    if options['print'] == True:
-    #Plotting an example of the edge_start region and the fitted background that will later be subtracted
-        fig, (ax1,ax2,ax3) = plt.subplots(1,3,figsize=(15,5))
-        df.plot(x="ZapEnergy", y=filenames,color="Black",ax=ax1)
-        df_bkgd.plot(x="ZapEnergy", y=filenames,color="Red",ax=ax1)
-        plt.axvline(x = max(df_start["ZapEnergy"])) 
-        #fig = plt.figure(figsize=(15,15))
-        df_bkgd.plot(x="ZapEnergy", y=filenames,color="Red",ax=ax2)
-        ax1.set_title('Data and fitted background')
-        #Zooming into bacground region to confirm fit and limits looks reasonable
-        df.plot(x = "ZapEnergy",y=filenames,ax=ax2) #defining x and y)
-        ax2.set_xlim([min(df_start["ZapEnergy"]),max(df_start["ZapEnergy"])+0.01])
-        #finding maximum and minimum values in the backgrounds
-        min_values=[]
-        max_values=[]
-        for file in filenames:
-            min_values.append(min(df_start[file]))
-            max_values.append(max(df_start[file]))
-        ax2.set_ylim([min(min_values),max(max_values)])
-        plt.axvline(x = max(df_start["ZapEnergy"]))
-        #ax2.set_xlim([25, 50])
-    ###################### Subtracting the pre edge from xmap_roi00   ################
+    return estimated_edge_shift
 
-    #making a new dataframe to insert the background subtracted intensities
-    df_bkgd_sub = pd.DataFrame(df["ZapEnergy"])
-    #inserting the background subtracted original xmap_roi00 data
-
-    for files in filenames:
-        newintensity_calc=df[files]-df_bkgd[files]
-        df_bkgd_sub.insert(1,files,newintensity_calc) 
-
-    if options['print'] == True:
-        df.plot(x = "ZapEnergy",y=filenames, color="Black", ax=ax3, legend=False)
-        #plt.axvline(x = max(df_start["ZapEnergy"])) 
-        df_bkgd_sub.plot(x="ZapEnergy", y=filenames,color="Red",ax=ax3, legend=False)
-        ax3.set_title('Data and background-subtracted data')
-
-    return df_bkgd_sub,filenames,edge
 
 def post_edge_fit(path, options={}):
     #FIXME should be called "fitting post edge" (normalization is not done here, need edge shift position)
@@ -205,25 +284,7 @@ def smoothing(path, options={}):
     
     return df_smooth, filenames
 
-def find_pos_maxdiff(df, filenames,options={}):
-    #a dataset is differentiated to find a first estimate of the edge shift to use as starting point. 
-    required_options = ['print','periods']
-    default_options = {
-        'print': False,
-        'periods': 2, #Periods needs to be an even number for the shifting of values to work properly
-    }
-    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
-    #making new dataframe to keep the differentiated data
-    df_diff = pd.DataFrame(df["ZapEnergy"])
-    df_diff[filenames]=df[filenames].diff(periods=options['periods'])
-
-    #shifting column values up so that average differential fits right between the points used in the calculation
-    df_diff[filenames]=df_diff[filenames].shift(-int(options['periods']/2))
-    df_diff_max = df_diff[filenames].dropna().max()
-    estimated_edge_shift =df_diff.loc[df_diff[filenames] == df_diff_max,'ZapEnergy'].values[0]
-
-    return estimated_edge_shift, df_diff, df_diff_max
 
 def find_nearest(array, value):
     #function to find the value closes to "value" in an "array"
@@ -250,7 +311,7 @@ def finding_e0(path, options={}):
        print("MORE THAN ONE FILE --> generalize")
     
     #####
-    estimated_edge_shift, df_diff, df_diff_max = find_pos_maxdiff(df_smooth, filenames,options=options)
+    estimated_edge_shift, df_diff, df_diff_max = estimate_edge_position(df_smooth, filenames,options=options)
     print(estimated_edge_shift)
     ####
     ###df_diff[filenames]=df_smooth[filenames].diff(periods=options['periods']) #

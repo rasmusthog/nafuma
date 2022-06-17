@@ -2,12 +2,17 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import numpy as np
+import nafuma.auxillary as aux 
+
 
 def split_xanes_scan(root, destination=None, replace=False):
     #root is the path to the beamtime-folder
     #destination should be the path to the processed data
     
     #insert a for-loop to go through all the folders.dat-files in the folder root\xanes\raw
+
+    # FIXME Only adding this variable to pass the Linting-tests - will refactor this later
+    filename = 'dummy'
     
     with open(filename, 'r') as f:
         lines = f.readlines()
@@ -84,65 +89,70 @@ def split_xanes_scan(root, destination=None, replace=False):
             df.to_csv('{}_{}_{}.dat'.format(filename.split('.')[0], edge_actual, count))
 
 
-#Function that "collects" all the files in a folder, only accepting .dat-files from xanes-measurements
-def get_filenames(path):
-    
-    
-    cwd = os.getcwd()
-    
-    # Change into path provided
-    os.chdir(path)
-    
-    filenames = [os.path.join(path, filename) for filename in os.listdir() if os.path.isfile(filename) and filename[-4:] == '.dat'] #changed
-    
-    
-    
-    # Change directory back to where you ran the script from
-    os.chdir(cwd)
-    
-    return filenames
 
-def put_in_dataframe(path):
-    filenames = get_filenames(path) 
 
-    #making the column names to be used in the dataframe, making sure the first column is the ZapEnergy
-    column_names = ["ZapEnergy"]
 
-    for i in range(len(filenames)):
-        column_names.append(filenames[i])
 
-    #Taking the first file in the folder and extracting ZapEnergies and intensity from that (only need the intensity from the rest)
-    first = pd.read_csv(filenames[0], skiprows=0)
+def read_data(data: dict, options={}) -> pd.DataFrame:
 
-    #Making a data frame with the correct columns, and will fill inn data afterwards
-    df = pd.DataFrame(columns = column_names)
-    #First putting in the 2theta-values
-    df["ZapEnergy"]=first["ZapEnergy"]
 
-    #filling in the intensities from all files into the corresponding column in the dataframe
-    for i in range(len(filenames)):
-        df2 = pd.read_csv(filenames[i])
-        df2 = df2.drop(['Mon','Det1','Det2','Det3','Det4','Det5', 'Det6','Ion1'], axis=1) #, axis=1)
-        df2 = df2.drop(['MonEx','Ion2','Htime','MusstEnc1','MusstEnc3','MusstEnc4', 'TwoTheta', 'ZCryo'], axis=1)
-        df2 = df2.drop(['ZBlower1', 'ZBlower2', 'ZSrcur'], axis=1)#, axis=19) #removing the sigma at this point
-        
-    ##############     THIS PART PICKS OUT WHICH ROI IS OF INTEREST, BUT MUST BE FIXED IF LOOKING AT THREE EDGES (roi00,roi01,roi02)    #####################
-        if 'xmap_roi01' in df2.columns: 
-            #Trying to pick the roi with the highest difference between maximum and minimum intensity --> biggest edge shift
-            if max(df2["xmap_roi00"])-min(df2["xmap_roi00"])>max(df2["xmap_roi01"])-min(df2["xmap_roi01"]):
-                df[filenames[i]]=df2["xmap_roi00"] #forMn
-            else: 
-                df[filenames[i]]=df2["xmap_roi01"] #forNi
+    # FIXME Handle the case when dataseries are not the same size
+
+    required_options = []
+    default_options = {
+
+    }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+    columns = ['ZapEnergy']
+
+    # Initialise DataFrame with only ZapEnergy-column
+    xanes_data = pd.read_csv(data['path'][0])[['ZapEnergy']]
+
+    if not isinstance(data['path'], list):
+        data['path'] = [data['path']]
+
+    for filename in data['path']:
+        columns.append(filename)
+
+        scan_data = pd.read_csv(filename)
+        scan_data = scan_data[[determine_active_roi(scan_data)]]
+        xanes_data = pd.concat([xanes_data, scan_data], axis=1)
+
+
+    xanes_data.columns = columns
+
+
+    return xanes_data
+
+
+
+
+
+def determine_active_roi(scan_data):
+
+    # FIXME For Co-edge, this gave a wrong scan
+    
+    #Trying to pick the roi with the highest difference between maximum and minimum intensity --> biggest edge shift
+    # if max(scan_data["xmap_roi00"])-min(scan_data["xmap_roi00"])>max(scan_data["xmap_roi01"])-min(scan_data["xmap_roi01"]):
+    #     active_roi = 'xmap_roi00'
+    # else: 
+    #     active_roi = 'xmap_roi01'
+    
+    if (scan_data['xmap_roi00'].iloc[0:100].mean() < scan_data['xmap_roi00'].iloc[-100:].mean()) and (scan_data['xmap_roi01'].iloc[0:100].mean() < scan_data['xmap_roi01'].iloc[-100:].mean()):
+        if (scan_data['xmap_roi00'].max()-scan_data['xmap_roi00'].min()) > (scan_data['xmap_roi01'].max() - scan_data['xmap_roi01'].min()):
+            active_roi = 'xmap_roi00'
         else:
-            df[filenames[i]]=df2["xmap_roi00"]
-    ###############################################################################################
+            active_roi = 'xmap_roi01'
 
-        i=i+1
+    elif scan_data['xmap_roi00'].iloc[0:100].mean() < scan_data['xmap_roi00'].iloc[-100:].mean():
+        active_roi = 'xmap_roi00'
+    
+    elif scan_data['xmap_roi01'].iloc[0:100].mean() < scan_data['xmap_roi01'].iloc[-100:].mean(): 
+        active_roi = 'xmap_roi01'
 
+    else:
+        active_roi = None
 
-    #print(df)
-    #If I want to make a csv-file of the raw data. Decided that was not necessary:
-    #df.to_csv('static-Mn-edge.csv') #writing it to a csv, first row is datapoint (index), second column is 2theta, and from there the scans starts
-
-
-    return df
+    return active_roi
