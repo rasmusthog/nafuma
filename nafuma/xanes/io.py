@@ -115,7 +115,10 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
 
         scan_data = pd.read_csv(filename)
         scan_data = scan_data[[determine_active_roi(scan_data)]]
-        xanes_data.insert(1, filename, scan_data)
+        xanes_data = pd.concat([xanes_data, scan_data], axis=1)
+
+
+    xanes_data.columns = columns
 
 
     return xanes_data
@@ -129,9 +132,24 @@ def determine_active_roi(scan_data):
     # FIXME For Co-edge, this gave a wrong scan
     
     #Trying to pick the roi with the highest difference between maximum and minimum intensity --> biggest edge shift
-    if max(scan_data["xmap_roi00"])-min(scan_data["xmap_roi00"])>max(scan_data["xmap_roi01"])-min(scan_data["xmap_roi01"]):
-        active_roi = 'xmap_roi00'
-    else: 
-        active_roi = 'xmap_roi01'
+    # if max(scan_data["xmap_roi00"])-min(scan_data["xmap_roi00"])>max(scan_data["xmap_roi01"])-min(scan_data["xmap_roi01"]):
+    #     active_roi = 'xmap_roi00'
+    # else: 
+    #     active_roi = 'xmap_roi01'
     
+    if (scan_data['xmap_roi00'].iloc[0:100].mean() < scan_data['xmap_roi00'].iloc[-100:].mean()) and (scan_data['xmap_roi01'].iloc[0:100].mean() < scan_data['xmap_roi01'].iloc[-100:].mean()):
+        if (scan_data['xmap_roi00'].max()-scan_data['xmap_roi00'].min()) > (scan_data['xmap_roi01'].max() - scan_data['xmap_roi01'].min()):
+            active_roi = 'xmap_roi00'
+        else:
+            active_roi = 'xmap_roi01'
+
+    elif scan_data['xmap_roi00'].iloc[0:100].mean() < scan_data['xmap_roi00'].iloc[-100:].mean():
+        active_roi = 'xmap_roi00'
+    
+    elif scan_data['xmap_roi01'].iloc[0:100].mean() < scan_data['xmap_roi01'].iloc[-100:].mean(): 
+        active_roi = 'xmap_roi01'
+
+    else:
+        active_roi = None
+
     return active_roi
