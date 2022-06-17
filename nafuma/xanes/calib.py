@@ -12,7 +12,7 @@ from datetime import datetime
 ##Better to make a new function that loops through the files, and performing the split_xanes_scan on
 
 #Trying to make a function that can decide which edge it is based on the first ZapEnergy-value
-def find_element(data: dict) -> str:
+def find_element(data: dict, index=0) -> str:
     ''' Takes the data dictionary and determines based on the start value of the ZapEnergy-column which element the edge is from.'''
 
     element_energy_intervals = {
@@ -22,13 +22,13 @@ def find_element(data: dict) -> str:
         'Ni': [8.0, 8.6]
     }
 
-    if (element_energy_intervals['Mn'][0] < data['xanes_data_original']["ZapEnergy"].iloc[0]) & (data['xanes_data_original']["ZapEnergy"].iloc[0] < element_energy_intervals['Mn'][1]):
+    if (element_energy_intervals['Mn'][0] < data['xanes_data_original']["ZapEnergy"].iloc[index]) & (data['xanes_data_original']["ZapEnergy"].iloc[index] < element_energy_intervals['Mn'][1]):
         edge = 'Mn'
-    elif (element_energy_intervals['Fe'][0] < data['xanes_data_original']["ZapEnergy"].iloc[0]) & (data['xanes_data_original']["ZapEnergy"].iloc[0] < element_energy_intervals['Fe'][1]):
+    elif (element_energy_intervals['Fe'][0] < data['xanes_data_original']["ZapEnergy"].iloc[index]) & (data['xanes_data_original']["ZapEnergy"].iloc[index] < element_energy_intervals['Fe'][1]):
         edge = 'Fe'
-    elif (element_energy_intervals['Co'][0] < data['xanes_data_original']["ZapEnergy"].iloc[0]) & (data['xanes_data_original']["ZapEnergy"].iloc[0] < element_energy_intervals['Co'][1]):
+    elif (element_energy_intervals['Co'][0] < data['xanes_data_original']["ZapEnergy"].iloc[index]) & (data['xanes_data_original']["ZapEnergy"].iloc[index] < element_energy_intervals['Co'][1]):
         edge = 'Co'   
-    elif (element_energy_intervals['Ni'][0] < data['xanes_data_original']["ZapEnergy"].iloc[0]) & (data['xanes_data_original']["ZapEnergy"].iloc[0] < element_energy_intervals['Ni'][1]):
+    elif (element_energy_intervals['Ni'][0] < data['xanes_data_original']["ZapEnergy"].iloc[index]) & (data['xanes_data_original']["ZapEnergy"].iloc[index] < element_energy_intervals['Ni'][1]):
         edge = 'Ni'
         
         
@@ -58,22 +58,25 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
 
 
     # FIXME Implement with finding accurate edge position
+    # FIXME Allow specification of start of pre-edge area
     # Find the cutoff point at which the edge starts - everything to the LEFT of this point will be used in the pre edge function fit
     if not options['edge_start']:
-        edge_starts = {
-            'Mn': 6.42,
-            'Fe': 7.09,
-            'Co': 7.705,
-            'Ni': 8.3        
+        pre_edge_limit_offsets = {
+            'Mn': 0.03,
+            'Fe': 0.03,
+            'Co': 0.03,
+            'Ni': 0.03        
         }
 
         data['edge'] = find_element(data)
-        edge_start = edge_starts[data['edge']]
+
+        edge_position = estimate_edge_position(data, options, index=0)
+        pre_edge_limit = edge_position - pre_edge_limit_offsets[data['edge']]
 
     # FIXME There should be an option to specify the interval in which to fit the background - now it is taking everything to the left of edge_start parameter, but if there are some artifacts in this area, it should be possible to
     # limit the interval
     # Making a dataframe only containing the rows that are included in the background subtraction (points lower than where the edge start is defined)
-    pre_edge_data = data['xanes_data_original'].loc[data['xanes_data_original']["ZapEnergy"] < edge_start]
+    pre_edge_data = data['xanes_data_original'].loc[data['xanes_data_original']["ZapEnergy"] < pre_edge_limit]
         
     # Making a new dataframe, with only the ZapEnergies as the first column -> will be filled to include the background data
     pre_edge_fit_data = pd.DataFrame(data['xanes_data_original']["ZapEnergy"])
@@ -159,6 +162,31 @@ def pre_edge_subtraction(data: dict, options={}):
                 plt.close()
 
     return xanes_data_bkgd_subtracted
+
+
+def estimate_edge_position(data: dict, options={}, index=0):
+    #a dataset is differentiated to find a first estimate of the edge shift to use as starting point. 
+    required_options = ['print','periods']
+    default_options = {
+        'print': False,
+        'periods': 2, #Periods needs to be an even number for the shifting of values to work properly
+    }
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+    #making new dataframe to keep the differentiated data
+    df_diff = pd.DataFrame(data['xanes_data_original']["ZapEnergy"])
+    df_diff[data['path'][index]]=data['xanes_data_original'][data['path'][index]].diff(periods=options['periods'])
+
+    #shifting column values up so that average differential fits right between the points used in the calculation
+    df_diff[data['path'][index]]=df_diff[data['path'][index]].shift(-int(options['periods']/2))
+    df_diff_max = df_diff[data['path'][index]].dropna().max()
+    estimated_edge_shift =df_diff.loc[df_diff[data['path'][index]] == df_diff_max,'ZapEnergy'].values[0]
+
+    # FIXME Add logging option to see the result
+
+    print(estimated_edge_shift)
+
+    return estimated_edge_shift
 
 
 def post_edge_fit(path, options={}):
@@ -254,25 +282,7 @@ def smoothing(path, options={}):
     
     return df_smooth, filenames
 
-def find_pos_maxdiff(df, filenames,options={}):
-    #a dataset is differentiated to find a first estimate of the edge shift to use as starting point. 
-    required_options = ['print','periods']
-    default_options = {
-        'print': False,
-        'periods': 2, #Periods needs to be an even number for the shifting of values to work properly
-    }
-    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
-    #making new dataframe to keep the differentiated data
-    df_diff = pd.DataFrame(df["ZapEnergy"])
-    df_diff[filenames]=df[filenames].diff(periods=options['periods'])
-
-    #shifting column values up so that average differential fits right between the points used in the calculation
-    df_diff[filenames]=df_diff[filenames].shift(-int(options['periods']/2))
-    df_diff_max = df_diff[filenames].dropna().max()
-    estimated_edge_shift =df_diff.loc[df_diff[filenames] == df_diff_max,'ZapEnergy'].values[0]
-
-    return estimated_edge_shift, df_diff, df_diff_max
 
 def find_nearest(array, value):
     #function to find the value closes to "value" in an "array"
