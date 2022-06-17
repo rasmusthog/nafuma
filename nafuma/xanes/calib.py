@@ -41,9 +41,9 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
 
     # FIXME Add log-file
 
-    required_options = ['edge_start', 'log', 'logfile', 'save_plots', 'save_folder']
+    required_options = ['pre_edge_start', 'log', 'logfile', 'save_plots', 'save_folder']
     default_options = {
-        'edge_start': None,
+        'pre_edge_start': None,
         'log': False,
         'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_pre_edge_fit.log',
         'save_plots': False,
@@ -60,18 +60,13 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
     # FIXME Implement with finding accurate edge position
     # FIXME Allow specification of start of pre-edge area
     # Find the cutoff point at which the edge starts - everything to the LEFT of this point will be used in the pre edge function fit
-    if not options['edge_start']:
-        pre_edge_limit_offsets = {
-            'Mn': 0.03,
-            'Fe': 0.03,
-            'Co': 0.03,
-            'Ni': 0.03        
-        }
+    if not options['pre_edge_start']:
+        pre_edge_limit_offset = 0.03
 
         data['edge'] = find_element(data)
 
         edge_position = estimate_edge_position(data, options, index=0)
-        pre_edge_limit = edge_position - pre_edge_limit_offsets[data['edge']]
+        pre_edge_limit = edge_position - pre_edge_limit_offset
 
     # FIXME There should be an option to specify the interval in which to fit the background - now it is taking everything to the left of edge_start parameter, but if there are some artifacts in this area, it should be possible to
     # limit the interval
@@ -169,6 +164,7 @@ def estimate_edge_position(data: dict, options={}, index=0):
     #a dataset is differentiated to find a first estimate of the edge shift to use as starting point. 
     required_options = ['print','periods']
     default_options = {
+
         'print': False,
         'periods': 2, #Periods needs to be an even number for the shifting of values to work properly
     }
@@ -191,45 +187,71 @@ def estimate_edge_position(data: dict, options={}, index=0):
     return estimated_edge_shift
 
 
-def post_edge_fit(path, options={}):
+def post_edge_fit(data: dict, options={}):
     #FIXME should be called "fitting post edge" (normalization is not done here, need edge shift position)
-    required_options = ['print']
+    required_options = ['post_edge_start', 'print']
     default_options = {
+        'post_edge_start': None,
         'print': False
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+    #FIXME Allow min and max limits
+
+    if not options['post_edge_start']:
+        post_edge_limit_offset = 0.03
+
+        data['edge'] = find_element(data)
+
+        edge_position = estimate_edge_position(data, options, index=0)
+        post_edge_limit = edge_position + post_edge_limit_offset
+
+
+    post_edge_data = data['xanes_data_original'].loc[data['xanes_data_original']["ZapEnergy"] > post_edge_limit]
+    post_edge_data.dropna(inplace=True) #Removing all indexes without any value, as some of the data sets misses the few last data points and fucks up the fit
+
+    # Making a new dataframe, with only the ZapEnergies as the first column -> will be filled to include the background data
+    post_edge_fit_data = pd.DataFrame(data['xanes_data_original']["ZapEnergy"])
     
-    df_bkgd_sub,filenames,edge = pre_edge_subtraction(path, options=options)
-    #Defining the end of the pre-edge-region for Mn/Ni, thus start of the edge
-    #FIXME Use rought edge shift estimate, add X eV as first guess, have an option to adjust this value with widget
-    if edge == 'Mn':
-        edge_stop = 6.565
-    if edge == 'Ni':
-        edge_stop = 8.361
+    for i, filename in enumerate(data['path']):
+        if options['log']:
+            aux.write_log(message=f'Fitting post edge on {os.path.basename(filename)} ({i+1} / {len(data["path"])})', options=options)
 
-    df_end= df_bkgd_sub.loc[df_bkgd_sub["ZapEnergy"] > edge_stop] # new dataframe only containing the post edge, where a regression line will be calculated in the for-loop below
-    df_end.dropna(inplace=True) #Removing all indexes without any value, as some of the data sets misses the few last data points and fucks up the fit
-    df_postedge = pd.DataFrame(df_bkgd_sub["ZapEnergy"]) #making a new dataframe 
+        #Fitting linear function to the background
+        params = np.polyfit(post_edge_data["ZapEnergy"], post_edge_data[filename], 2)
+        fit_function = np.poly1d(params)
+        
+        #making a list, y_pre,so the background will be applied to all ZapEnergy-values
+        background=fit_function(post_edge_fit_data["ZapEnergy"])
+            
+        #adding a new column in df_background with the y-values of the background
+        post_edge_fit_data.insert(1,filename,background) 
+        
+        if options['save_plots']:
+            if not os.path.isdir(options['save_folder']):
+                os.makedirs(options['save_folder'])
 
-    function_post_list=[]
-    for files in filenames: 
-        d = np.polyfit(df_end["ZapEnergy"],df_end[files],1)
-        function_post = np.poly1d(d)
-        y_post=function_post(df_bkgd_sub["ZapEnergy"]) 
-        function_post_list.append(function_post)
-        df_postedge.insert(1,files,y_post) #adding a new column with the y-values of the fitted post edge
+            dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_post_edge_fit.png'
 
-    #Plotting the background subtracted signal with the post-edge regression line and the start point for the linear regression line
-    if options['print'] == True:
-        ax = df_bkgd_sub.plot(x = "ZapEnergy",y=filenames) #defining x and y
-        plt.axvline(x = min(df_end["ZapEnergy"])) 
-        fig = plt.figure(figsize=(15,15))
-        df_postedge.plot(x="ZapEnergy", y=filenames,color="Green",ax=ax, legend=False)  
-        ax = df_bkgd_sub.plot(x = "ZapEnergy",y=filenames, legend=False) #defining x and y
-        df_postedge.plot(x="ZapEnergy", y=filenames,color="Green",ax=ax, legend=False)  
-        plt.axvline(x = min(df_end["ZapEnergy"])) 
+            fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,5))
+            data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax1)
+            post_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax1)
+            ax1.axvline(x = max(post_edge_data['ZapEnergy']), ls='--')
+            ax1.set_title(f'{os.path.basename(filename)} - Full view', size=20)
 
-    return df_bkgd_sub, df_postedge, filenames, edge
+            data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax2)
+            post_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax2)
+            ax2.axvline(x = max(post_edge_data['ZapEnergy']), ls='--')
+            ax2.set_xlim([min(post_edge_data['ZapEnergy']), max(post_edge_data['ZapEnergy'])])
+            ax2.set_ylim([min(post_edge_data[filename]), max(post_edge_data[filename])])
+            ax2.set_title(f'{os.path.basename(filename)} - Fit region', size=20)
+
+
+            plt.savefig(dst, transparent=False)
+            plt.close()
+
+
+    return post_edge_fit_data
 
 def smoothing(path, options={}):
     required_options = ['print','window_length','polyorder']
