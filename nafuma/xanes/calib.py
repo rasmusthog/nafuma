@@ -136,6 +136,7 @@ def pre_edge_subtraction(data: dict, options={}):
         'save_folder': './'
     }
 
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
     if options['log']:
         aux.write_log(message='Starting pre edge subtraction', options=options)
 
@@ -145,16 +146,16 @@ def pre_edge_subtraction(data: dict, options={}):
         if options['log']:
             aux.write_log(message=f'Subtracting background on {filename} ({i} / {len(data["path"])}', options=options)
 
-        xanes_data_bkgd_subtracted.insert(1, filename, data['xanes_data'][filename] - data['pre_edge_fit_data'][filename])
+        xanes_data_bkgd_subtracted.insert(1, filename, data['xanes_data_original'][filename] - data['pre_edge_fit_data'][filename])
 
         if options['save_plots']:
                 if not os.path.isdir(options['save_folder']):
                     os.makedirs(options['save_folder'])
 
-                dst = os.path.join(options['save_folder'], filename) + '_pre_edge_subtraction.png'
+                dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_pre_edge_subtraction.png'
 
-                fig, ax = plt.subplots(1,2,figsize=(10,5))
-                data['xanes_data'].plot(x='ZapEnergy', y=filename, color='black', ax=ax)
+                fig, ax = plt.subplots(figsize=(10,5))
+                data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax)
                 xanes_data_bkgd_subtracted.plot(x='ZapEnergy', y=filename, color='red', ax=ax)
                 ax.set_title(f'{os.path.basename(filename)} - After subtraction', size=20)
 
@@ -184,7 +185,8 @@ def estimate_edge_position(data: dict, options={}, index=0):
 
     # FIXME Add logging option to see the result
 
-    print(estimated_edge_shift)
+    if options['log']:
+        aux.write_log(message=f'Estimated edge shift for determination of pre-edge area is: {estimated_edge_shift} keV', options=options)
 
     return estimated_edge_shift
 
@@ -309,7 +311,7 @@ def finding_e0(path, options={}):
        print("MORE THAN ONE FILE --> generalize")
     
     #####
-    estimated_edge_shift, df_diff, df_diff_max = find_pos_maxdiff(df_smooth, filenames,options=options)
+    estimated_edge_shift, df_diff, df_diff_max = estimate_edge_position(df_smooth, filenames,options=options)
     print(estimated_edge_shift)
     ####
     ###df_diff[filenames]=df_smooth[filenames].diff(periods=options['periods']) #
