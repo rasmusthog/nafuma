@@ -16,7 +16,7 @@ def split_scan_data(data: dict, options={}) -> list:
 
     default_options = {
         'log': False,
-        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S.log")}_split_edges.log',
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_split_edges.log',
         'save': False, # whether to save the files or not
         'save_folder': '.', # root folder of where to save the files
         'replace': False, # whether to replace the files if they already exist
@@ -24,12 +24,6 @@ def split_scan_data(data: dict, options={}) -> list:
     }
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
-    #root is the path to the beamtime-folder
-    #destination should be the path to the processed data
-    
-    #insert a for-loop to go through all the folders.dat-files in the folder root\xanes\raw
-
-    # FIXME Only adding this variable to pass the Linting-tests - will refactor this later
 
     if not isinstance(data['path'], list):
         data['path'] = [data['path']]
@@ -89,12 +83,12 @@ def split_scan_data(data: dict, options={}) -> list:
             edge = find_element({'xanes_data_original': xanes_df})
 
             if options['log']:
-                aux.write_log(message=f'Starting data clean-up ({edge}-edge)... ({i+1}/{len(scan_datas)})', options=options)
+                aux.write_log(message=f'... Starting data clean-up ({edge}-edge)... ({i+1}/{len(scan_datas)})', options=options)
 
 
             if not ('xmap_roi00' in headers[i]) and (not 'xmap_roi01' in headers[i]):
                 if options['log']:
-                    aux.write_log(message='... Did not find fluoresence data. Skipping...', options=options)
+                    aux.write_log(message='... ... Did not find fluoresence data. Skipping...', options=options)
 
                 continue 
 
@@ -106,13 +100,13 @@ def split_scan_data(data: dict, options={}) -> list:
         if options['add']:
 
             if options['log']:
-                aux.write_log(message=f'Addition of rois enabled. Starting addition...', options=options)
+                aux.write_log(message=f'... Addition of rois enabled. Starting addition...', options=options)
    
             added_edges = {'Mn': [], 'Fe': [], 'Co': [], 'Ni': []}
             for edge, scans in edges.items():
 
                 if options['log']:
-                    aux.write_log(message=f'... Adding rois of the {edge}-edge...', options=options)
+                    aux.write_log(message=f'... ... Adding rois of the {edge}-edge...', options=options)
                 
                 if scans:
                     xanes_df = scans[0]
@@ -121,7 +115,7 @@ def split_scan_data(data: dict, options={}) -> list:
                         if i > 0:
 
                             if options['log']:
-                                aux.write_log(message=f'... ... Adding {i}/{len(scans)}', options=options)
+                                aux.write_log(message=f'... ... ... Adding {i+1}/{len(scans)}', options=options)
 
                             if 'xmap_roi00' in xanes_df.columns:
                                 xanes_df['xmap_roi00'] += scan['xmap_roi00']
@@ -135,11 +129,11 @@ def split_scan_data(data: dict, options={}) -> list:
         if options['save']:
 
             if options['log']:
-                aux.write_log(message=f'Saving data to {options["save_folder"]}', options=options)
+                aux.write_log(message=f'... Saving data to {options["save_folder"]}', options=options)
 
             if not os.path.isdir(options['save_folder']):
                 if options['log']:
-                    aux.write_log(message=f'... {options["save_folder"]} does not exist. Creating folder.', options=options)
+                    aux.write_log(message=f'... ... {options["save_folder"]} does not exist. Creating folder.', options=options)
 
                 os.makedirs(options['save_folder'])
 
@@ -154,16 +148,16 @@ def split_scan_data(data: dict, options={}) -> list:
                     if not os.path.isfile(path):
                         scan.to_csv(path)
                         if options['log']:
-                            aux.write_log(message=f'... Scan saved to {path}', options=options)
+                            aux.write_log(message=f'... ... Scan saved to {path}', options=options)
                     
                     elif options['replace'] and os.path.isfile(path):
                         scan.to_csv(path)
                         if options['log']:
-                            aux.write_log(message=f'... File already exists. Overwriting to {path}', options=options)
+                            aux.write_log(message=f'... ... File already exists. Overwriting to {path}', options=options)
 
                     elif not options['replace'] and os.path.isfile(path):
                         if options['log']:
-                            aux.write_log(message=f'... File already exists. Skipping...', options=options)
+                            aux.write_log(message=f'... ... File already exists. Skipping...', options=options)
 
         all_scans.append(edges)
 
