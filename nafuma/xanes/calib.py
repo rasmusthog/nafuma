@@ -126,7 +126,7 @@ def pre_edge_subtraction(data: dict, options={}):
     required_options = ['log', 'logfile', 'save_plots', 'save_folder']
     default_options = {
         'log': False,
-        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S.log")}_pre_edge_subtraction.log',
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_pre_edge_subtraction.log',
         'save_plots': False,
         'save_folder': './'
     }
@@ -162,10 +162,10 @@ def pre_edge_subtraction(data: dict, options={}):
 
 def estimate_edge_position(data: dict, options={}, index=0):
     #a dataset is differentiated to find a first estimate of the edge shift to use as starting point. 
-    required_options = ['print','periods']
+    required_options = ['log','logfile', 'periods']
     default_options = {
-
-        'print': False,
+        'log': False,
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_edge_position_estimation.log',
         'periods': 2, #Periods needs to be an even number for the shifting of values to work properly
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -189,25 +189,29 @@ def estimate_edge_position(data: dict, options={}, index=0):
 
 def post_edge_fit(data: dict, options={}):
     #FIXME should be called "fitting post edge" (normalization is not done here, need edge shift position)
-    required_options = ['post_edge_start', 'print']
+    required_options = ['log', 'logfile', 'post_edge_interval']
     default_options = {
-        'post_edge_start': None,
-        'print': False
+        'log': False,
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_post_edge_fit.log',
+        'post_edge_interval': [None, None],
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
-    #FIXME Allow min and max limits
 
-    if not options['post_edge_start']:
+    if not options['post_edge_interval'][0]:
         post_edge_limit_offset = 0.03
 
         data['edge'] = find_element(data)
 
         edge_position = estimate_edge_position(data, options, index=0)
-        post_edge_limit = edge_position + post_edge_limit_offset
+        options['post_edge_interval'][0] = edge_position + post_edge_limit_offset
 
 
-    post_edge_data = data['xanes_data_original'].loc[data['xanes_data_original']["ZapEnergy"] > post_edge_limit]
+    if not options['post_edge_interval'][1]:
+        options['post_edge_interval'][1] = data['xanes_data_original']['ZapEnergy'].max()
+
+
+    post_edge_data = data['xanes_data_original'].loc[(data['xanes_data_original']["ZapEnergy"] > options['post_edge_interval'][0]) & (data['xanes_data_original']["ZapEnergy"] < options['post_edge_interval'][1])]
     post_edge_data.dropna(inplace=True) #Removing all indexes without any value, as some of the data sets misses the few last data points and fucks up the fit
 
     # Making a new dataframe, with only the ZapEnergies as the first column -> will be filled to include the background data
@@ -253,40 +257,31 @@ def post_edge_fit(data: dict, options={}):
 
     return post_edge_fit_data
 
-def smoothing(path, options={}):
-    required_options = ['print','window_length','polyorder']
+def smoothing(data: dict, options={}):
+
+    # FIXME Add logging
+    # FIXME Add saving of files
+
+    required_options = ['log', 'logfile', 'window_length','polyorder']
     default_options = {
-        'print': False,
+        'log': False,
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_smoothing.log',
+        'save_plots': False,
+        'save_folder': './',
         'window_length': 3,
         'polyorder': 2
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
-    df_bkgd_sub, df_postedge, filenames, edge = post_edge_fit(path,options=options)
-    #================= SMOOTHING
-    df_smooth = pd.DataFrame(df_bkgd_sub["ZapEnergy"])
-    df_default = pd.DataFrame(df_bkgd_sub["ZapEnergy"])
-    #df_smooth[filenames] = df_bkgd_sub.iloc[:,2].rolling(window=rolling_av).mean()
-    #df_smooth[filenames] = df_smooth[filenames].shift(-int((rolling_av)/2))
-    for filename in filenames:
-        x_smooth=savgol_filter(df_bkgd_sub[filename], options['window_length'],options['polyorder'])
-        df_smooth[filename] = x_smooth
-        x_default=savgol_filter(df_bkgd_sub[filename],default_options['window_length'],default_options['polyorder'])
-        df_default[filename] = x_default
-    
-    
+
+    # FIXME Add other types of filters
+    for filename in data['path']:
+        xanes_smooth = savgol_filter(data['xanes_data'][filename], options['window_length'], options['polyorder'])
+        default_smooth = savgol_filter(data['xanes_data'][filename], default_options['window_length'], default_options['polyorder'])    
+
         
     #printing the smoothed curves vs data
-    if options['print'] == True:
-
-        ## ================================================
-        #df_diff = pd.DataFrame(df_smooth["ZapEnergy"])
-        #df_diff_estimated_max = df_diff[filenames].dropna().max()
-
-    
-        #estimated_edge_shift=df_diff.loc[df_diff[filenames] == df_diff_max,'ZapEnergy'].values[0]
-        # ==========================================
-        
+    if options['save_folder'] == True:        
 
         fig, (ax1,ax2) = plt.subplots(1,2,figsize=(15,5))
         x_range_zoom=[6.54,6.55] #make into widget
@@ -303,8 +298,34 @@ def smoothing(path, options={}):
         ax2.set_xlim(x_range_zoom)
         ax2.set_ylim(y_range_zoom)
         ax2.set_title("Smoothed curve (green) vs data (red) using default window_length and polyorder")
+
+
+    # FIXME Clear up these two plotting functions
+
+    if options['save_plots']:
+        if not os.path.isdir(options['save_folder']):
+            os.makedirs(options['save_folder'])
+
+        dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_pre_edge_fit.png'
+
+        fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,5))
+        data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax1)
+        pre_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax1)
+        ax1.axvline(x = max(pre_edge_data['ZapEnergy']), ls='--')
+        ax1.set_title(f'{os.path.basename(filename)} - Full view', size=20)
+
+        data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax2)
+        pre_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax2)
+        ax2.axvline(x = max(pre_edge_data['ZapEnergy']), ls='--')
+        ax2.set_xlim([min(pre_edge_data['ZapEnergy']), max(pre_edge_data['ZapEnergy'])])
+        ax2.set_ylim([min(pre_edge_data[filename]), max(pre_edge_data[filename])])
+        ax2.set_title(f'{os.path.basename(filename)} - Fit region', size=20)
+
+
+        plt.savefig(dst, transparent=False)
+        plt.close()
     
-    return df_smooth, filenames
+    return xanes_smooth, default_smooth
 
 
 
