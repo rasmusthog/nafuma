@@ -262,70 +262,75 @@ def smoothing(data: dict, options={}):
     # FIXME Add logging
     # FIXME Add saving of files
 
-    required_options = ['log', 'logfile', 'window_length','polyorder']
+    required_options = ['log', 'logfile', 'window_length','polyorder', 'save_default']
     default_options = {
         'log': False,
         'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_smoothing.log',
         'save_plots': False,
         'save_folder': './',
         'window_length': 3,
-        'polyorder': 2
+        'polyorder': 2,
+        'save_default': False
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
+    if options['save_default']:
+        data['xanes_data_smooth_default'] = data['xanes_data']['ZapEnergy']
 
     # FIXME Add other types of filters
+    # FIXME Instead of assigning values directly to the data dictionary, these should be made into an own DataFrame that you can decide later what to do with - these variables should
+    # then be returned
     for filename in data['path']:
         xanes_smooth = savgol_filter(data['xanes_data'][filename], options['window_length'], options['polyorder'])
-        default_smooth = savgol_filter(data['xanes_data'][filename], default_options['window_length'], default_options['polyorder'])    
+        if options['save_default']:
+            default_smooth = savgol_filter(data['xanes_data'][filename], default_options['window_length'], default_options['polyorder'])
 
+        data['xanes_data'][filename] = xanes_smooth
         
-    #printing the smoothed curves vs data
-    if options['save_folder'] == True:        
-
-        fig, (ax1,ax2) = plt.subplots(1,2,figsize=(15,5))
-        x_range_zoom=[6.54,6.55] #make into widget
-        y_range_zoom=[20000,80000] #make into widget
-
-        df_bkgd_sub.plot.scatter(x = "ZapEnergy",y=filenames, ax=ax1, color="Red") 
-        df_smooth.plot(x = "ZapEnergy",y=filenames, ax=ax1, color="Blue")
-        ax1.set_xlim(x_range_zoom)
-        ax1.set_ylim(y_range_zoom)
-        ax1.set_title("Smoothed curve (blue) vs data (red) used for further analysis")
-
-        df_bkgd_sub.plot.scatter(x = "ZapEnergy",y=filenames, ax=ax2, color="Red") 
-        df_default.plot(x = "ZapEnergy",y=filenames, ax=ax2, color="Green") 
-        ax2.set_xlim(x_range_zoom)
-        ax2.set_ylim(y_range_zoom)
-        ax2.set_title("Smoothed curve (green) vs data (red) using default window_length and polyorder")
+        if options['save_default']:
+            data['xanes_data_smooth_default'][filename] = default_smooth
 
 
-    # FIXME Clear up these two plotting functions
+        if options['save_plots']:
+            if not os.path.isdir(options['save_folder']):
+                os.makedirs(options['save_folder'])
 
-    if options['save_plots']:
-        if not os.path.isdir(options['save_folder']):
-            os.makedirs(options['save_folder'])
+            dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_smooth.png'
 
-        dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_pre_edge_fit.png'
-
-        fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,5))
-        data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax1)
-        pre_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax1)
-        ax1.axvline(x = max(pre_edge_data['ZapEnergy']), ls='--')
-        ax1.set_title(f'{os.path.basename(filename)} - Full view', size=20)
-
-        data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax2)
-        pre_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax2)
-        ax2.axvline(x = max(pre_edge_data['ZapEnergy']), ls='--')
-        ax2.set_xlim([min(pre_edge_data['ZapEnergy']), max(pre_edge_data['ZapEnergy'])])
-        ax2.set_ylim([min(pre_edge_data[filename]), max(pre_edge_data[filename])])
-        ax2.set_title(f'{os.path.basename(filename)} - Fit region', size=20)
+            edge_pos = estimate_edge_position(data=data, options=options)
+            intensity_midpoint = data['xanes_data'][filename].max() - data['xanes_data'][filename].min()
 
 
-        plt.savefig(dst, transparent=False)
-        plt.close()
+            if options['save_default']:
+                fig, (ax1, ax2) = plt.subplots(1,2,figsize=(20,5))
+                data['xanes_data'].plot(x='ZapEnergy', y=filename, color='black', ax=ax1)
+                xanes_smooth.plot(x='ZapEnergy', y=filename, color='red', ax=ax1)
+                ax1.set_xlim([edge_pos-0.5, edge_pos+0.5])
+                ax1.set_ylim([intensity_midpoint*0.98, intensity_midpoint*1.02])
+                
+                ax1.set_title(f'{os.path.basename(filename)} - Smooth', size=20)
+
+                data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax2)
+                data['xanes_data_smooth_default'].plot(x='ZapEnergy', y=filename, color='green', ax=ax2)
+                ax2.set_xlim([edge_pos-0.5, edge_pos+0.5])
+                ax2.set_ylim([intensity_midpoint*0.98, intensity_midpoint*1.02])
+                ax2.set_title(f'{os.path.basename(filename)} - Smooth (default values)', size=20)
+
+            elif not options['save_default']:
+                fig, ax = plt.subplots(figsize=(10,5))
+                data['xanes_data'].plot(x='ZapEnergy', y=filename, color='black', ax=ax1)
+                xanes_smooth.plot(x='ZapEnergy', y=filename, color='red', ax=ax1)
+                ax1.set_xlim([edge_pos-0.5, edge_pos+0.5])
+                ax1.set_ylim([intensity_midpoint*0.98, intensity_midpoint*1.02])
+                
+                ax1.set_title(f'{os.path.basename(filename)} - Smooth', size=20)
+
+
+            plt.savefig(dst, transparent=False)
+            plt.close()
     
-    return xanes_smooth, default_smooth
+    # FIXME See comment above about return values
+    return None
 
 
 
