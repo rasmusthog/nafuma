@@ -1,3 +1,5 @@
+from logging import raiseExceptions
+from jinja2 import TemplateRuntimeError
 import pandas as pd
 import numpy as np
 import os
@@ -160,31 +162,7 @@ def pre_edge_subtraction(data: dict, options={}):
     return xanes_data_bkgd_subtracted
 
 
-def estimate_edge_position(data: dict, options={}, index=0):
-    #a dataset is differentiated to find a first estimate of the edge shift to use as starting point. 
-    required_options = ['log','logfile', 'periods']
-    default_options = {
-        'log': False,
-        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_edge_position_estimation.log',
-        'periods': 2, #Periods needs to be an even number for the shifting of values to work properly
-    }
-    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
-    #making new dataframe to keep the differentiated data
-    df_diff = pd.DataFrame(data['xanes_data_original']["ZapEnergy"])
-    df_diff[data['path'][index]]=data['xanes_data_original'][data['path'][index]].diff(periods=options['periods'])
-
-    #shifting column values up so that average differential fits right between the points used in the calculation
-    df_diff[data['path'][index]]=df_diff[data['path'][index]].shift(-int(options['periods']/2))
-    df_diff_max = df_diff[data['path'][index]].dropna().max()
-    estimated_edge_shift =df_diff.loc[df_diff[data['path'][index]] == df_diff_max,'ZapEnergy'].values[0]
-
-    # FIXME Add logging option to see the result
-
-    if options['log']:
-        aux.write_log(message=f'Estimated edge shift for determination of pre-edge area is: {estimated_edge_shift} keV', options=options)
-
-    return estimated_edge_shift
 
 
 def post_edge_fit(data: dict, options={}):
@@ -274,22 +252,20 @@ def smoothing(data: dict, options={}):
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
+    df_smooth = pd.DataFrame(data['xanes_data']['ZapEnergy'])
+
     if options['save_default']:
-        data['xanes_data_smooth_default'] = data['xanes_data']['ZapEnergy']
+        df_smooth_default = pd.DataFrame(data['xanes_data']['ZapEnergy'])
 
     # FIXME Add other types of filters
     # FIXME Instead of assigning values directly to the data dictionary, these should be made into an own DataFrame that you can decide later what to do with - these variables should
     # then be returned
     for filename in data['path']:
-        xanes_smooth = savgol_filter(data['xanes_data'][filename], options['window_length'], options['polyorder'])
-        if options['save_default']:
-            default_smooth = savgol_filter(data['xanes_data'][filename], default_options['window_length'], default_options['polyorder'])
-
-        data['xanes_data'][filename] = xanes_smooth
+        df_smooth.insert(1, filename, savgol_filter(data['xanes_data'][filename], options['window_length'], options['polyorder']))
         
         if options['save_default']:
-            data['xanes_data_smooth_default'][filename] = default_smooth
-
+            df_smooth_default.insert(1, filename, savgol_filter(data['xanes_data'][filename], default_options['window_length'], default_options['polyorder']))
+        
 
         if options['save_plots']:
             if not os.path.isdir(options['save_folder']):
@@ -298,39 +274,35 @@ def smoothing(data: dict, options={}):
             dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_smooth.png'
 
             edge_pos = estimate_edge_position(data=data, options=options)
-            intensity_midpoint = data['xanes_data'][filename].max() - data['xanes_data'][filename].min()
-
-
+            intensity_midpoint = df_smooth[filename].iloc[np.where(df_smooth['ZapEnergy'] == find_nearest(df_smooth['ZapEnergy'], edge_pos))].values[0]
+    
             if options['save_default']:
                 fig, (ax1, ax2) = plt.subplots(1,2,figsize=(20,5))
-                data['xanes_data'].plot(x='ZapEnergy', y=filename, color='black', ax=ax1)
-                xanes_smooth.plot(x='ZapEnergy', y=filename, color='red', ax=ax1)
-                ax1.set_xlim([edge_pos-0.5, edge_pos+0.5])
-                ax1.set_ylim([intensity_midpoint*0.98, intensity_midpoint*1.02])
-                
+                data['xanes_data'].loc[(data['xanes_data']['ZapEnergy'] > edge_pos-0.0015) & (data['xanes_data']['ZapEnergy'] < edge_pos+0.0015)].plot(x='ZapEnergy', y=filename, color='black', ax=ax1, kind='scatter')
+                df_smooth.loc[(df_smooth['ZapEnergy'] > edge_pos-0.0015) & (df_smooth['ZapEnergy'] < edge_pos+0.0015)].plot(x='ZapEnergy', y=filename, color='red', ax=ax1)
                 ax1.set_title(f'{os.path.basename(filename)} - Smooth', size=20)
 
-                data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax2)
-                data['xanes_data_smooth_default'].plot(x='ZapEnergy', y=filename, color='green', ax=ax2)
-                ax2.set_xlim([edge_pos-0.5, edge_pos+0.5])
-                ax2.set_ylim([intensity_midpoint*0.98, intensity_midpoint*1.02])
+                data['xanes_data'].loc[(data['xanes_data']['ZapEnergy'] > edge_pos-0.0015) & (data['xanes_data']['ZapEnergy'] < edge_pos+0.0015)].plot(x='ZapEnergy', y=filename, color='black', ax=ax2,  kind='scatter')
+                df_smooth_default.loc[(df_smooth_default['ZapEnergy'] > edge_pos-0.0015) & (df_smooth_default['ZapEnergy'] < edge_pos+0.0015)].plot(x='ZapEnergy', y=filename, color='red', ax=ax2)
                 ax2.set_title(f'{os.path.basename(filename)} - Smooth (default values)', size=20)
 
             elif not options['save_default']:
                 fig, ax = plt.subplots(figsize=(10,5))
-                data['xanes_data'].plot(x='ZapEnergy', y=filename, color='black', ax=ax1)
-                xanes_smooth.plot(x='ZapEnergy', y=filename, color='red', ax=ax1)
-                ax1.set_xlim([edge_pos-0.5, edge_pos+0.5])
-                ax1.set_ylim([intensity_midpoint*0.98, intensity_midpoint*1.02])
+                data['xanes_data'].loc[(data['xanes_data']['ZapEnergy'] > edge_pos-0.0015) & (data['xanes_data']['ZapEnergy'] < edge_pos+0.0015)].plot(x='ZapEnergy', y=filename, color='black', ax=ax,  kind='scatter')
+                df_smooth.loc[(df_smooth['ZapEnergy'] > edge_pos-0.0015) & (df_smooth['ZapEnergy'] < edge_pos+0.0015)].plot(x='ZapEnergy', y=filename, color='red', ax=ax)
+                ax.set_xlim([edge_pos-0.0015, edge_pos+0.0015])
+                ax.set_ylim([intensity_midpoint*0.9, intensity_midpoint*1.1])
                 
-                ax1.set_title(f'{os.path.basename(filename)} - Smooth', size=20)
+                ax.set_title(f'{os.path.basename(filename)} - Smooth', size=20)
 
 
             plt.savefig(dst, transparent=False)
             plt.close()
     
-    # FIXME See comment above about return values
-    return None
+    if not options['save_default']:
+        df_smooth_default = None
+    
+    return df_smooth, df_smooth_default
 
 
 
@@ -340,133 +312,184 @@ def find_nearest(array, value):
     idx = (np.abs(array - value)).argmin()
     return array[idx]
 
-def finding_e0(path, options={}):
-    required_options = ['print','periods']
+
+def estimate_edge_position(data: dict, options={}, index=0):
+    #a dataset is differentiated to find a first estimate of the edge shift to use as starting point. 
+    required_options = ['log','logfile', 'periods']
     default_options = {
-        'print': False,
+        'log': False,
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_edge_position_estimation.log',
         'periods': 2, #Periods needs to be an even number for the shifting of values to work properly
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
-    df_smooth, filenames = smoothing(path, options=options) #This way the smoothing is printed as long as the "finding e0" is printed.
-
-    if options['periods'] % 2 == 1:
-        print("NB!!!!!!!!!!!!!!!!! Periods needs to be an even number for the shifting of values to work properly")
-    ###df_diff = pd.DataFrame(df_smooth["ZapEnergy"]) #
-    if len(filenames) == 1:
-        filenames=filenames[0]
-    else:
-       print("MORE THAN ONE FILE --> generalize")
-    
-    #####
-    estimated_edge_shift, df_diff, df_diff_max = estimate_edge_position(df_smooth, filenames,options=options)
-    print(estimated_edge_shift)
-    ####
-    ###df_diff[filenames]=df_smooth[filenames].diff(periods=options['periods']) #
-    df_doublediff=pd.DataFrame(df_smooth["ZapEnergy"])
-    df_doublediff[filenames]=df_diff[filenames].diff(periods=options['periods'])
-    
-    if options['print'] == True:
-        fig, (ax1,ax2) = plt.subplots(1,2,figsize=(15,5))
-
-        df_diff.plot(x = "ZapEnergy",y=filenames, ax=ax1) #defining x and y
-        df_doublediff.plot(x = "ZapEnergy",y=filenames,ax=ax2) #defining x and y
+    #making new dataframe to keep the differentiated data
+    df_diff = pd.DataFrame(data['xanes_data_original']["ZapEnergy"])
+    df_diff[data['path'][index]]=data['xanes_data_original'][data['path'][index]].diff(periods=options['periods'])
 
     #shifting column values up so that average differential fits right between the points used in the calculation
-    #df_diff[filenames]=df_diff[filenames].shift(-int(options['periods']/2)) #
-    df_doublediff[filenames]=df_doublediff[filenames].shift(-int(options['periods']))
+    df_diff[data['path'][index]]=df_diff[data['path'][index]].shift(-int(options['periods']/2))
+    df_diff_max = df_diff[data['path'][index]].dropna().max()
+    estimated_edge_shift =df_diff.loc[df_diff[data['path'][index]] == df_diff_max,'ZapEnergy'].values[0]
+
+    # FIXME Add logging option to see the result
+
+    if options['log']:
+        aux.write_log(message=f'Estimated edge shift for determination of pre-edge area is: {estimated_edge_shift} keV', options=options)
+
+    return estimated_edge_shift
+
+def determine_edge_position(data: dict, options={}):
     
-    #finding maximum value to maneuver to the correct part of the data set
-    #df_diff_max = df_diff[filenames].dropna().max()
-
+    required_options = ['log', 'logfile', 'save_plots', 'save_folder', 'periods', 'diff', 'double_diff', 'fit_region']
+    default_options = {
+        'log': False,
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_determine_edge_position.log',
+        'save_plots': False,
+        'save_folder': './',
+        'periods': 2, #Periods needs to be an even number for the shifting of values to work properly,
+        'diff': True,
+        'double_diff': False,
+        'fit_region': 0.0005
     
-    estimated_edge_shift=df_diff.loc[df_diff[filenames] == df_diff_max,'ZapEnergy'].values[0]
+    }
 
-    fit_region = 0.0004
-    df_diff_edge=df_diff.loc[(df_diff["ZapEnergy"] < estimated_edge_shift+fit_region)]# and (df_diff["ZapEnergy"] > estimated_edge_shift-0.05)]
-    df_diff_edge=df_diff_edge.loc[(df_diff["ZapEnergy"] > estimated_edge_shift-fit_region)]
-    
-    
-    
-    
-    df_doublediff_edge=df_doublediff.loc[(df_doublediff["ZapEnergy"] < estimated_edge_shift+fit_region)]# and (df_diff["ZapEnergy"] > estimated_edge_shift-0.05)]
-    df_doublediff_edge=df_doublediff_edge.loc[(df_doublediff["ZapEnergy"] > estimated_edge_shift-fit_region)]
-    #df_diff_edge=df_diff.loc[(df_diff["ZapEnergy"] > estimated_edge_shift-0.15) and (df_diff["ZapEnergy"] < estimated_edge_shift+0.15)]
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
-    #df_diff_edge=df_diff.loc[df_diff["ZapEnergy"] > estimated_edge_shift-0.15]
-    #print(df_diff_edge)
-    if options['print'] == True:
-        fig, (ax3,ax4) = plt.subplots(1,2,figsize=(15,5))
+    if options['periods'] % 2 == 1:
+        raise Exception("NB! Periods needs to be an even number for the shifting of values to work properly")
 
-        df_diff_edge.plot(x = "ZapEnergy",y=filenames,ax=ax3) #defining x and y
-        ax3.set_title("Zoomed into edge region (derivative))")
-        ax3.axvline(x = estimated_edge_shift)
-
-        df_doublediff_edge.plot(x = "ZapEnergy",y=filenames,ax=ax4,kind="scatter") #defining x and y
-        ax4.set_title("Zoomed into edge region (double derivative)")
-        ax4.axvline(x = estimated_edge_shift)
-        ax4.axhline(0)
-
-
-
-        #ax1.set_xlim([estimated_edge_shift-fit_region,estimated_edge_shift+fit_region])
-        #ax1.set_title("not sure what this is tbh")
-  
-        #ax2.set_xlim([estimated_edge_shift-fit_region,estimated_edge_shift+fit_region])
-        #ax2.set_title("not sure what this is either tbh")
-
-    #==============
-    #df_smooth=df_smooth2
-    #=================
-
-
-
-
-    #========================== fitting first differential ==========
-    df_diff = df_diff[df_diff[filenames].notna()]
-
-    #fitting a function to the chosen interval
-    d = np.polyfit(df_diff_edge["ZapEnergy"],df_diff_edge[filenames],2)
-    function_diff = np.poly1d(d)
-
-    x_diff=np.linspace(df_diff_edge["ZapEnergy"].iloc[0],df_diff_edge["ZapEnergy"].iloc[-1],num=1000)
-    y_diff=function_diff(x_diff)
-    #print(df_diff_edge["ZapEnergy"].iloc[-1])
-    if options['print'] == True:
-        ax3.plot(x_diff,y_diff,color='Green')
-
-    #y_diff_max=np.amax(y_diff,0)
-    y_diff_max_index = np.where(y_diff == np.amax(y_diff))
-    #print(y_diff_max_index[0])
-    edge_shift_diff=float(x_diff[y_diff_max_index])
-    print("Edge shift estimated by the differential maximum is "+str(round(edge_shift_diff,5)))
-    if options['print'] == True:
-        ax3.axvline(x=edge_shift_diff,color="green")
-    #print(df_doublediff_edge["ZapEnergy"].iloc[0])
-    #ax4.plot(x_doublediff,y_doublediff,color='Green'))
-
-
-    #fitting double differentiate 
-    df_doublediff = df_doublediff[df_doublediff[filenames].notna()]
-    d = np.polyfit(df_doublediff_edge["ZapEnergy"],df_doublediff_edge[filenames],2)
-    function_doublediff = np.poly1d(d)
-
-    x_doublediff=np.linspace(df_doublediff_edge["ZapEnergy"].iloc[0],df_doublediff_edge["ZapEnergy"].iloc[-1],num=10000)
-    y_doublediff=function_doublediff(x_doublediff)
-
-    if options['print'] == True:
-        ax4.plot(x_doublediff,y_doublediff,color='Green')
-
-    y_doublediff_zero=find_nearest(y_doublediff,0)
-    y_doublediff_zero_index = np.where(y_doublediff == y_doublediff_zero)
-    
-    edge_shift_doublediff=float(x_doublediff[y_doublediff_zero_index])
    
-    print("Edge shift estimated by the double differential zero-point is "+str(round(edge_shift_doublediff,5)))
-    if options['print'] == True:
-        ax4.axvline(x=edge_shift_doublediff,color="green")
+    #####
 
-    return df_smooth, filenames, edge_shift_diff
+    if options['diff']:
+        df_diff = pd.DataFrame(data['xanes_data']['ZapEnergy'])
+    if options['double_diff']:
+        df_double_diff = pd.DataFrame(data['xanes_data']['ZapEnergy'])
+
+    for i, filename in enumerate(data['path']):
+        estimated_edge_pos = estimate_edge_position(data, options=options, index=i)
+
+        
+        #========================== fitting first differential ==========
+
+        if options['diff']:
+            df_diff[filename] = data['xanes_data'][filename].diff(periods=options['periods'])
+            df_diff[filename]=df_diff[filename].shift(-int(options['periods']/2))
+
+            df_diff_edge = df_diff.loc[(df_diff["ZapEnergy"] < estimated_edge_pos+options['fit_region']) & ((df_diff["ZapEnergy"] > estimated_edge_pos-options['fit_region']))]
+    
+            
+            # Fitting a function to the chosen interval
+            params = np.polyfit(df_diff_edge["ZapEnergy"], df_diff_edge[filename], 2)
+            diff_function = np.poly1d(params)
+
+            x_diff=np.linspace(df_diff_edge["ZapEnergy"].iloc[0],df_diff_edge["ZapEnergy"].iloc[-1],num=10000)
+            y_diff=diff_function(x_diff)
+
+            df_diff_fit_function = pd.DataFrame(x_diff)
+            df_diff_fit_function['y_diff'] = y_diff
+            df_diff_fit_function.columns = ['x_diff', 'y_diff']
+            
+            # Picks out the x-value where the y-value is at a maximum
+            edge_pos_diff=x_diff[np.where(y_diff == np.amax(y_diff))][0]
+            
+            if options['log']:
+                aux.write_log(message=f"Edge shift estimated by the differential maximum is: {str(round(edge_pos_diff,5))}", options=options)
+
+
+        if options['double_diff']:
+            df_double_diff[filename] = data['xanes_data'][filename].diff(periods=options['periods']).diff(periods=options['periods'])
+            df_double_diff[filename]=df_double_diff[filename].shift(-int(options['periods']))
+            
+            # Pick out region of interest
+            df_double_diff_edge = df_double_diff.loc[(df_double_diff["ZapEnergy"] < estimated_edge_pos+options['fit_region']) & ((df_double_diff["ZapEnergy"] > estimated_edge_pos-options['fit_region']))]
+
+            # Fitting a function to the chosen interval
+            params = np.polyfit(df_double_diff_edge["ZapEnergy"], df_double_diff_edge[filename], 2)
+            double_diff_function = np.poly1d(params)
+
+            x_double_diff=np.linspace(df_double_diff_edge["ZapEnergy"].iloc[0], df_double_diff_edge["ZapEnergy"].iloc[-1],num=10000)
+            y_double_diff=double_diff_function(x_double_diff)
+
+            df_double_diff_fit_function = pd.DataFrame(x_double_diff)
+            df_double_diff_fit_function['y_diff'] = y_double_diff
+            df_double_diff_fit_function.columns = ['x_diff', 'y_diff']
+
+
+            # Picks out the x-value where the y-value is closest to 0
+            edge_pos_double_diff=x_double_diff[np.where(y_double_diff == find_nearest(y_double_diff,0))][0]
+        
+            if options['log']:
+                aux.write_log(message=f"Edge shift estimated by the double differential zero-point is {str(round(edge_pos_double_diff,5))}", options=options)
+
+            if options['save_plots']:
+
+                if options['diff'] and options['double_diff']:
+                    
+                    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(ncols=2, nrows=2, figsize=(20,20))
+                    df_diff.plot(x='ZapEnergy', y=filename, ax=ax1, kind='scatter')
+                    df_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax1)
+                    ax1.set_xlim([edge_pos_diff-0.0015, edge_pos_diff+0.0015])
+                    ax1.axvline(x=edge_pos_diff-options['fit_region'], ls='--', c='black')
+                    ax1.axvline(x=edge_pos_diff, ls='--', c='green')
+                    ax1.axvline(x=edge_pos_diff+options['fit_region'], ls='--', c='black')
+                    ax1.set_title('Fit region of differentiated data')
+
+                    df_diff_edge.plot(x='ZapEnergy', y=filename, ax=ax2, kind='scatter')
+                    df_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax2)
+                    ax2.axvline(x=edge_pos_diff, ls='--', c='green')
+                    ax2.axvline(x=estimated_edge_pos, ls='--', c='red')
+                    ax2.set_title('Fit of differentiated data')
+
+
+                    df_double_diff.plot(x='ZapEnergy', y=filename, ax=ax3, kind='scatter')
+                    df_double_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax3)
+                    ax3.set_xlim([edge_pos_double_diff-0.0015, edge_pos_double_diff+0.0015])
+                    ax3.axvline(x=edge_pos_double_diff-options['fit_region'], ls='--', c='black')
+                    ax3.axvline(x=edge_pos_double_diff, ls='--', c='green')
+                    ax3.axvline(x=edge_pos_double_diff+options['fit_region'], ls='--', c='black')
+
+                    df_double_diff_edge.plot(x='ZapEnergy', y=filename, ax=ax4, kind='scatter')
+                    df_double_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax4)
+                    ax4.axvline(x=edge_pos_double_diff, ls='--', c='green')
+                    ax4.axvline(x=estimated_edge_pos, ls='--', c='red')
+
+                    
+
+
+                elif options['diff']:
+                    fig, (ax1, ax2) = plt.subplots(ncols=2,nrows=1, figsize=(20, 10))
+                    df_diff.plot(x='ZapEnergy', y=filename, ax=ax1, kind='scatter')
+                    ax1.set_xlim([edge_pos_diff-0.5, edge_pos_diff+0.5])
+                    ax1.axvline(x=edge_pos_diff-options['fit_region'], ls='--', c='black')
+                    ax1.axvline(x=edge_pos_diff, ls='--', c='green')
+                    ax1.axvline(x=edge_pos_diff+options['fit_region'], ls='--', c='black')
+
+                    df_diff_edge.plot(x='ZapEnergy', y=filename, ax=ax2)
+                    ax2.axvline(x=edge_pos_diff, ls='--', c='green')
+                    ax2.axvline(x=estimated_edge_pos, ls='--', c='red')
+
+                
+                elif options['double_diff']:
+                    fig, (ax1, ax2) = plt.subplots(ncols=2,nrows=1, figsize=(20, 10))
+                    df_double_diff.plot(x='ZapEnergy', y=filename, ax=ax1, kind='scatter')
+                    ax1.set_xlim([edge_pos_double_diff-0.5, edge_pos_double_diff+0.5])
+                    ax1.axvline(x=edge_pos_double_diff-options['fit_region'], ls='--', c='black')
+                    ax1.axvline(x=edge_pos_double_diff, ls='--', c='green')
+                    ax1.axvline(x=edge_pos_double_diff+options['fit_region'], ls='--', c='black')
+
+                    df_double_diff_edge.plot(x='ZapEnergy', y=filename, ax=ax2)
+                    ax2.axvline(x=edge_pos_double_diff, ls='--', c='green')
+                    ax2.axvline(x=estimated_edge_pos, ls='--', c='red')
+
+
+    if not options['diff']:
+        edge_pos_diff = None
+    if not options['double_diff']:
+        edge_pos_double_diff = None
+
+    return edge_pos_diff, edge_pos_double_diff
 
 def normalization(data,options={}):
     required_options = ['print']
