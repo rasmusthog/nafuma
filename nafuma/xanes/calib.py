@@ -491,24 +491,51 @@ def determine_edge_position(data: dict, options={}):
 
     return edge_pos_diff, edge_pos_double_diff
 
-def normalization(data,options={}):
-    required_options = ['print']
+def normalise(data: dict, options={}):
+    required_options = ['log', 'logfile', 'save_values']
     default_options = {
-        'print': False,
+        'log': False,
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_normalisation.log',
+        'save_values': True
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
-    #Finding the normalization constant µ_0(E_0), by subtracting the value of the pre-edge-line from the value of the post-edge line at e0
-    normalization_constant=post_edge_fit_function(e0) - pre_edge_fit_function(e0)
-    
-    #subtracting background (as in pre_edge_subtraction)
+    normalised_df = pd.DataFrame(data['xanes_data']['ZapEnergy'])
 
-    #dividing the background-subtracted data with the normalization constant
+    #Finding the normalisation constant µ_0(E_0), by subtracting the value of the pre-edge-line from the value of the post-edge line at e0
+    for filename in data['path']:
+        normalisation_constant = data['post_edge_fit_function'][filename].loc[data['post_edge_fit_function']['ZapEnergy'] == data['e0'][filename]] - data['pre_edge_fit_function'].loc[data['pre_edge_fit_function']['ZapEnergy'] == data['e0'][filename]]
+
+        normalised_df.insert(1, filename, data['xanes_data'] / normalisation_constant)
+
+    if options['save_values']:
+        data['xanes_data'] = normalised_df
+
+
+    return normalised_df
 
     
-def flattening(data,options={}):
+def flatten(data:dict, options={}):
     #only picking out zapenergy-values higher than edge position (edge pos and below remains untouched)
+
+    required_options = ['log', 'logfile', 'save_values']
+    default_options = {
+        'log': False,
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_flattening.log',
+        'save_values': True
+    }
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+
     df_e0_and_above=df.loc[df['ZapEnergy'] > edge_shift_diff]
+
+    flattened_df = pd.DataFrame(data['xanes_data']['ZapEnergy'])
+
+    for filename in data['path']:
+        above_e0 = data['xanes_data'][filename].loc(data['xanes_data']['ZapEnergy'] > data['e0'][filename])
+        flattened_data = data['post_edge_fit_function'][filename] - 
+
+
 
     flattened_data = post_edge_fit_function(df_e0_and_above['ZapEnergy']) - pre_edge_fit_function(df_e0_and_above['ZapEnergy'])
 
