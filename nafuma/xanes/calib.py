@@ -78,6 +78,8 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
     # Making a new dataframe, with only the ZapEnergies as the first column -> will be filled to include the background data
     pre_edge_fit_data = pd.DataFrame(data['xanes_data_original']["ZapEnergy"])
 
+    data['pre_edge_params'] = {}
+
     for i, filename in enumerate(data['path']):
         if options['log']:
             aux.write_log(message=f'Fitting background on {os.path.basename(filename)} ({i+1} / {len(data["path"])})', options=options)
@@ -85,6 +87,8 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
         #Fitting linear function to the background
         params = np.polyfit(pre_edge_data["ZapEnergy"],pre_edge_data[filename],1)
         fit_function = np.poly1d(params)
+
+        data['pre_edge_params'][filename] = params
         
         #making a list, y_pre,so the background will be applied to all ZapEnergy-values
         background=fit_function(pre_edge_fit_data["ZapEnergy"])
@@ -194,6 +198,8 @@ def post_edge_fit(data: dict, options={}):
 
     # Making a new dataframe, with only the ZapEnergies as the first column -> will be filled to include the background data
     post_edge_fit_data = pd.DataFrame(data['xanes_data_original']["ZapEnergy"])
+
+    data['post_edge_params'] = {}
     
     for i, filename in enumerate(data['path']):
         if options['log']:
@@ -202,6 +208,8 @@ def post_edge_fit(data: dict, options={}):
         #Fitting linear function to the background
         params = np.polyfit(post_edge_data["ZapEnergy"], post_edge_data[filename], 2)
         fit_function = np.poly1d(params)
+
+        data['post_edge_params'][filename] = params
         
         #making a list, y_pre,so the background will be applied to all ZapEnergy-values
         background=fit_function(post_edge_fit_data["ZapEnergy"])
@@ -341,8 +349,9 @@ def estimate_edge_position(data: dict, options={}, index=0):
 
 def determine_edge_position(data: dict, options={}):
     
-    required_options = ['log', 'logfile', 'save_plots', 'save_folder', 'periods', 'diff', 'double_diff', 'fit_region']
+    required_options = ['save_values', 'log', 'logfile', 'save_plots', 'save_folder', 'periods', 'diff', 'double_diff', 'fit_region']
     default_options = {
+        'save_values': True,
         'log': False,
         'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_determine_edge_position.log',
         'save_plots': False,
@@ -366,6 +375,9 @@ def determine_edge_position(data: dict, options={}):
         df_diff = pd.DataFrame(data['xanes_data']['ZapEnergy'])
     if options['double_diff']:
         df_double_diff = pd.DataFrame(data['xanes_data']['ZapEnergy'])
+    if options['save_values']:
+        data['e0'] = {}
+
 
     for i, filename in enumerate(data['path']):
         estimated_edge_pos = estimate_edge_position(data, options=options, index=i)
@@ -395,7 +407,10 @@ def determine_edge_position(data: dict, options={}):
             edge_pos_diff=x_diff[np.where(y_diff == np.amax(y_diff))][0]
             
             if options['log']:
-                aux.write_log(message=f"Edge shift estimated by the differential maximum is: {str(round(edge_pos_diff,5))}", options=options)
+                aux.write_log(message=f"Edge position estimated by the differential maximum is: {str(round(edge_pos_diff,5))}", options=options)
+            
+            if options['save_values']:
+                data['e0'][filename] = edge_pos_diff
 
 
         if options['double_diff']:
@@ -501,12 +516,21 @@ def normalise(data: dict, options={}):
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
     normalised_df = pd.DataFrame(data['xanes_data']['ZapEnergy'])
+    data['normalisation_constants'] = {}
 
     #Finding the normalisation constant µ_0(E_0), by subtracting the value of the pre-edge-line from the value of the post-edge line at e0
     for filename in data['path']:
-        normalisation_constant = data['post_edge_fit_function'][filename].loc[data['post_edge_fit_function']['ZapEnergy'] == data['e0'][filename]] - data['pre_edge_fit_function'].loc[data['pre_edge_fit_function']['ZapEnergy'] == data['e0'][filename]]
+        e0_ind = data['post_edge_fit_data'].loc[data['post_edge_fit_data']['ZapEnergy'] == find_nearest(data['post_edge_fit_data']['ZapEnergy'], data['e0'][filename])].index.values[0]
+        #norm = data['post_edge_fit_data'][filename].iloc[find_nearest(data['post_edge_fit_data'][filename], data['e0'][filename])]
+        normalisation_constant = data['post_edge_fit_data'][filename].iloc[e0_ind] - data['pre_edge_fit_data'][filename].iloc[e0_ind]
+        normalised_df.insert(1, filename, data['xanes_data'][filename] / normalisation_constant)
 
-        normalised_df.insert(1, filename, data['xanes_data'] / normalisation_constant)
+
+        # Normalise the pre-edge and post-edge fit function data
+        data['pre_edge_fit_data'][filename] = data['pre_edge_fit_data'][filename] / normalisation_constant
+        data['post_edge_fit_data'][filename] = data['post_edge_fit_data'][filename] / normalisation_constant
+
+        data['normalisation_constants'][filename] = normalisation_constant
 
     if options['save_values']:
         data['xanes_data'] = normalised_df
@@ -527,17 +551,20 @@ def flatten(data:dict, options={}):
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
 
-    df_e0_and_above=df.loc[df['ZapEnergy'] > edge_shift_diff]
-
     flattened_df = pd.DataFrame(data['xanes_data']['ZapEnergy'])
 
     for filename in data['path']:
-        above_e0 = data['xanes_data'][filename].loc(data['xanes_data']['ZapEnergy'] > data['e0'][filename])
-        flattened_data = data['post_edge_fit_function'][filename] - 
+        fit_function_diff = -data['post_edge_fit_data'][filename] + data['pre_edge_params'][filename][0]
+        fit_function_diff.loc[flattened_df['ZapEnergy'] <= data['e0'][filename]] = 0
+
+        flattened_df[filename] = data['xanes_data'][filename] - fit_function_diff
 
 
+    if options['save_values']:
+        data['xanes_data'] = flattened_df
+    
 
-    flattened_data = post_edge_fit_function(df_e0_and_above['ZapEnergy']) - pre_edge_fit_function(df_e0_and_above['ZapEnergy'])
+    return flattened_df, fit_function_diff
 
     #make a new dataframe with flattened values
 
