@@ -97,7 +97,7 @@ def split_scan_data(data: dict, options={}) -> list:
             edges[edge].append(xanes_df)
             
         
-        if options['add']:
+        if options['add_rois']:
 
             if options['log']:
                 aux.write_log(message=f'... Addition of rois enabled. Starting addition...', options=options)
@@ -142,7 +142,7 @@ def split_scan_data(data: dict, options={}) -> list:
 
             for edge, scans in edges.items():
                 for i, scan in enumerate(scans):
-                    count = '' if options['add'] else '_'+str(i).zfill(4)
+                    count = '' if options['add_rois'] else '_'+str(i).zfill(4)
                     path = os.path.join(options['save_folder'], f'{filename}_{edge}{count}.dat')
                     
                     if not os.path.isfile(path):
