@@ -127,7 +127,7 @@ def split_scan_data(data: dict, options={}) -> list:
             edges = added_edges
             
         if options['save']:
-
+            #FIXME If there is something wrong with the input file, the file will not be saved but log-file still sais it is saved. Goes from "Saving data to ..." to "All done!" no matter if it fals or not.
             if options['log']:
                 aux.write_log(message=f'... Saving data to {options["save_folder"]}', options=options)
 
