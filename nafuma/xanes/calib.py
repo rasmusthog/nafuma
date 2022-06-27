@@ -5,10 +5,13 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import nafuma.auxillary as aux
+import nafuma.plotting as btp
 import nafuma.xanes as xas
 import nafuma.xanes.io as io
 from scipy.signal import savgol_filter
 from datetime import datetime
+import ipywidgets as widgets
+from IPython.display import display
 
 
 ##Better to make a new function that loops through the files, and performing the split_xanes_scan on
@@ -43,13 +46,15 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
 
     # FIXME Add log-file
 
-    required_options = ['pre_edge_start', 'log', 'logfile', 'save_plots', 'save_folder']
+    required_options = ['pre_edge_limit', 'log', 'logfile', 'show_plots', 'save_plots', 'save_folder', 'interactive']
     default_options = {
-        'pre_edge_start': None,
+        'pre_edge_limit': [None, None],
         'log': False,
         'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_pre_edge_fit.log',
+        'show_plots': False,
         'save_plots': False,
-        'save_folder': './'
+        'save_folder': './',
+        'interactive': False
     }
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -57,23 +62,34 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
     if options['log']:
         aux.write_log(message='Starting pre edge fit', options=options)
 
-
-
     # FIXME Implement with finding accurate edge position
     # FIXME Allow specification of start of pre-edge area
     # Find the cutoff point at which the edge starts - everything to the LEFT of this point will be used in the pre edge function fit
-    if not options['pre_edge_start']:
+    if not options['pre_edge_limit'][0]:
+        options['pre_edge_limit'][0] = data['xanes_data_original']['ZapEnergy'].min()
+    
+    if not options['pre_edge_limit'][1]:
         pre_edge_limit_offset = 0.03
 
         data['edge'] = find_element(data)
 
         edge_position = estimate_edge_position(data, options, index=0)
-        pre_edge_limit = edge_position - pre_edge_limit_offset
+        options['pre_edge_limit'][1] = edge_position - pre_edge_limit_offset
+
+    # Start inteactive session with ipywidgets. Disables options['interactive'] in order for the interactive loop to not start another interactive session
+    if options['interactive']:
+        options['interactive'] = False
+        options['interactive_session_active'] = True
+        options['show_plots'] = True
+        pre_edge_fit_interactive(data=data, options=options)
+        return
+
+
 
     # FIXME There should be an option to specify the interval in which to fit the background - now it is taking everything to the left of edge_start parameter, but if there are some artifacts in this area, it should be possible to
     # limit the interval
     # Making a dataframe only containing the rows that are included in the background subtraction (points lower than where the edge start is defined)
-    pre_edge_data = data['xanes_data_original'].loc[data['xanes_data_original']["ZapEnergy"] < pre_edge_limit]
+    pre_edge_data = data['xanes_data_original'].loc[(data['xanes_data_original']["ZapEnergy"] > options['pre_edge_limit'][0]) & (data['xanes_data_original']["ZapEnergy"] < options['pre_edge_limit'][1])]
         
     # Making a new dataframe, with only the ZapEnergies as the first column -> will be filled to include the background data
     pre_edge_fit_data = pd.DataFrame(data['xanes_data_original']["ZapEnergy"])
@@ -96,16 +112,12 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
         #adding a new column in df_background with the y-values of the background
         pre_edge_fit_data.insert(1,filename,background) 
         
-        if options['save_plots']:
-            if not os.path.isdir(options['save_folder']):
-                os.makedirs(options['save_folder'])
-
-            dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_pre_edge_fit.png'
-
-            fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,5))
+        if options['show_plots'] or options['save_plots']:
+            fig, (ax1, ax2) = plt.subplots(1,2,figsize=(20,10))
             data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax1)
             pre_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax1)
             ax1.axvline(x = max(pre_edge_data['ZapEnergy']), ls='--')
+            ax1.axvline(x = min(pre_edge_data['ZapEnergy']), ls='--')
             ax1.set_title(f'{os.path.basename(filename)} - Full view', size=20)
 
             data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax2)
@@ -115,15 +127,36 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
             ax2.set_ylim([min(pre_edge_data[filename]), max(pre_edge_data[filename])])
             ax2.set_title(f'{os.path.basename(filename)} - Fit region', size=20)
 
+            if options['save_plots']:
+                if not os.path.isdir(options['save_folder']):
+                    os.makedirs(options['save_folder'])
 
-            plt.savefig(dst, transparent=False)
-            plt.close()
+                dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_pre_edge_fit.png'
+                plt.savefig(dst, transparent=False)
+            
+            if not options['show_plots']:
+                plt.close()
 
 
     if options['log']:
         aux.write_log(message=f'Pre edge fitting done.', options=options)   
 
     return pre_edge_fit_data
+
+
+
+def pre_edge_fit_interactive(data: dict, options: dict) -> None:
+
+
+    w = widgets.interactive(
+        btp.ipywidgets_update, func=widgets.fixed(pre_edge_fit), data=widgets.fixed(data), options=widgets.fixed(options), 
+        pre_edge_limit=widgets.FloatRangeSlider(value=[options['pre_edge_limit'][0], options['pre_edge_limit'][1]], min=data['xanes_data_original']['ZapEnergy'].min(), max=data['xanes_data_original']['ZapEnergy'].max(), step=0.001)
+    )
+    
+    options['widget'] = w
+
+    display(w)
+
 
 
 
@@ -171,30 +204,43 @@ def pre_edge_subtraction(data: dict, options={}):
 
 def post_edge_fit(data: dict, options={}):
     #FIXME should be called "fitting post edge" (normalization is not done here, need edge shift position)
-    required_options = ['log', 'logfile', 'post_edge_interval']
+    required_options = ['log', 'logfile', 'post_edge_limit', 'interactive']
     default_options = {
         'log': False,
         'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_post_edge_fit.log',
-        'post_edge_interval': [None, None],
+        'post_edge_limit': [None, None],
+        'interactive': False,
+        'show_plots': False,
+        'save_plots': False,
+        'save_folder': './',
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
 
-    if not options['post_edge_interval'][0]:
+    if not options['post_edge_limit'][0]:
         post_edge_limit_offset = 0.03
 
         data['edge'] = find_element(data)
 
         edge_position = estimate_edge_position(data, options, index=0)
-        options['post_edge_interval'][0] = edge_position + post_edge_limit_offset
+        options['post_edge_limit'][0] = edge_position + post_edge_limit_offset
 
 
-    if not options['post_edge_interval'][1]:
-        options['post_edge_interval'][1] = data['xanes_data_original']['ZapEnergy'].max()
+    if not options['post_edge_limit'][1]:
+        options['post_edge_limit'][1] = data['xanes_data_original']['ZapEnergy'].max()
+
+    # Start inteactive session with ipywidgets. Disables options['interactive'] in order for the interactive loop to not start another interactive session
+    if options['interactive']:
+        options['interactive'] = False
+        options['interactive_session_active'] = True
+        options['show_plots'] = True
+        post_edge_fit_interactive(data=data, options=options)
+        return
 
 
-    post_edge_data = data['xanes_data_original'].loc[(data['xanes_data_original']["ZapEnergy"] > options['post_edge_interval'][0]) & (data['xanes_data_original']["ZapEnergy"] < options['post_edge_interval'][1])]
-    post_edge_data.dropna(inplace=True) #Removing all indexes without any value, as some of the data sets misses the few last data points and fucks up the fit
+
+    post_edge_data = data['xanes_data_original'].loc[(data['xanes_data_original']["ZapEnergy"] > options['post_edge_limit'][0]) & (data['xanes_data_original']["ZapEnergy"] < options['post_edge_limit'][1])]
+    post_edge_data = post_edge_data.dropna() #Removing all indexes without any value, as some of the data sets misses the few last data points and fucks up the fit
 
     # Making a new dataframe, with only the ZapEnergies as the first column -> will be filled to include the background data
     post_edge_fit_data = pd.DataFrame(data['xanes_data_original']["ZapEnergy"])
@@ -217,16 +263,14 @@ def post_edge_fit(data: dict, options={}):
         #adding a new column in df_background with the y-values of the background
         post_edge_fit_data.insert(1,filename,background) 
         
-        if options['save_plots']:
-            if not os.path.isdir(options['save_folder']):
-                os.makedirs(options['save_folder'])
+        if options['save_plots'] or options['show_plots']:
 
-            dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_post_edge_fit.png'
 
-            fig, (ax1, ax2) = plt.subplots(1,2,figsize=(10,5))
+            fig, (ax1, ax2) = plt.subplots(1,2,figsize=(20,10))
             data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax1)
             post_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax1)
             ax1.axvline(x = max(post_edge_data['ZapEnergy']), ls='--')
+            ax1.axvline(x = min(post_edge_data['ZapEnergy']), ls='--')
             ax1.set_title(f'{os.path.basename(filename)} - Full view', size=20)
 
             data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax2)
@@ -236,12 +280,31 @@ def post_edge_fit(data: dict, options={}):
             ax2.set_ylim([min(post_edge_data[filename]), max(post_edge_data[filename])])
             ax2.set_title(f'{os.path.basename(filename)} - Fit region', size=20)
 
+            if options['save_plots']:
+                if not os.path.isdir(options['save_folder']):
+                    os.makedirs(options['save_folder'])
 
-            plt.savefig(dst, transparent=False)
-            plt.close()
+                dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_post_edge_fit.png'
+
+                plt.savefig(dst, transparent=False)
+            
+            if not options['show_plots']:
+                plt.close()
 
 
     return post_edge_fit_data
+
+
+def post_edge_fit_interactive(data: dict, options: dict) -> None:
+
+    w = widgets.interactive(
+        btp.ipywidgets_update, func=widgets.fixed(post_edge_fit), data=widgets.fixed(data), options=widgets.fixed(options), 
+        post_edge_limit=widgets.FloatRangeSlider(value=[options['post_edge_limit'][0], options['post_edge_limit'][1]], min=data['xanes_data_original']['ZapEnergy'].min(), max=data['xanes_data_original']['ZapEnergy'].max(), step=0.001)
+    )
+    
+    options['widget'] = w
+
+    display(w)
 
 def smoothing(data: dict, options={}):
 
@@ -295,7 +358,7 @@ def smoothing(data: dict, options={}):
                 ax2.set_title(f'{os.path.basename(filename)} - Smooth (default values)', size=20)
 
             elif not options['save_default']:
-                fig, ax = plt.subplots(figsize=(10,5))
+                fig, ax = plt.subplots(figsize=(20,10))
                 data['xanes_data'].loc[(data['xanes_data']['ZapEnergy'] > edge_pos-0.0015) & (data['xanes_data']['ZapEnergy'] < edge_pos+0.0015)].plot(x='ZapEnergy', y=filename, color='black', ax=ax,  kind='scatter')
                 df_smooth.loc[(df_smooth['ZapEnergy'] > edge_pos-0.0015) & (df_smooth['ZapEnergy'] < edge_pos+0.0015)].plot(x='ZapEnergy', y=filename, color='red', ax=ax)
                 ax.set_xlim([edge_pos-0.0015, edge_pos+0.0015])
