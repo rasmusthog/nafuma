@@ -220,7 +220,7 @@ def pre_edge_subtraction(data: dict, options={}):
 
 def post_edge_fit(data: dict, options={}):
     #FIXME should be called "fitting post edge" (normalization is not done here, need edge shift position)
-    required_options = ['log', 'logfile', 'masks', 'post_edge_limit', 'interactive', 'show_plots', 'save_plots', 'save_folder']
+    required_options = ['log', 'logfile', 'masks', 'post_edge_limit', 'polyorder', 'interactive', 'show_plots', 'save_plots', 'save_folder']
     default_options = {
         'log': False,
         'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_post_edge_fit.log',
@@ -444,24 +444,31 @@ def estimate_edge_position(data: dict, options={}, index=0):
     return estimated_edge_shift
 
 def determine_edge_position(data: dict, options={}):
+    ''' Determines the edge position by 1) first differential maximum and/or 2) second differential zero-point. Calculates differential and/or double differential by periods'''
     
-    required_options = ['save_values', 'log', 'logfile', 'save_plots', 'save_folder', 'periods', 'diff', 'double_diff', 'fit_region']
+    required_options = ['save_values', 'log', 'logfile', 'save_plots', 'save_folder',  'diff', 'diff.polyorder', 'diff.periods', 'double_diff', 'double_diff.polyorder', 'double_diff.periods', 'fit_region']
     default_options = {
         'save_values': True,
         'log': False,
         'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_determine_edge_position.log',
+        'show_plots': False,
         'save_plots': False,
         'save_folder': './',
-        'periods': 2, #Periods needs to be an even number for the shifting of values to work properly,
         'diff': True,
+        'diff.polyorder': 2,
+        'diff.periods': 2, #Periods needs to be an even number for the shifting of values to work properly,
         'double_diff': False,
-        'fit_region': 0.0005
+        'double_diff.polyorder': 2,
+        'double_diff.periods': 2, #Periods needs to be an even number for the shifting of values to work properly,
+        'fit_region': None # The length of the region to find points to fit to a function
     
     }
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
-    if options['periods'] % 2 == 1:
+    if options['diff'] and options['diff.periods'] % 2 != 0:
+        raise Exception("NB! Periods needs to be an even number for the shifting of values to work properly")
+    if options['double_diff'] and options['double_diff.periods'] % 2 != 0:
         raise Exception("NB! Periods needs to be an even number for the shifting of values to work properly")
 
    
@@ -478,18 +485,21 @@ def determine_edge_position(data: dict, options={}):
     for i, filename in enumerate(data['path']):
         estimated_edge_pos = estimate_edge_position(data, options=options, index=i)
 
-        
-        #========================== fitting first differential ==========
+        if not options['fit_region']:
+            options['fit_region'] = (5)*(data['xanes_data']['ZapEnergy'].iloc[1] - data['xanes_data']['ZapEnergy'].iloc[0])
+
+
+        #========================== Fitting first differential ==========
 
         if options['diff']:
             df_diff[filename] = data['xanes_data'][filename].diff(periods=options['periods'])
             df_diff[filename]=df_diff[filename].shift(-int(options['periods']/2))
 
-            df_diff_edge = df_diff.loc[(df_diff["ZapEnergy"] < estimated_edge_pos+options['fit_region']) & ((df_diff["ZapEnergy"] > estimated_edge_pos-options['fit_region']))]
+            df_diff_edge = df_diff.loc[(df_diff["ZapEnergy"] <= estimated_edge_pos+options['fit_region']) & ((df_diff["ZapEnergy"] >= estimated_edge_pos-options['fit_region']))]
     
             
             # Fitting a function to the chosen interval
-            params = np.polyfit(df_diff_edge["ZapEnergy"], df_diff_edge[filename], 2)
+            params = np.polyfit(df_diff_edge["ZapEnergy"], df_diff_edge[filename], options['diff.polyorder'])
             diff_function = np.poly1d(params)
 
             x_diff=np.linspace(df_diff_edge["ZapEnergy"].iloc[0],df_diff_edge["ZapEnergy"].iloc[-1],num=10000)
@@ -503,7 +513,7 @@ def determine_edge_position(data: dict, options={}):
             edge_pos_diff=x_diff[np.where(y_diff == np.amax(y_diff))][0]
             
             if options['log']:
-                aux.write_log(message=f"Edge position estimated by the differential maximum is: {str(round(edge_pos_diff,5))}", options=options)
+                aux.write_log(message=f"Edge position estimated by the differential maximum is: {str(round(edge_pos_diff,5))} keV", options=options)
             
             if options['save_values']:
                 data['e0'][filename] = edge_pos_diff
@@ -517,7 +527,7 @@ def determine_edge_position(data: dict, options={}):
             df_double_diff_edge = df_double_diff.loc[(df_double_diff["ZapEnergy"] < estimated_edge_pos+options['fit_region']) & ((df_double_diff["ZapEnergy"] > estimated_edge_pos-options['fit_region']))]
 
             # Fitting a function to the chosen interval
-            params = np.polyfit(df_double_diff_edge["ZapEnergy"], df_double_diff_edge[filename], 2)
+            params = np.polyfit(df_double_diff_edge["ZapEnergy"], df_double_diff_edge[filename], options['double_diff.polyorder'])
             double_diff_function = np.poly1d(params)
 
             x_double_diff=np.linspace(df_double_diff_edge["ZapEnergy"].iloc[0], df_double_diff_edge["ZapEnergy"].iloc[-1],num=10000)
@@ -532,67 +542,98 @@ def determine_edge_position(data: dict, options={}):
             edge_pos_double_diff=x_double_diff[np.where(y_double_diff == find_nearest(y_double_diff,0))][0]
         
             if options['log']:
-                aux.write_log(message=f"Edge shift estimated by the double differential zero-point is {str(round(edge_pos_double_diff,5))}", options=options)
+                aux.write_log(message=f"Edge position estimated by the double differential zero-point is {str(round(edge_pos_double_diff,5))} keV", options=options)
 
-            if options['save_plots']:
+                if options['diff']:
+                    aux.write_log(message=f"Difference between edge position estimated from differential maximum and double differential zero-point is {(edge_pos_diff-edge_pos_double_diff)*1000} eV.")
+
+            if options['save_plots'] or options['show_plots']:
 
                 if options['diff'] and options['double_diff']:
-                    
-                    fig, ((ax1, ax2), (ax3, ax4)) = plt.subplots(ncols=2, nrows=2, figsize=(20,20))
-                    df_diff.plot(x='ZapEnergy', y=filename, ax=ax1, kind='scatter')
-                    df_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax1)
-                    ax1.set_xlim([edge_pos_diff-0.0015, edge_pos_diff+0.0015])
-                    ax1.axvline(x=edge_pos_diff-options['fit_region'], ls='--', c='black')
+ 
+                    fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(ncols=3, nrows=2, figsize=(20,20))
+                    data['xanes_data'].plot(x='ZapEnergy', y=filename, ax=ax1, c='black')
                     ax1.axvline(x=edge_pos_diff, ls='--', c='green')
-                    ax1.axvline(x=edge_pos_diff+options['fit_region'], ls='--', c='black')
-                    ax1.set_title('Fit region of differentiated data')
-
-                    df_diff_edge.plot(x='ZapEnergy', y=filename, ax=ax2, kind='scatter')
+                    
+                    df_diff.plot(x='ZapEnergy', y=filename, ax=ax2, kind='scatter')
                     df_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax2)
+                    ax2.set_xlim([edge_pos_diff-0.0015, edge_pos_diff+0.0015])
+                    ax2.axvline(x=estimated_edge_pos-options['fit_region'], ls='--', c='black')
                     ax2.axvline(x=edge_pos_diff, ls='--', c='green')
-                    ax2.axvline(x=estimated_edge_pos, ls='--', c='red')
-                    ax2.set_title('Fit of differentiated data')
+                    ax2.axvline(x=estimated_edge_pos+options['fit_region'], ls='--', c='black')
+                    ax2.set_title('Fit region of differentiated data')
+
+                    df_diff_edge.plot(x='ZapEnergy', y=filename, ax=ax3, kind='scatter')
+                    df_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax3)
+                    ax3.axvline(x=edge_pos_diff, ls='--', c='green')
+                    ax3.axvline(x=estimated_edge_pos, ls='--', c='red')
+                    ax3.set_title('Fit of differentiated data')
 
 
-                    df_double_diff.plot(x='ZapEnergy', y=filename, ax=ax3, kind='scatter')
-                    df_double_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax3)
-                    ax3.set_xlim([edge_pos_double_diff-0.0015, edge_pos_double_diff+0.0015])
-                    ax3.axvline(x=edge_pos_double_diff-options['fit_region'], ls='--', c='black')
-                    ax3.axvline(x=edge_pos_double_diff, ls='--', c='green')
-                    ax3.axvline(x=edge_pos_double_diff+options['fit_region'], ls='--', c='black')
-
-                    df_double_diff_edge.plot(x='ZapEnergy', y=filename, ax=ax4, kind='scatter')
-                    df_double_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax4)
+                    data['xanes_data'].plot(x='ZapEnergy', y=filename, ax=ax4, c='black')
                     ax4.axvline(x=edge_pos_double_diff, ls='--', c='green')
-                    ax4.axvline(x=estimated_edge_pos, ls='--', c='red')
 
+                    df_double_diff.plot(x='ZapEnergy', y=filename, ax=ax5, kind='scatter')
+                    df_double_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax5)
+                    ax5.set_xlim([edge_pos_double_diff-0.0015, edge_pos_double_diff+0.0015])
+                    ax5.axvline(x=estimated_edge_pos-options['fit_region'], ls='--', c='black')
+                    ax5.axvline(x=edge_pos_double_diff, ls='--', c='green')
+                    ax5.axvline(x=estimated_edge_pos+options['fit_region'], ls='--', c='black')
+
+                    df_double_diff_edge.plot(x='ZapEnergy', y=filename, ax=ax6, kind='scatter')
+                    df_double_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax6)
+                    ax6.axvline(x=edge_pos_double_diff, ls='--', c='green')
+                    ax6.axvline(x=estimated_edge_pos, ls='--', c='red')
                     
 
 
                 elif options['diff']:
-                    fig, (ax1, ax2) = plt.subplots(ncols=2,nrows=1, figsize=(20, 10))
-                    df_diff.plot(x='ZapEnergy', y=filename, ax=ax1, kind='scatter')
-                    ax1.set_xlim([edge_pos_diff-0.5, edge_pos_diff+0.5])
-                    ax1.axvline(x=edge_pos_diff-options['fit_region'], ls='--', c='black')
+                    fig, (ax1, ax2, ax3) = plt.subplots(ncols=3,nrows=1, figsize=(20, 10))
+                    
+                    data['xanes_data'].plot(x='ZapEnergy', y=filename, ax=ax1, c='black')
                     ax1.axvline(x=edge_pos_diff, ls='--', c='green')
-                    ax1.axvline(x=edge_pos_diff+options['fit_region'], ls='--', c='black')
 
-                    df_diff_edge.plot(x='ZapEnergy', y=filename, ax=ax2)
+                    df_diff.plot(x='ZapEnergy', y=filename, ax=ax2, kind='scatter')
+                    df_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax2)
+                    ax2.set_xlim([edge_pos_diff-0.5, edge_pos_diff+0.5])
+                    ax2.axvline(x=edge_pos_diff-options['fit_region'], ls='--', c='black')
                     ax2.axvline(x=edge_pos_diff, ls='--', c='green')
-                    ax2.axvline(x=estimated_edge_pos, ls='--', c='red')
+                    ax2.axvline(x=edge_pos_diff+options['fit_region'], ls='--', c='black')
+
+                    df_diff_edge.plot(x='ZapEnergy', y=filename, ax=ax3)
+                    df_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax3)
+                    ax3.axvline(x=edge_pos_diff, ls='--', c='green')
+                    ax3.axvline(x=estimated_edge_pos, ls='--', c='red')
 
                 
                 elif options['double_diff']:
-                    fig, (ax1, ax2) = plt.subplots(ncols=2,nrows=1, figsize=(20, 10))
-                    df_double_diff.plot(x='ZapEnergy', y=filename, ax=ax1, kind='scatter')
-                    ax1.set_xlim([edge_pos_double_diff-0.5, edge_pos_double_diff+0.5])
-                    ax1.axvline(x=edge_pos_double_diff-options['fit_region'], ls='--', c='black')
+                    fig, (ax1, ax2, ax3) = plt.subplots(ncols=3,nrows=1, figsize=(20, 10))
+                    
+                    data['xanes_data'].plot(x='ZapEnergy', y=filename, ax=ax1, c='black')
                     ax1.axvline(x=edge_pos_double_diff, ls='--', c='green')
-                    ax1.axvline(x=edge_pos_double_diff+options['fit_region'], ls='--', c='black')
 
-                    df_double_diff_edge.plot(x='ZapEnergy', y=filename, ax=ax2)
+                    df_double_diff.plot(x='ZapEnergy', y=filename, ax=ax2, kind='scatter')
+                    df_double_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax2)
+                    ax2.set_xlim([edge_pos_double_diff-0.5, edge_pos_double_diff+0.5])
+                    ax2.axvline(x=edge_pos_double_diff-options['fit_region'], ls='--', c='black')
                     ax2.axvline(x=edge_pos_double_diff, ls='--', c='green')
-                    ax2.axvline(x=estimated_edge_pos, ls='--', c='red')
+                    ax2.axvline(x=edge_pos_double_diff+options['fit_region'], ls='--', c='black')
+
+                    df_double_diff_edge.plot(x='ZapEnergy', y=filename, ax=ax3)
+                    df_double_diff_fit_function.plot(x='x_diff', y='y_diff', ax=ax3)
+                    ax3.axvline(x=edge_pos_double_diff, ls='--', c='green')
+                    ax3.axvline(x=estimated_edge_pos, ls='--', c='red')
+
+                if options['save_plots']:
+                    if not os.path.isdir(options['save_folder']):
+                        os.makedirs(options['save_folder'])
+
+                    dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_edge_position.png'
+
+                    plt.savefig(dst, transparent=False)
+
+                if not options['show_plots']:
+                    plt.close()
 
 
     if not options['diff']:
