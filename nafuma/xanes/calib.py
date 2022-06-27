@@ -444,44 +444,56 @@ def estimate_edge_position(data: dict, options={}, index=0):
     return estimated_edge_shift
 
 def determine_edge_position(data: dict, options={}):
-    ''' Determines the edge position by 1) first differential maximum and/or 2) second differential zero-point. Calculates differential and/or double differential by periods'''
+    ''' Determines the edge position by 1) first differential maximum and/or 2) second differential zero-point. Calculates differential and/or double differential by diff.periods and double_diff.periods respectively.
+    The differentiated and/or doubly differentiated data is fitted to a polynomial of diff.polyorder and/or double_diff.polyorder around the estimated edge position. The estimated edge position is set to be the x-value of the data 
+    point at maximum of the differentiated data. The region to be fitted to the polynomial is determined by fit_region, which defaults to 5 times the distance between two data points, giving five data points to fit to.
+    
+    Allows plotting and saving of three plots to assess the quality of the fit, and also allows logging.
+    
+    Requires that XANES-data is already loaded in data['xanes_data']. This allows the user to choose when to determine the edge position - whether before or after normalisation, flattening etc.'''
     
     required_options = ['save_values', 'log', 'logfile', 'save_plots', 'save_folder',  'diff', 'diff.polyorder', 'diff.periods', 'double_diff', 'double_diff.polyorder', 'double_diff.periods', 'fit_region']
     default_options = {
-        'save_values': True,
-        'log': False,
-        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_determine_edge_position.log',
-        'show_plots': False,
-        'save_plots': False,
-        'save_folder': './',
-        'diff': True,
-        'diff.polyorder': 2,
-        'diff.periods': 2, #Periods needs to be an even number for the shifting of values to work properly,
-        'double_diff': False,
-        'double_diff.polyorder': 2,
-        'double_diff.periods': 2, #Periods needs to be an even number for the shifting of values to work properly,
+        'save_values': True, # Whether the edge positions should be stored in a dictionary within the main data dictionary. 
+        'log': False, # Toggles logging on/off
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_determine_edge_position.log', # Sets the path to the logfile. Ignored if log == False
+        'show_plots': False, #  Toggles on/off whether plots should be shown. For sequential data, saving the plots and inspecting them there is probably better.
+        'save_plots': False, # Toggles on/off whether plots should be saved. 
+        'save_folder': './', # Sets the path to where the plots should be saved. Creates folder if doesn't exist. Ignored if save_plots == False
+        'diff': True, # Toggles calculation of the edge position based on differential data
+        'diff.polyorder': 2, # Sets the order of the polynomial to fit edge region of the differential to
+        'diff.periods': 2, # Sets the number of data points between which the first order difference should be calculated. Needs to be even for subsequent shifting of data to function.
+        'double_diff': False, # Toggles calculation of the edge position based on double differential data
+        'double_diff.polyorder': 2, # Sets the order of the polynomial to fit edge region of the double differential to
+        'double_diff.periods': 2, # Sets the number of data points between which the second order difference should be calculated. Needs to be even for subsequent shifting of data to function.
         'fit_region': None # The length of the region to find points to fit to a function
-    
     }
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
+
+    # Check if periods are even
     if options['diff'] and options['diff.periods'] % 2 != 0:
+        if options['log']:
+            aux.write_log(message='Periods for differentiation is not even. Ending run.', options=options)
         raise Exception("NB! Periods needs to be an even number for the shifting of values to work properly")
     if options['double_diff'] and options['double_diff.periods'] % 2 != 0:
+        aux.write_log(message='Periods for double differentiation is not even. Ending run.', options=options)
         raise Exception("NB! Periods needs to be an even number for the shifting of values to work properly")
 
    
-    #####
-
+    
+    # Prepare dataframes for differential data
     if options['diff']:
         df_diff = pd.DataFrame(data['xanes_data']['ZapEnergy'])
     if options['double_diff']:
         df_double_diff = pd.DataFrame(data['xanes_data']['ZapEnergy'])
     if options['save_values']:
-        data['e0'] = {}
+        data['e0_diff'] = {}
+        data['e0_double_diff'] = {}
 
 
+    # Get rough estimate of edge position
     for i, filename in enumerate(data['path']):
         estimated_edge_pos = estimate_edge_position(data, options=options, index=i)
 
@@ -489,12 +501,13 @@ def determine_edge_position(data: dict, options={}):
             options['fit_region'] = (5)*(data['xanes_data']['ZapEnergy'].iloc[1] - data['xanes_data']['ZapEnergy'].iloc[0])
 
 
-        #========================== Fitting first differential ==========
+        #========================== Fitting the first order derivative ==========
 
         if options['diff']:
-            df_diff[filename] = data['xanes_data'][filename].diff(periods=options['periods'])
-            df_diff[filename]=df_diff[filename].shift(-int(options['periods']/2))
+            df_diff[filename] = data['xanes_data'][filename].diff(periods=options['diff.periods']) 
+            df_diff[filename]=df_diff[filename].shift(-int(options['diff.periods']/2)) # Shifts the data back so that the difference between the points is located in the middle of the two points the caluclated difference is between
 
+            # Picks out the points to be fitted
             df_diff_edge = df_diff.loc[(df_diff["ZapEnergy"] <= estimated_edge_pos+options['fit_region']) & ((df_diff["ZapEnergy"] >= estimated_edge_pos-options['fit_region']))]
     
             
@@ -516,12 +529,12 @@ def determine_edge_position(data: dict, options={}):
                 aux.write_log(message=f"Edge position estimated by the differential maximum is: {str(round(edge_pos_diff,5))} keV", options=options)
             
             if options['save_values']:
-                data['e0'][filename] = edge_pos_diff
+                data['e0_diff'][filename] = edge_pos_diff
 
-
+         #========================== Fitting the second order derivative ==========
         if options['double_diff']:
-            df_double_diff[filename] = data['xanes_data'][filename].diff(periods=options['periods']).diff(periods=options['periods'])
-            df_double_diff[filename]=df_double_diff[filename].shift(-int(options['periods']))
+            df_double_diff[filename] = data['xanes_data'][filename].diff(periods=options['double_diff.periods']).diff(periods=options['double_diff.periods'])
+            df_double_diff[filename]=df_double_diff[filename].shift(-int(options['double_diff.periods']))
             
             # Pick out region of interest
             df_double_diff_edge = df_double_diff.loc[(df_double_diff["ZapEnergy"] < estimated_edge_pos+options['fit_region']) & ((df_double_diff["ZapEnergy"] > estimated_edge_pos-options['fit_region']))]
@@ -547,8 +560,15 @@ def determine_edge_position(data: dict, options={}):
                 if options['diff']:
                     aux.write_log(message=f"Difference between edge position estimated from differential maximum and double differential zero-point is {(edge_pos_diff-edge_pos_double_diff)*1000} eV.")
 
+            if options['save_values']:
+                data['e0_double_diff'][filename] = edge_pos_double_diff
+
+
+            # Make and show / save plots
             if options['save_plots'] or options['show_plots']:
 
+
+                # If both are enabled
                 if options['diff'] and options['double_diff']:
  
                     fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(ncols=3, nrows=2, figsize=(20,20))
@@ -586,7 +606,7 @@ def determine_edge_position(data: dict, options={}):
                     ax6.axvline(x=estimated_edge_pos, ls='--', c='red')
                     
 
-
+                # If only first order differentials is enabled
                 elif options['diff']:
                     fig, (ax1, ax2, ax3) = plt.subplots(ncols=3,nrows=1, figsize=(20, 10))
                     
@@ -605,7 +625,7 @@ def determine_edge_position(data: dict, options={}):
                     ax3.axvline(x=edge_pos_diff, ls='--', c='green')
                     ax3.axvline(x=estimated_edge_pos, ls='--', c='red')
 
-                
+                # If only second order differentials is enabled
                 elif options['double_diff']:
                     fig, (ax1, ax2, ax3) = plt.subplots(ncols=3,nrows=1, figsize=(20, 10))
                     
@@ -624,6 +644,8 @@ def determine_edge_position(data: dict, options={}):
                     ax3.axvline(x=edge_pos_double_diff, ls='--', c='green')
                     ax3.axvline(x=estimated_edge_pos, ls='--', c='red')
 
+
+                # Save plots if toggled
                 if options['save_plots']:
                     if not os.path.isdir(options['save_folder']):
                         os.makedirs(options['save_folder'])
@@ -632,6 +654,8 @@ def determine_edge_position(data: dict, options={}):
 
                     plt.savefig(dst, transparent=False)
 
+
+                # Close plots if show_plots not toggled
                 if not options['show_plots']:
                     plt.close()
 
