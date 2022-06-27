@@ -46,14 +46,16 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
 
     # FIXME Add log-file
 
-    required_options = ['pre_edge_limit', 'log', 'logfile', 'show_plots', 'save_plots', 'save_folder', 'interactive']
+    required_options = ['pre_edge_limit', 'masks', 'log', 'logfile', 'show_plots', 'save_plots', 'save_folder', 'ylim', 'interactive']
     default_options = {
         'pre_edge_limit': [None, None],
+        'masks': [],
         'log': False,
         'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_pre_edge_fit.log',
         'show_plots': False,
         'save_plots': False,
         'save_folder': './',
+        'ylim': [None, None],
         'interactive': False
     }
 
@@ -67,6 +69,7 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
     # Find the cutoff point at which the edge starts - everything to the LEFT of this point will be used in the pre edge function fit
     if not options['pre_edge_limit'][0]:
         options['pre_edge_limit'][0] = data['xanes_data_original']['ZapEnergy'].min()
+
     
     if not options['pre_edge_limit'][1]:
         pre_edge_limit_offset = 0.03
@@ -89,8 +92,13 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
     # FIXME There should be an option to specify the interval in which to fit the background - now it is taking everything to the left of edge_start parameter, but if there are some artifacts in this area, it should be possible to
     # limit the interval
     # Making a dataframe only containing the rows that are included in the background subtraction (points lower than where the edge start is defined)
-    pre_edge_data = data['xanes_data_original'].loc[(data['xanes_data_original']["ZapEnergy"] > options['pre_edge_limit'][0]) & (data['xanes_data_original']["ZapEnergy"] < options['pre_edge_limit'][1])]
-        
+    pre_edge_data = data['xanes_data_original'].loc[(data['xanes_data_original']["ZapEnergy"] > options['pre_edge_limit'][0]) & (data['xanes_data_original']["ZapEnergy"] < options['pre_edge_limit'][1])].copy()
+
+    for mask in options['masks']:
+        pre_edge_data.loc[(pre_edge_data['ZapEnergy'] > mask[0]) & (pre_edge_data['ZapEnergy'] < mask[1])] = np.nan
+
+    pre_edge_data = pre_edge_data.dropna()
+
     # Making a new dataframe, with only the ZapEnergies as the first column -> will be filled to include the background data
     pre_edge_fit_data = pd.DataFrame(data['xanes_data_original']["ZapEnergy"])
 
@@ -119,6 +127,14 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
             ax1.axvline(x = max(pre_edge_data['ZapEnergy']), ls='--')
             ax1.axvline(x = min(pre_edge_data['ZapEnergy']), ls='--')
             ax1.set_title(f'{os.path.basename(filename)} - Full view', size=20)
+            
+            if options['ylim'][0] != None:
+                ax1.set_ylim(bottom=options['ylim'][0])
+            if options['ylim'][1]:
+                ax1.set_ylim(top=options['ylim'][1])
+
+            for mask in options['masks']:
+                ax1.fill_between(x=mask, y1=0, y2=data['xanes_data_original'][filename].max()*2, alpha=0.2, color='black')
 
             data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax2)
             pre_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax2)
@@ -204,11 +220,13 @@ def pre_edge_subtraction(data: dict, options={}):
 
 def post_edge_fit(data: dict, options={}):
     #FIXME should be called "fitting post edge" (normalization is not done here, need edge shift position)
-    required_options = ['log', 'logfile', 'post_edge_limit', 'interactive']
+    required_options = ['log', 'logfile', 'masks', 'post_edge_limit', 'interactive', 'show_plots', 'save_plots', 'save_folder']
     default_options = {
         'log': False,
         'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_post_edge_fit.log',
         'post_edge_limit': [None, None],
+        'masks': [],
+        'polyorder': 2,
         'interactive': False,
         'show_plots': False,
         'save_plots': False,
@@ -239,7 +257,11 @@ def post_edge_fit(data: dict, options={}):
 
 
 
-    post_edge_data = data['xanes_data_original'].loc[(data['xanes_data_original']["ZapEnergy"] > options['post_edge_limit'][0]) & (data['xanes_data_original']["ZapEnergy"] < options['post_edge_limit'][1])]
+    post_edge_data = data['xanes_data_original'].loc[(data['xanes_data_original']["ZapEnergy"] > options['post_edge_limit'][0]) & (data['xanes_data_original']["ZapEnergy"] < options['post_edge_limit'][1])].copy()
+
+    for mask in options['masks']:
+        post_edge_data.loc[(post_edge_data['ZapEnergy'] > mask[0]) & (post_edge_data['ZapEnergy'] < mask[1])] = np.nan
+
     post_edge_data = post_edge_data.dropna() #Removing all indexes without any value, as some of the data sets misses the few last data points and fucks up the fit
 
     # Making a new dataframe, with only the ZapEnergies as the first column -> will be filled to include the background data
@@ -249,11 +271,14 @@ def post_edge_fit(data: dict, options={}):
     
     for i, filename in enumerate(data['path']):
         if options['log']:
-            aux.write_log(message=f'Fitting post edge on {os.path.basename(filename)} ({i+1} / {len(data["path"])})', options=options)
+            aux.write_log(message=f'Fitting post edge on {os.path.basename(filename)} ({i+1} / {len(data["path"])}) with polynomial order {options["polyorder"]}', options=options)
 
         #Fitting linear function to the background
-        params = np.polyfit(post_edge_data["ZapEnergy"], post_edge_data[filename], 2)
+        params = np.polyfit(post_edge_data["ZapEnergy"], post_edge_data[filename], options['polyorder'])
         fit_function = np.poly1d(params)
+
+        if options['log']:
+            aux.write_log(message=f'Post edge fitted with parameters: {params}')
 
         data['post_edge_params'][filename] = params
         
@@ -272,6 +297,14 @@ def post_edge_fit(data: dict, options={}):
             ax1.axvline(x = max(post_edge_data['ZapEnergy']), ls='--')
             ax1.axvline(x = min(post_edge_data['ZapEnergy']), ls='--')
             ax1.set_title(f'{os.path.basename(filename)} - Full view', size=20)
+
+            for mask in options['masks']:
+                ax1.fill_between(x=mask, y1=0, y2=data['xanes_data_original'][filename].max()*2, alpha=0.2, color='black')
+
+            if options['ylim'][0] != None:
+                ax1.set_ylim(bottom=options['ylim'][0])
+            if options['ylim'][1] != None:
+                ax1.set_ylim(top=options['ylim'][1])
 
             data['xanes_data_original'].plot(x='ZapEnergy', y=filename, color='black', ax=ax2)
             post_edge_fit_data.plot(x='ZapEnergy', y=filename, color='red', ax=ax2)
