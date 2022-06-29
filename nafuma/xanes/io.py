@@ -183,12 +183,13 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
 
     columns = ['ZapEnergy']
 
+    if not isinstance(data['path'], list):
+        data['path'] = [data['path']]
+        
     # Initialise DataFrame with only ZapEnergy-column
     xanes_data = pd.read_csv(data['path'][0])[['ZapEnergy']]
     xanes_data['ZapEnergy'] += options['adjust']
 
-    if not isinstance(data['path'], list):
-        data['path'] = [data['path']]
 
     for filename in data['path']:
         columns.append(filename)
