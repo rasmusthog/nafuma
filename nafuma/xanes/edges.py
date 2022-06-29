@@ -6,7 +6,7 @@ from scipy.constants import c, h
 keV_per_J = (1 / 1.602176634e-19) / 1000
 
 # kXu values taken from International Tables for Crystallography Volume , Kulwer Academic Publishers - Dordrect / Boston / London (1992)
-k_edge = {   'Z':    [ 1, 2,
+K = {   'Z':    [ 1, 2,
                         3, 4, 5, 6, 7, 8, 9, 10,
                         11, 12, 13, 14, 15, 16, 17, 18,
                         19, 20, 21, 22, 23, 24, 25, 26, 27, 28, 29, 30, 31, 32, 33, 34, 35, 36,
@@ -23,5 +23,8 @@ k_edge = {   'Z':    [ 1, 2,
                         0.81549, 0.76969, 0.72762, 0.68877, 0.65291, 0.61977, 0.5891, 0.56047, 0.53378, 0.50915, 0.48582, 0.46409]}
 
 
-k_edge = pd.DataFrame(k_edge)
-k_edge['keV'] = np.round(h*c/(k_edge['kXu']*10**-10) * keV_per_J, 3)
+K = pd.DataFrame(K)
+K['keV'] = np.round(h*c/(K['kXu']*10**-10) * keV_per_J, 3)
+
+
+# FIXME If needed, add energies for L-edges as well. 
