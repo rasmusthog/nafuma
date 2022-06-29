@@ -12,11 +12,21 @@ def update_options(options, required_options, default_options):
 
     return options
 
-def save_options(options, path):
+def save_options(options, path, ignore=None):
     ''' Saves any options dictionary to a JSON-file in the specified path'''
 
+    options_copy = options.copy()
+
+    if ignore:
+        if not isinstance(ignore, list):
+            ignore = [ignore]
+
+        for i in ignore:
+            options_copy[i] = 'Removed'
+
+
     with open(path, 'w') as f:
-        json.dump(options,f)
+        json.dump(options_copy,f, skipkeys=True, indent=4)
 
 
 def load_options(path):
