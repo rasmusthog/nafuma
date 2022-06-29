@@ -373,52 +373,53 @@ def post_edge_fit_interactive(data: dict, options: dict) -> None:
     display(w)
 
 def smoothing(data: dict, options={}):
+    ' Smoothes the data using the Savitzky-Golay filter. This is the only algorithm at this moment.  '
 
-    # FIXME Add logging
-    # FIXME Add saving of files
 
     required_options = ['log', 'logfile', 'show_plots', 'save_plots', 'save_folder', 'interactive', 'smooth_window_length', 'smooth_algorithm', 'smooth_polyorder', 'smooth_save_default', 'smooth_store_data']
     default_options = {
-        'log': False,
-        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_smoothing.log',
-        'show_plots': False,
-        'save_plots': False,
-        'save_folder': './',
-        'interactive': False,
-        'smooth_window_length': 3,
-        'smooth_polyorder': 2,
+        'log': False, # Toggles logging on / off
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_smoothing.log', # Sets path to log-file. Ignored if log == False
+        'show_plots': False, # Toggles showing plots on / off. This is only recommended when working with a handful of scans. 
+        'save_plots': False, # Toggles saving plots on / off
+        'save_folder': './', # Sets path to folder where plots should be saved. Ignored if save_plots == False
+        'interactive': False, # Toggles interactive mode on / off. This is only recommended for a single scan to determine proper parameters for smoothing.
+        'smooth_window_length': 3, # Determines the window length of smoothing that the savgol-filter uses for smoothing
+        'smooth_polyorder': 2, # Determines the order of the polynomial used in the smoothing algorithm
         'smooth_algorithm': 'savgol', # At the present, only Savitzky-Golay filter is implemented. Add Gaussian and Boxcar later.
-        'smooth_save_default': False,
-        'smooth_store_data': False,
+        'smooth_save_default': False, # Toggles whether or not to run a separate smoothing using default values on / off
+        'smooth_store_data': False, # Toggles storing data to data['xanes_data'] on / off
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
+    # Initialise new DataFrame with correct x-values
     df_smooth = pd.DataFrame(data['xanes_data']['ZapEnergy'])
 
+    # Do the same if smoothing with default values is toggled on
     if options['smooth_save_default']:
         df_smooth_default = pd.DataFrame(data['xanes_data']['ZapEnergy'])
 
     if options['log']:
-        aux.write_log(message='Starting smoothing.')
+        aux.write_log(message='Starting smoothing procedure.')
 
 
+    # Run in interactive mode if enabled
     if options['interactive']:
-        data['xanes_data_backup'] = data['xanes_data']
-        options['interactive'] = False
-        options['interactive_session_active'] = True
-        options['show_plots'] = True
-        smoothing_interactive(data=data, options=options)
+        data['xanes_data_backup'] = data['xanes_data'] # Backup the data
+        options['interactive'] = False # Turn interactive mode off so that it is not called again within the interactive loop
+        options['show_plots'] = True # Force plotting on as interactive mode is useless without it
+        smoothing_interactive(data=data, options=options) # Call interactive version of the function
         return
 
 
     # FIXME Add other types of filters
-    # FIXME Instead of assigning values directly to the data dictionary, these should be made into an own DataFrame that you can decide later what to do with - these variables should
-    # then be returned
     for i, filename in enumerate(data['path']):
 
         if options['smooth_algorithm'] == 'savgol':
             if options['log']:
                 aux.write_log(message=f'Smoothing {filename} with algorithm: {options["smooth_algorithm"]} ({i+1}/{len(data["path"])})', options=options)
+
+            # Apply savgol filter and add to DataFrame
             df_smooth.insert(1, filename, savgol_filter(data['xanes_data'][filename], options['smooth_window_length'], options['smooth_polyorder']))
         
         if options['smooth_save_default']:
@@ -428,16 +429,16 @@ def smoothing(data: dict, options={}):
                 df_smooth_default.insert(1, filename, savgol_filter(data['xanes_data'][filename], default_options['smooth_window_length'], default_options['smooth_polyorder']))
         
 
+        # Make plots ...
         if options['save_plots'] or options['show_plots']:
 
             
 
             edge_pos = estimate_edge_position(data=data, options=options)
-            intensity_midpoint = df_smooth[filename].iloc[np.where(df_smooth['ZapEnergy'] == find_nearest(df_smooth['ZapEnergy'], edge_pos))].values[0]
             step_length = data['xanes_data']['ZapEnergy'].iloc[1] - data['xanes_data']['ZapEnergy'].iloc[0]
 
 
-    
+            # ... if default smoothing is enabled. Only plotting +- 10 step sizes from the edge position
             if options['smooth_save_default']:
                 fig, (ax1, ax2) = plt.subplots(1,2,figsize=(20,5))
                 data['xanes_data'].loc[(data['xanes_data']['ZapEnergy'] > edge_pos-10*step_length) & (data['xanes_data']['ZapEnergy'] < edge_pos+10*step_length)].plot(x='ZapEnergy', y=filename, color='black', ax=ax1, kind='scatter')
@@ -448,6 +449,7 @@ def smoothing(data: dict, options={}):
                 df_smooth_default.loc[(df_smooth_default['ZapEnergy'] > edge_pos-10*step_length) & (df_smooth_default['ZapEnergy'] < edge_pos+10*step_length)].plot(x='ZapEnergy', y=filename, color='red', ax=ax2)
                 ax2.set_title(f'{os.path.basename(filename)} - Smooth (default values)', size=20)
 
+            # ... if only smoothing with user defined variables is enabled. Only plotting +- 10 step sizes from the edge position
             elif not options['smooth_save_default']:
                 fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(20,10))
                 data['xanes_data'].plot(x='ZapEnergy', y=filename, ax=ax1, kind='scatter', c='black')
@@ -455,12 +457,11 @@ def smoothing(data: dict, options={}):
 
                 data['xanes_data'].loc[(data['xanes_data']['ZapEnergy'] > edge_pos-10*step_length) & (data['xanes_data']['ZapEnergy'] < edge_pos+10*step_length)].plot(x='ZapEnergy', y=filename, color='black', ax=ax2,  kind='scatter')
                 df_smooth.loc[(df_smooth['ZapEnergy'] > edge_pos-10*step_length) & (df_smooth['ZapEnergy'] < edge_pos+10*step_length)].plot(x='ZapEnergy', y=filename, color='red', ax=ax2)
-                #ax.set_xlim([edge_pos-0.0015, edge_pos+0.0015])
-                #ax.set_ylim([intensity_midpoint*0.9, intensity_midpoint*1.1])
                 
                 ax1.set_title(f'{os.path.basename(filename)} - Smooth', size=20)
                 ax2.set_title(f'{os.path.basename(filename)} - Smooth Edge Region', size=20)
 
+            # Save plots
             if options['save_plots']:
                 if not os.path.isdir(options['save_folder']):
                     os.makedirs(options['save_folder'])
@@ -468,6 +469,7 @@ def smoothing(data: dict, options={}):
                 dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_smooth.png'
                 plt.savefig(dst, transparent=False)
             
+            # Close plots
             if not options['show_plots']:
                 plt.close()
     
@@ -498,23 +500,29 @@ def smoothing_interactive(data: dict, options: dict) -> None:
 
 
 def restore_from_backup(data):
+    ''' Restores DataFrame from data['xanes_data_backup'] to data['xanes_data']. This can be useful e.g. when smoothing and you want to re-do the smoothing with different parameters. 
+    
+    If there is no DataFrame stored in data['xanes_data_backup'], this function does nothing. '''
+
     if 'xanes_data_bakcup' in data.keys():
         data['xanes_data'] = data['xanes_data_backup']
 
 
 def find_nearest(array, value):
-    #function to find the value closes to "value" in an "array"
+    ''' Finds the value closest to value in array'''
     array = np.asarray(array)
     idx = (np.abs(array - value)).argmin()
     return array[idx]
 
 
 def estimate_edge_position(data: dict, options={}, index=0):
-    #a dataset is differentiated to find a first estimate of the edge shift to use as starting point. 
+    ''' Gets an estimation of the edge position. This is very similar to determine_edge_position, but provides instead a quick and dirty way where the actual data point closest to the maximum of the differentiated data
+    is located. '''
+
     required_options = ['log','logfile', 'periods']
     default_options = {
-        'log': False,
-        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_edge_position_estimation.log',
+        'log': False, # Toggles logging on/off
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_edge_position_estimation.log', # Sets path to log-file
         'periods': 6, #Periods needs to be an even number for the shifting of values to work properly
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -528,10 +536,8 @@ def estimate_edge_position(data: dict, options={}, index=0):
     df_diff_max = df_diff[data['path'][index]].dropna().max()
     estimated_edge_shift =df_diff.loc[df_diff[data['path'][index]] == df_diff_max,'ZapEnergy'].values[0]
 
-    # FIXME Add logging option to see the result
-
     if options['log']:
-        aux.write_log(message=f'Estimated edge shift for determination of pre-edge area is: {estimated_edge_shift} keV', options=options)
+        aux.write_log(message=f'Estimated edge shift is: {estimated_edge_shift} keV', options=options)
 
     return estimated_edge_shift
 
@@ -666,14 +672,14 @@ def determine_edge_position(data: dict, options={}):
                 data['e0_double_diff'][filename] = edge_pos_double_diff
 
 
-        # Make and show / save plots
+        # Make and show / save plots ...
         if options['save_plots'] or options['show_plots']:
 
 
-            # If both are enabled
+            # ... if both are enabled
             if options['diff'] and options['double_diff']:
 
-                fig, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(ncols=3, nrows=2, figsize=(20,20))
+                _, ((ax1, ax2, ax3), (ax4, ax5, ax6)) = plt.subplots(ncols=3, nrows=2, figsize=(20,20))
                 data['xanes_data'].plot(x='ZapEnergy', y=filename, ax=ax1, c='black')
                 ax1.axvline(x=edge_pos_diff, ls='--', c='green')
                 
@@ -708,9 +714,9 @@ def determine_edge_position(data: dict, options={}):
                 ax6.axvline(x=estimated_edge_pos, ls='--', c='red')
                 
 
-            # If only first order differentials is enabled
+            # ... if only first order differentials is enabled
             elif options['diff']:
-                fig, (ax1, ax2, ax3) = plt.subplots(ncols=3,nrows=1, figsize=(20, 10))
+                _, (ax1, ax2, ax3) = plt.subplots(ncols=3,nrows=1, figsize=(20, 10))
                 
                 data['xanes_data'].plot(x='ZapEnergy', y=filename, ax=ax1, c='black')
                 ax1.axvline(x=edge_pos_diff, ls='--', c='green')
@@ -727,9 +733,9 @@ def determine_edge_position(data: dict, options={}):
                 ax3.axvline(x=edge_pos_diff, ls='--', c='green')
                 ax3.axvline(x=estimated_edge_pos, ls='--', c='red')
 
-            # If only second order differentials is enabled
+            # ... if only second order differentials is enabled
             elif options['double_diff']:
-                fig, (ax1, ax2, ax3) = plt.subplots(ncols=3,nrows=1, figsize=(20, 10))
+                _, (ax1, ax2, ax3) = plt.subplots(ncols=3,nrows=1, figsize=(20, 10))
                 
                 data['xanes_data'].plot(x='ZapEnergy', y=filename, ax=ax1, c='black')
                 ax1.axvline(x=edge_pos_double_diff, ls='--', c='green')
@@ -774,9 +780,6 @@ def determine_edge_position(data: dict, options={}):
 def determine_edge_position_interactive(data: dict, options: dict) -> None:
     ''' Defines the widgets to use with the ipywidgets interactive mode and calls the update function found in btp.ipywidgets. '''
 
-
-    step_size = data['xanes_data']['ZapEnergy'].iloc[1] - data['xanes_data']['ZapEnergy'].iloc[0]
-
     w = widgets.interactive(
         btp.ipywidgets_update, func=widgets.fixed(determine_edge_position), data=widgets.fixed(data), options=widgets.fixed(options), 
         points_around_edge=widgets.IntSlider(value=options['points_around_edge'], min=1, max=20, step=1),   
@@ -786,12 +789,18 @@ def determine_edge_position_interactive(data: dict, options: dict) -> None:
 
     display(w)
 
+
 def normalise(data: dict, options={}):
+    ''' Normalises the data so that the difference between the fitted pre- and post-edge functions is 1 at the edge position. 
+    
+    Requires that edge positions have already been determined with determine_edge_position() and stored in data['e0_diff']. '''
+
+
     required_options = ['log', 'logfile', 'normalisation_store_data']
     default_options = {
-        'log': False,
-        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_normalisation.log',
-        'normalisation_store_data': False,
+        'log': False, # Toggles logging on/off
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_normalisation.log', # Sets path to log-file
+        'normalisation_store_data': False, # Toggles storing of the flattened data in data['xanes_data'] on/off
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
@@ -827,33 +836,44 @@ def normalise(data: dict, options={}):
 
     
 def flatten(data:dict, options={}):
-    #only picking out zapenergy-values higher than edge position (edge pos and below remains untouched)
+    ''' Flattens the post-edge region (from edge position and up). Only for visual purposes.
+    
+    Requires data['xanes_data'] that is normalised through normalise() and that normalised versions of the post_edge_fit_data is stored in data['post_edge_fit_data_norm'].
+    Also assumes that the pre edge-fit data is already subtracted from the data'''
+
 
     required_options = ['log', 'logfile', 'flatten_store_data']
     default_options = {
-        'log': False,
-        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_flattening.log',
-        'flatten_store_data': False,
+        'log': False, # Toggles logging on/off
+        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_flattening.log', # Sets path to log-file
+        'flatten_store_data': False, # Toggles storing of the flattened data in data['xanes_data'] on/off 
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
 
+    # Initialise DataFrame with x-values
     flattened_df = pd.DataFrame(data['xanes_data']['ZapEnergy'])
 
+    # Loop through all files
     for filename in data['path']:
+
+        # Subtract 1 from the _normalised_ post edge fit function
         fit_function_diff = data['post_edge_fit_data_norm'][filename] - 1
         
+        # Set all values from edge position and downwards to 0 so that only data above the edge position will be adjusted
         fit_function_diff.loc[flattened_df['ZapEnergy'] <= data['e0_diff'][filename]] = 0
 
+        # Subtract the difference between 1 and the post edge fit function from the normalised data.
         flattened_df[filename] = data['xanes_data'][filename] - fit_function_diff
 
 
+    # Saves the flattened DataFrame
     if options['flatten_store_data']:
         data['xanes_data'] = flattened_df
     
 
     return flattened_df, fit_function_diff
 
-    #make a new dataframe with flattened values
+
 
 
