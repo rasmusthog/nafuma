@@ -77,6 +77,10 @@ def write_log(message, options={}):
 
     options = update_options(options=options, required_options=required_options, default_options=default_options)
 
+    if not os.path.isdir(os.path.dirname(options['logfile'])):
+        os.makedirs(os.path.dirname(options['logfile']))
+
+
     now = datetime.now().strftime('%Y/%m/%d %H:%M:%S')
     message = f'[{now}] {message} \n'
 
