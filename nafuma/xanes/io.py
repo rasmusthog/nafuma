@@ -12,7 +12,7 @@ def split_scan_data(data: dict, options={}) -> list:
     As of now only picks out xmap_rois (fluoresence mode) and for Mn, Fe, Co and Ni K-edges.'''
     
 
-    required_options = ['log', 'logfile', 'save', 'save_folder', 'replace', 'add_rois']
+    required_options = ['log', 'logfile', 'save', 'save_folder', 'replace', 'add_rois', 'return']
 
     default_options = {
         'log': False,
@@ -20,7 +20,8 @@ def split_scan_data(data: dict, options={}) -> list:
         'save': False, # whether to save the files or not
         'save_folder': '.', # root folder of where to save the files
         'replace': False, # whether to replace the files if they already exist
-        'add_rois': False # Whether to add the rois of individual scans of the same edge together
+        'add_rois': False, # Whether to add the rois of individual scans of the same edge together
+        'return': True
     }
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -165,7 +166,10 @@ def split_scan_data(data: dict, options={}) -> list:
         aux.write_log(message=f'All done!', options=options)
 
 
-    return all_scans
+    if options['return']:
+        return all_scans
+    else:
+        return
 
 
 
@@ -219,8 +223,15 @@ def determine_active_roi(scan_data):
     #     active_roi = 'xmap_roi00'
     # else: 
     #     active_roi = 'xmap_roi01'
+
+
+    if not ('xmap_roi00' in scan_data.columns) or not ('xmap_roi01' in scan_data.columns):
+        if 'xmap_roi00' in scan_data.columns:
+            active_roi = 'xmap_roi00'
+        elif 'xmap_roi01' in scan_data.columns:
+            active_roi = 'xmap_roi01'
     
-    if (scan_data['xmap_roi00'].iloc[0:100].mean() < scan_data['xmap_roi00'].iloc[-100:].mean()) and (scan_data['xmap_roi01'].iloc[0:100].mean() < scan_data['xmap_roi01'].iloc[-100:].mean()):
+    elif (scan_data['xmap_roi00'].iloc[0:100].mean() < scan_data['xmap_roi00'].iloc[-100:].mean()) and (scan_data['xmap_roi01'].iloc[0:100].mean() < scan_data['xmap_roi01'].iloc[-100:].mean()):
         if (scan_data['xmap_roi00'].max()-scan_data['xmap_roi00'].min()) > (scan_data['xmap_roi01'].max() - scan_data['xmap_roi01'].min()):
             active_roi = 'xmap_roi00'
         else:
