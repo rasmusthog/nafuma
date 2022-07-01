@@ -46,7 +46,7 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
 
     # FIXME Add log-file
 
-    required_options = ['pre_edge_limits', 'pre_edge_masks', 'pre_edge_polyorder', 'pre_edge_store_data', 'log', 'logfile', 'show_plots', 'save_plots', 'save_folder', 'ylim', 'interactive']
+    required_options = ['pre_edge_limits', 'pre_edge_masks', 'pre_edge_polyorder', 'pre_edge_store_data', 'log', 'logfile', 'show_plots', 'save_plots', 'save_folder', 'ylim', 'interactive', 'interactive_session_active']
     default_options = {
         'pre_edge_limits': [None, None],
         'pre_edge_masks': [],
@@ -58,7 +58,8 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
         'save_plots': False,
         'save_folder': './',
         'ylim': [None, None],
-        'interactive': False
+        'interactive': False,
+        'interactive_session_active': False
     }
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -107,6 +108,10 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
     data['pre_edge_params'] = {}
 
     for i, filename in enumerate(data['path']):
+
+        if options['interactive_session_active'] and i > 0:
+            continue
+
         if options['log']:
             aux.write_log(message=f'Fitting background on {os.path.basename(filename)} ({i+1}/{len(data["path"])})', options=options)
 
@@ -247,7 +252,7 @@ def post_edge_fit(data: dict, options={}):
     '''
     
     
-    required_options = ['log', 'logfile', 'post_edge_masks', 'post_edge_limits', 'post_edge_polyorder', 'post_edge_store_data', 'interactive', 'show_plots', 'save_plots', 'save_folder']
+    required_options = ['log', 'logfile', 'post_edge_masks', 'post_edge_limits', 'post_edge_polyorder', 'post_edge_store_data', 'interactive', 'interactive_session_active', 'show_plots', 'save_plots', 'save_folder']
     default_options = {
         'log': False, 
         'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_post_edge_fit.log',
@@ -256,6 +261,7 @@ def post_edge_fit(data: dict, options={}):
         'post_edge_polyorder': 2,
         'post_edge_store_data': False,
         'interactive': False,
+        'interactive_session_active': False,
         'show_plots': False,
         'save_plots': False,
         'save_folder': './',
@@ -304,6 +310,10 @@ def post_edge_fit(data: dict, options={}):
     data['post_edge_params'] = {}
     
     for i, filename in enumerate(data['path']):
+
+        if options['interactive_session_active'] and i > 0:
+            continue
+
         if options['log']:
             aux.write_log(message=f'Fitting post edge on {os.path.basename(filename)} ({i+1} / {len(data["path"])}) with polynomial order {options["post_edge_polyorder"]}', options=options)
 
