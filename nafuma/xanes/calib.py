@@ -375,7 +375,7 @@ def post_edge_fit(data: dict, options={}):
         aux.write_log(message='Post edge fitting done!', options=options)
 
     if options['post_edge_store_data']:
-        data['post_edge_fit_data'] = post_edge_fit_data
+        data['post_edge_fit_data'] = post_edge_fit_data.dropna(axis=0)
 
 
     return post_edge_fit_data
@@ -875,7 +875,6 @@ def normalise(data: dict, options={}):
 
     #Finding the normalisation constant µ_0(E_0), by subtracting the value of the pre-edge-line from the value of the post-edge line at e0
     for filename in data['path']:
-        print(filename)
         e0_ind = data['post_edge_fit_data'].loc[data['post_edge_fit_data']['ZapEnergy'] == find_nearest(data['post_edge_fit_data']['ZapEnergy'], data['e0_diff'][filename])].index.values[0]
         #norm = data['post_edge_fit_data'][filename].iloc[find_nearest(data['post_edge_fit_data'][filename], data['e0'][filename])]
         normalisation_constant = data['post_edge_fit_data'][filename].iloc[e0_ind] - data['pre_edge_fit_data'][filename].iloc[e0_ind]
