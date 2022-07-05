@@ -82,6 +82,11 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
         edge_position = estimate_edge_position(data, options, index=0)
         options['pre_edge_limits'][1] = edge_position - pre_edge_limit_offset
 
+        print(edge_position)
+
+    if options['pre_edge_limits'][0] >= options['pre_edge_limits'][1]:
+        options['pre_edge_limits'][1] = options['pre_edge_limits'][0] + 0.03
+
     # Start inteactive session with ipywidgets. Disables options['interactive'] in order for the interactive loop to not start another interactive session
     if options['interactive']:
         options['interactive'] = False
@@ -113,7 +118,7 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
             continue
 
         if options['log']:
-            aux.write_log(message=f'Fitting background on {os.path.basename(filename)} ({i+1}/{len(data["path"])})', options=options)
+            aux.write_log(message=f'... Fitting pre edge on {os.path.basename(filename)} ({i+1}/{len(data["path"])})', options=options)
 
         #Fitting linear function to the background
         params = np.polyfit(pre_edge_data["ZapEnergy"],pre_edge_data[filename],options['pre_edge_polyorder'])
@@ -122,9 +127,9 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
         data['pre_edge_params'][filename] = params
 
         if options['log']:
-            aux.write_log(message=f'Pre edge fitted between {options["pre_edge_limits"][0]} and {options["pre_edge_limits"][1]} with polynomial of order {options["pre_edge_polyorder"]} with parmameters {params}.', options=options)
+            aux.write_log(message=f'...... Pre edge fitted between {options["pre_edge_limits"][0]} and {options["pre_edge_limits"][1]} with polynomial of order {options["pre_edge_polyorder"]} with parmameters {params}.', options=options)
             if options['pre_edge_masks']:
-                aux.write_log(message=f'Excluded regions: {options["pre_edge_masks"]}', options=options)
+                aux.write_log(message=f'...... Excluded regions: {options["pre_edge_masks"]}', options=options)
         
         #making a list, y_pre,so the background will be applied to all ZapEnergy-values
         background=fit_function(pre_edge_fit_data["ZapEnergy"])
@@ -212,7 +217,7 @@ def pre_edge_subtraction(data: dict, options={}):
 
     for i, filename in enumerate(data['path']):
         if options['log']:
-            aux.write_log(message=f'Subtracting background on {filename} ({i} / {len(data["path"])}', options=options)
+            aux.write_log(message=f'... Subtracting background on {os.path.basename(filename)} ({i}/{len(data["path"])})', options=options)
 
         xanes_data_bkgd_subtracted.insert(1, filename, data['xanes_data_original'][filename] - data['pre_edge_fit_data'][filename])
 
@@ -315,16 +320,16 @@ def post_edge_fit(data: dict, options={}):
             continue
 
         if options['log']:
-            aux.write_log(message=f'Fitting post edge on {os.path.basename(filename)} ({i+1} / {len(data["path"])}) with polynomial order {options["post_edge_polyorder"]}', options=options)
+            aux.write_log(message=f'... Fitting post edge on {os.path.basename(filename)} ({i+1}/{len(data["path"])}) with polynomial order {options["post_edge_polyorder"]}', options=options)
 
         #Fitting linear function to the background
         params = np.polyfit(post_edge_data["ZapEnergy"], post_edge_data[filename], options['post_edge_polyorder'])
         fit_function = np.poly1d(params)
 
         if options['log']:
-            aux.write_log(message=f'Post edge fitted between {options["post_edge_limits"][0]} and {options["post_edge_limits"][1]} with polynomial of order {options["post_edge_polyorder"]} with parmameters {params}.', options=options)
+            aux.write_log(message=f'...... Post edge fitted between {options["post_edge_limits"][0]} and {options["post_edge_limits"][1]} with polynomial of order {options["post_edge_polyorder"]} with parmameters {params}.', options=options)
             if options['post_edge_masks']:
-                aux.write_log(message=f'Excluded regions: {options["post_edge_masks"]}', options=options)
+                aux.write_log(message=f'...... Excluded regions: {options["post_edge_masks"]}', options=options)
 
         data['post_edge_params'][filename] = params
         
@@ -570,6 +575,9 @@ def estimate_edge_position(data: dict, options={}, index=0):
         for mask in options['post_edge_masks']:
             df_diff[data['path'][index]].loc[(df_diff['ZapEnergy'] > mask[0]) & (df_diff['ZapEnergy'] < mask[1])] = 0
 
+    if 'edge_masks' in options.keys():
+        for mask in options['edge_masks']:
+            df_diff[data['path'][index]].loc[(df_diff['ZapEnergy'] > mask[0]) & (df_diff['ZapEnergy'] < mask[1])] = 0
 
     df_diff_max = df_diff[data['path'][index]].dropna().max()
 
@@ -597,6 +605,7 @@ def determine_edge_position(data: dict, options={}):
         'show_plots': False, #  Toggles on/off whether plots should be shown. For sequential data, saving the plots and inspecting them there is probably better.
         'save_plots': False, # Toggles on/off whether plots should be saved. 
         'save_folder': './', # Sets the path to where the plots should be saved. Creates folder if doesn't exist. Ignored if save_plots == False
+        'edge_masks': [],
         'diff': True, # Toggles calculation of the edge position based on differential data
         'diff.polyorder': 2, # Sets the order of the polynomial to fit edge region of the differential to
         'diff.periods': 2, # Sets the number of data points between which the first order difference should be calculated. Needs to be even for subsequent shifting of data to function.
@@ -641,8 +650,13 @@ def determine_edge_position(data: dict, options={}):
         data['e0_double_diff'] = {}
 
 
+    if options['log']:
+        aux.write_log(message='Starting edge position determination', options=options)
+
+
     # Get rough estimate of edge position
     for i, filename in enumerate(data['path']):
+
         estimated_edge_pos = estimate_edge_position(data, options=options, index=i)
 
         
@@ -677,7 +691,7 @@ def determine_edge_position(data: dict, options={}):
             edge_pos_diff=x_diff[np.where(y_diff == np.amax(y_diff))][0]
             
             if options['log']:
-                aux.write_log(message=f"Edge position estimated by the differential maximum is: {str(round(edge_pos_diff,5))} keV", options=options)
+                aux.write_log(message=f"... Edge position of {os.path.basename(filename)} determined by the differential maximum is: {str(round(edge_pos_diff,5))} keV", options=options)
             
             if options['save_values']:
                 data['e0_diff'][filename] = edge_pos_diff
@@ -706,10 +720,10 @@ def determine_edge_position(data: dict, options={}):
             edge_pos_double_diff=x_double_diff[np.where(y_double_diff == find_nearest(y_double_diff,0))][0]
         
             if options['log']:
-                aux.write_log(message=f"Edge position estimated by the double differential zero-point is {str(round(edge_pos_double_diff,5))} keV", options=options)
+                aux.write_log(message=f"... Edge position of {os.path.basename(filename)} determined by the double differential zero-point is {str(round(edge_pos_double_diff,5))} keV", options=options)
 
                 if options['diff']:
-                    aux.write_log(message=f"Difference between edge position estimated from differential maximum and double differential zero-point is {(edge_pos_diff-edge_pos_double_diff)*1000} eV.", options=options)
+                    aux.write_log(message=f"... Difference between edge position estimated from differential maximum and double differential zero-point is {(edge_pos_diff-edge_pos_double_diff)*1000} eV.", options=options)
 
             if options['save_values']:
                 data['e0_double_diff'][filename] = edge_pos_double_diff
@@ -862,6 +876,9 @@ def normalise(data: dict, options={}):
     default_options = {
         'log': False, # Toggles logging on/off
         'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_normalisation.log', # Sets path to log-file
+        'show_plots': False, #  Toggles on/off whether plots should be shown. For sequential data, saving the plots and inspecting them there is probably better.
+        'save_plots': False, # Toggles on/off whether plots should be saved. 
+        'save_folder': './', # Sets the path to where the plots should be saved. Creates folder if doesn't exist. Ignored if save_plots == False
         'normalisation_store_data': False, # Toggles storing of the flattened data in data['xanes_data'] on/off
     }
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -877,12 +894,41 @@ def normalise(data: dict, options={}):
     for filename in data['path']:
         e0_ind = data['post_edge_fit_data'].loc[data['post_edge_fit_data']['ZapEnergy'] == find_nearest(data['post_edge_fit_data']['ZapEnergy'], data['e0_diff'][filename])].index.values[0]
         #norm = data['post_edge_fit_data'][filename].iloc[find_nearest(data['post_edge_fit_data'][filename], data['e0'][filename])]
-        normalisation_constant = data['post_edge_fit_data'][filename].iloc[e0_ind] - data['pre_edge_fit_data'][filename].iloc[e0_ind]
+        normalisation_constant = data['post_edge_fit_data'][filename].iloc[e0_ind] #- data['pre_edge_fit_data'][filename].iloc[e0_ind]
         normalised_df.insert(1, filename, data['xanes_data'][filename] / normalisation_constant)
+
+    
+        if options['show_plots'] or options['save_plots']:
+
+            fig, ax = plt.subplots(figsize=(10,5))
+
+            normalised_df.plot(x='ZapEnergy', y=filename, ax=ax, color='red', label='Normalised data')
+            ax.set_title(f'{os.path.basename(filename)} - After normalisation', size=20)
+            ax.set_ylabel('Normalised x$\mu$(E)', size=20)
+            ax.set_xlabel('Energy (keV)', size=20)
+            ax.axhline(y=1, ls='--', c='black')
+
+
+            # Save plots if toggled
+            if options['save_plots']:
+                if not os.path.isdir(options['save_folder']):
+                    os.makedirs(options['save_folder'])
+
+                dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_normalisation.png'
+
+                plt.savefig(dst, transparent=False)
+
+
+            # Close plots if show_plots not toggled
+            if not options['show_plots']:
+                plt.close()
+
 
         if options['normalisation_store_data']:
             pre_edge_fit_data_norm.insert(1, filename, data['pre_edge_fit_data'][filename] / normalisation_constant)
             post_edge_fit_data_norm.insert(1, filename, data['post_edge_fit_data'][filename] / normalisation_constant)
+
+
 
 
 
@@ -928,6 +974,32 @@ def flatten(data:dict, options={}):
 
         # Subtract the difference between 1 and the post edge fit function from the normalised data.
         flattened_df[filename] = data['xanes_data'][filename] - fit_function_diff
+
+
+        if options['show_plots'] or options['save_plots']:
+
+            fig, ax = plt.subplots(figsize=(10,5))
+
+            flattened_df.plot(x='ZapEnergy', y=filename, ax=ax, color='red', label='Flattened data')
+            ax.set_title(f'{os.path.basename(filename)} - After flattening', size=20)
+            ax.set_ylabel('Normalised x$\mu$(E)', size=20)
+            ax.set_xlabel('Energy (keV)', size=20)
+            ax.axhline(y=1, ls='--', c='black')
+
+
+            # Save plots if toggled
+            if options['save_plots']:
+                if not os.path.isdir(options['save_folder']):
+                    os.makedirs(options['save_folder'])
+
+                dst = os.path.join(options['save_folder'], os.path.basename(filename)) + '_flattened.png'
+
+                plt.savefig(dst, transparent=False)
+
+
+            # Close plots if show_plots not toggled
+            if not options['show_plots']:
+                plt.close()
 
 
     # Saves the flattened DataFrame
