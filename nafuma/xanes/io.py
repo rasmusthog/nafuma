@@ -12,7 +12,7 @@ def split_scan_data(data: dict, options={}) -> list:
     As of now only picks out xmap_rois (fluoresence mode) and for Mn, Fe, Co and Ni K-edges.'''
     
 
-    required_options = ['log', 'logfile', 'save', 'save_folder', 'replace', 'add_rois', 'return']
+    required_options = ['log', 'logfile', 'save', 'save_folder', 'replace', 'active_roi', 'add_rois', 'return']
 
     default_options = {
         'log': False,
@@ -20,6 +20,7 @@ def split_scan_data(data: dict, options={}) -> list:
         'save': False, # whether to save the files or not
         'save_folder': '.', # root folder of where to save the files
         'replace': False, # whether to replace the files if they already exist
+        'active_roi': None,
         'add_rois': False, # Whether to add the rois of individual scans of the same edge together
         'return': True
     }
@@ -200,7 +201,11 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
 
         scan_data = pd.read_csv(filename)
 
-        scan_data = scan_data[[determine_active_roi(scan_data)]]
+        if not options['active_roi']:
+            scan_data = scan_data[[determine_active_roi(scan_data)]]
+        else:
+            scan_data = scan_data[options['active_roi']]
+            
         xanes_data = pd.concat([xanes_data, scan_data], axis=1)
 
 
