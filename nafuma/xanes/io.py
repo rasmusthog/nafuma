@@ -57,7 +57,7 @@ def split_scan_data(data: dict, options={}) -> list:
                 continue
 
             # First line after data started with #C - stops data read-in
-            elif line[0:2] == "#C":
+            elif line[0:2] == "#C" or line[0:2] == '#S':
                 read_data = False
                 
                 if scan_data:

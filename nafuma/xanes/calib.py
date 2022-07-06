@@ -206,7 +206,7 @@ def pre_edge_subtraction(data: dict, options={}):
         'show_plots': False,
         'save_plots': False,
         'save_folder': './',
-        'pre_edge_subtraction_store_data': False
+        'pre_edge_subtraction_store_data': True
     }
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -893,8 +893,10 @@ def normalise(data: dict, options={}):
     #Finding the normalisation constant µ_0(E_0), by subtracting the value of the pre-edge-line from the value of the post-edge line at e0
     for filename in data['path']:
         e0_ind = data['post_edge_fit_data'].loc[data['post_edge_fit_data']['ZapEnergy'] == find_nearest(data['post_edge_fit_data']['ZapEnergy'], data['e0_diff'][filename])].index.values[0]
+       
         #norm = data['post_edge_fit_data'][filename].iloc[find_nearest(data['post_edge_fit_data'][filename], data['e0'][filename])]
-        normalisation_constant = data['post_edge_fit_data'][filename].iloc[e0_ind] #- data['pre_edge_fit_data'][filename].iloc[e0_ind]
+        normalisation_constant = data['post_edge_fit_data'][filename].iloc[e0_ind] - data['pre_edge_fit_data'][filename].iloc[e0_ind]
+        print(normalisation_constant)
         normalised_df.insert(1, filename, data['xanes_data'][filename] / normalisation_constant)
 
     
@@ -967,7 +969,7 @@ def flatten(data:dict, options={}):
     for filename in data['path']:
 
         # Subtract 1 from the _normalised_ post edge fit function
-        fit_function_diff = data['post_edge_fit_data_norm'][filename] - 1
+        fit_function_diff = data['post_edge_fit_data_norm'][filename] - 1 - data['pre_edge_fit_data_norm'][filename]
         
         # Set all values from edge position and downwards to 0 so that only data above the edge position will be adjusted
         fit_function_diff.loc[flattened_df['ZapEnergy'] <= data['e0_diff'][filename]] = 0
