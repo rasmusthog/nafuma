@@ -26,11 +26,12 @@ def save_options(options, path, ignore=None):
 
 
     if not os.path.isdir(os.path.dirname(path)):
-        os.makedirs(os.path.dirname(path))
+        if os.path.dirname(path):
+            os.makedirs(os.path.dirname(path))
 
 
     with open(path, 'w') as f:
-        json.dump(options_copy,f, skipkeys=True, indent=4)
+        json.dump(options_copy, f, skipkeys=True, indent=4)
 
 
 def load_options(path):
