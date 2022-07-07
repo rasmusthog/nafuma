@@ -253,3 +253,4 @@ def determine_active_roi(scan_data):
         active_roi = None
 
     return active_roi
+    
