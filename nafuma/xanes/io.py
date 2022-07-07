@@ -4,7 +4,7 @@ import os
 import numpy as np
 import nafuma.auxillary as aux
 from nafuma.xanes.calib import find_element
-from datetime import datetime
+import datetime
 
 
 def split_scan_data(data: dict, options={}) -> list:
@@ -16,7 +16,7 @@ def split_scan_data(data: dict, options={}) -> list:
 
     default_options = {
         'log': False,
-        'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_split_edges.log',
+        'logfile': f'{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_split_edges.log',
         'save': False, # whether to save the files or not
         'save_folder': '.', # root folder of where to save the files
         'replace': False, # whether to replace the files if they already exist
@@ -43,13 +43,17 @@ def split_scan_data(data: dict, options={}) -> list:
         with open(filename, 'r') as f:
             lines = f.readlines()
             
+        timestamps = []
         scan_datas, scan_data = [], []
         headers, header = [], ''
         read_data = False
         
-        for line in lines:
+        for i, line in enumerate(lines):
             # Header line starts with #L - reads headers, and toggles data read-in on
-            if line[0:2] == "#L":
+            if 'zapline mono' in line:
+                timestamps.append(lines[i+1].strip('#D'))
+            
+            elif line[0:2] == "#L":
                 header, read_data = line[2:].split(), True
 
                 if options['log']:
@@ -148,12 +152,19 @@ def split_scan_data(data: dict, options={}) -> list:
                     path = os.path.join(options['save_folder'], f'{filename}_{edge}{count}.dat')
                     
                     if not os.path.isfile(path):
-                        scan.to_csv(path)
+                        
+                        with open(path, 'w', newline = '\n') as f:
+
+                            f.write(f'# Time: {timestamps[i]}')
+                            scan.to_csv(f)
+
                         if options['log']:
                             aux.write_log(message=f'... ... Scan saved to {path}', options=options)
                     
                     elif options['replace'] and os.path.isfile(path):
-                        scan.to_csv(path)
+                        with open(path, 'w', newline = '\n') as f:
+                            scan.to_csv(f)
+                        
                         if options['log']:
                             aux.write_log(message=f'... ... File already exists. Overwriting to {path}', options=options)
 
@@ -193,14 +204,14 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
         data['path'] = [data['path']]
         
     # Initialise DataFrame with only ZapEnergy-column
-    xanes_data = pd.read_csv(data['path'][0])[['ZapEnergy']]
+    xanes_data = pd.read_csv(data['path'][0], skiprows=1)[['ZapEnergy']]
     xanes_data['ZapEnergy'] += options['adjust']
 
 
     for filename in data['path']:
         columns.append(filename)
 
-        scan_data = pd.read_csv(filename)
+        scan_data = pd.read_csv(filename, skiprows=1)
 
         if not options['active_roi']:
             scan_data = scan_data[[determine_active_roi(scan_data)]]
@@ -214,6 +225,49 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
 
 
     return xanes_data
+
+
+def read_metadata(data: dict, options={}) -> dict:
+
+    required_options = ['get_temperature', 'get_timestamp', 'adjust_time']
+
+    default_options = {
+        'get_temperature': True,
+        'get_timestamp': True,
+        'adjust_time': False
+    }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+
+    temperatures = []
+    timestamps = []
+
+    for filename in data['path']:
+        scan_data = pd.read_csv(filename, skiprows=1)
+
+        if options['get_temperature']:
+            temperatures.append(scan_data['ZBlower2'].mean())
+
+        if options['get_timestamp']:
+
+            with open(filename, 'r') as f:
+                time = f.readline().strip('# Time: ')
+                time = datetime.datetime.strptime(time, "%a %b %d %H:%M:%S %Y ")
+
+            if options['adjust_time']:
+                time_elapsed = scan_data['Htime'].iloc[-1] - scan_data['Htime'].iloc[0]
+
+                time += datetime.timedelta(microseconds=time_elapsed)/2
+
+
+            timestamps.append(time)
+
+
+    metadata = {'time': timestamps, 'temperature': temperatures}
+
+    return metadata
+
 
 
 
