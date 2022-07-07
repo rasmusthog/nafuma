@@ -896,7 +896,6 @@ def normalise(data: dict, options={}):
        
         #norm = data['post_edge_fit_data'][filename].iloc[find_nearest(data['post_edge_fit_data'][filename], data['e0'][filename])]
         normalisation_constant = data['post_edge_fit_data'][filename].iloc[e0_ind] - data['pre_edge_fit_data'][filename].iloc[e0_ind]
-        print(normalisation_constant)
         normalised_df.insert(1, filename, data['xanes_data'][filename] / normalisation_constant)
 
     
