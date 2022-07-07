@@ -104,3 +104,10 @@ def get_filenames(path, ext, filter=''):
     filenames = [os.path.join(path, filename) for filename in os.listdir(path) if os.path.isfile(os.path.join(path, filename)) and filename.endswith(ext) and filter in filename] 
         
     return filenames
+
+def move_list_element_last(filenames,string):
+    for i,file in enumerate(filenames):
+        if string in file:
+            del filenames[i]
+            filenames.append(file)
+    return filenames
