@@ -2,147 +2,307 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import os
 import numpy as np
+import nafuma.auxillary as aux
+from nafuma.xanes.calib import find_element
+import datetime
 
-def split_xanes_scan(filename, destination=None, replace=False):
-    #root is the path to the beamtime-folder
-    #destination should be the path to the processed data
+def split_scan_data(data: dict, options={}) -> list:
+    ''' Splits a XANES-file from BM31 into different files depending on the edge. Has the option to add intensities of all scans of same edge into the same file. 
+    As of now only picks out xmap_rois (fluoresence mode) and for Mn, Fe, Co and Ni K-edges.'''
+
+    required_options = ['log', 'logfile', 'save', 'save_folder', 'replace', 'active_roi', 'add_rois', 'return']
+
+    default_options = {
+        'log': False,
+        'logfile': f'{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_split_edges.log',
+        'save': False, # whether to save the files or not
+        'save_folder': '.', # root folder of where to save the files
+        'replace': False, # whether to replace the files if they already exist
+        'active_roi': None,
+        'add_rois': False, # Whether to add the rois of individual scans of the same edge together
+        'return': True
+    }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+    if not isinstance(data['path'], list):
+        data['path'] = [data['path']]
+
+    all_scans = []
+
+    if options['log']:
+        aux.write_log(message='Starting file splitting...', options=options)
     
-    #insert a for-loop to go through all the folders.dat-files in the folder root\xanes\raw
-    
-    with open(filename, 'r') as f:
-        lines = f.readlines()
+    for filename in data['path']:
+
+        if options['log']:
+            aux.write_log(message=f'Reading {filename}...', options=options)
+
+        with open(filename, 'r') as f:
+            lines = f.readlines()
+            
+        timestamps = []
+        scan_datas, scan_data = [], []
+        headers, header = [], ''
+        read_data = False
         
-    datas = []
-    data = []
-    headers = []
-    header = ''
-    start = False
-    
-    for line in lines:
-        if line[0:2] == "#L":
-            start = True
-            header = line[2:].split()
-            continue
+        for i, line in enumerate(lines):
+            # Header line starts with #L - reads headers, and toggles data read-in on
+            if 'zapline mono' in line:
+                timestamps.append(lines[i+1].strip('#D'))
             
-        elif line[0:2] == "#C":
-            start = False
-            
-            if data:
-                datas.append(data)
-                data = []
-                
-            if header:
-                headers.append(header)
-                header = ''
-                
-                
+            elif line[0:2] == "#L":
+                header, read_data = line[2:].split(), True
 
-        if start == False:
-            continue
+                if options['log']:
+                    aux.write_log(message='... Found scan data. Starting read-in...', options=options)
+                continue
+
+            # First line after data started with #C - stops data read-in
+            elif line[0:2] == "#C" or line[0:2] == '#S':
+                read_data = False
+                
+                if scan_data:
+                    scan_datas.append(scan_data); scan_data = []
+                    
+                if header:
+                    headers.append(header); header = ''
+                    
+            # Ignore line if read-in not toggled       
+            if read_data == False:
+                continue
             
+            # Read in data if it is
+            else:
+                scan_data.append(line.split())
+                
+                
+        edges = {'Mn': [], 'Fe': [], 'Co': [], 'Ni': []}
+        
+
+        for i, scan_data in enumerate(scan_datas):
+            
+            xanes_df = pd.DataFrame(scan_data).apply(pd.to_numeric)
+            xanes_df.columns = headers[i]
+            edge = find_element({'xanes_data_original': xanes_df})
+
+            if options['log']:
+                aux.write_log(message=f'... Starting data clean-up ({edge}-edge)... ({i+1}/{len(scan_datas)})', options=options)
+
+
+            if not ('xmap_roi00' in headers[i]) and (not 'xmap_roi01' in headers[i]):
+                if options['log']:
+                    aux.write_log(message='... ... Did not find fluoresence data. Skipping...', options=options)
+
+                continue 
+
+            
+            
+            edges[edge].append(xanes_df)
+            
+        
+        if options['add_rois']:
+
+            if options['log']:
+                aux.write_log(message=f'... Addition of rois enabled. Starting addition...', options=options)
+   
+            added_edges = {'Mn': [], 'Fe': [], 'Co': [], 'Ni': []}
+            for edge, scans in edges.items():
+
+                if options['log']:
+                    aux.write_log(message=f'... ... Adding rois of the {edge}-edge...', options=options)
+                
+                if scans:
+                    xanes_df = scans[0]
+
+                    for i, scan in enumerate(scans):
+                        if i > 0:
+
+                            if options['log']:
+                                aux.write_log(message=f'... ... ... Adding {i+1}/{len(scans)}', options=options)
+
+                            if 'xmap_roi00' in xanes_df.columns:
+                                xanes_df['xmap_roi00'] += scan['xmap_roi00']
+                            if 'xmap_roi01' in xanes_df.columns:
+                                xanes_df['xmap_roi01'] += scan['xmap_roi01']
+
+                    added_edges[edge].append(xanes_df)
+
+            edges = added_edges
+            
+        if options['save']:
+            #FIXME If there is something wrong with the input file, the file will not be saved but log-file still sais it is saved. Goes from "Saving data to ..." to "All done!" no matter if it fals or not.
+            if options['log']:
+                aux.write_log(message=f'... Saving data to {options["save_folder"]}', options=options)
+
+            if not os.path.isdir(options['save_folder']):
+                if options['log']:
+                    aux.write_log(message=f'... ... {options["save_folder"]} does not exist. Creating folder.', options=options)
+
+                os.makedirs(options['save_folder'])
+
+
+            filename = os.path.basename(filename).split('.')[0]
+
+            for edge, scans in edges.items():
+                for i, scan in enumerate(scans):
+                    count = '' if options['add_rois'] else '_'+str(i).zfill(4)
+                    path = os.path.join(options['save_folder'], f'{filename}_{edge}{count}.dat')
+                    
+                    if not os.path.isfile(path):
+                        
+                        with open(path, 'w', newline = '\n') as f:
+
+                            f.write(f'# Time: {timestamps[i]}')
+                            scan.to_csv(f)
+
+                        if options['log']:
+                            aux.write_log(message=f'... ... Scan saved to {path}', options=options)
+                    
+                    elif options['replace'] and os.path.isfile(path):
+                        with open(path, 'w', newline = '\n') as f:
+                            scan.to_csv(f)
+                        
+                        if options['log']:
+                            aux.write_log(message=f'... ... File already exists. Overwriting to {path}', options=options)
+
+                    elif not options['replace'] and os.path.isfile(path):
+                        if options['log']:
+                            aux.write_log(message=f'... ... File already exists. Skipping...', options=options)
+
+        all_scans.append(edges)
+
+    if options['log']:
+        aux.write_log(message=f'All done!', options=options)
+
+
+    if options['return']:
+        return all_scans
+    else:
+        return
+
+
+
+def read_data(data: dict, options={}) -> pd.DataFrame:
+
+
+    # FIXME Handle the case when dataseries are not the same size
+    # FIXME Add possibility to extract TIME (for operando runs) and Blower Temp (for variable temperature runs)
+    # FIXME Add possibility to iport transmission data
+    required_options = ['adjust']
+    default_options = {
+        'adjust': 0
+    }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+    columns = ['ZapEnergy']
+
+    if not isinstance(data['path'], list):
+        data['path'] = [data['path']]
+        
+    # Initialise DataFrame with only ZapEnergy-column
+    xanes_data = pd.read_csv(data['path'][0], skiprows=1)[['ZapEnergy']]
+    xanes_data['ZapEnergy'] += options['adjust']
+
+
+    for filename in data['path']:
+        columns.append(filename)
+
+        scan_data = pd.read_csv(filename, skiprows=1)
+
+        if not options['active_roi']:
+            scan_data = scan_data[[determine_active_roi(scan_data)]]
         else:
-            data.append(line.split())
+            scan_data = scan_data[options['active_roi']]
             
-            
-            
-            
-    edges = {'Mn': [6.0, 6.1, 6.2, 6.3, 6.4, 6.5], 'Fe': [6.8, 6.9, 7.0, 7.1, 7.2], 'Co': [7.6, 7.7, 7.8, 7.9], 'Ni': [8.1, 8.2, 8.3, 8.4, 8.5]}
-    edge_count = {'Mn': 0, 'Fe': 0, 'Co': 0, 'Ni': 0}
+        xanes_data = pd.concat([xanes_data, scan_data], axis=1)
+
+
+    xanes_data.columns = columns
+
+
+    return xanes_data
+
+
+def read_metadata(data: dict, options={}) -> dict:
+
+    required_options = ['get_temperature', 'get_timestamp', 'adjust_time']
+
+    default_options = {
+        'get_temperature': True,
+        'get_timestamp': True,
+        'adjust_time': False
+    }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+
+    temperatures = []
+    timestamps = []
+
+    for filename in data['path']:
+        scan_data = pd.read_csv(filename, skiprows=1)
+
+        if options['get_temperature']:
+            temperatures.append(scan_data['ZBlower2'].mean())
+
+        if options['get_timestamp']:
+
+            with open(filename, 'r') as f:
+                time = f.readline().strip('# Time: ')
+                time = datetime.datetime.strptime(time, "%a %b %d %H:%M:%S %Y ")
+
+            if options['adjust_time']:
+                time_elapsed = scan_data['Htime'].iloc[-1] - scan_data['Htime'].iloc[0]
+
+                time += datetime.timedelta(microseconds=time_elapsed)/2
+
+
+            timestamps.append(time)
+
+
+    metadata = {'time': timestamps, 'temperature': temperatures}
+
+    return metadata
+
+
+
+
+
+
+
+def determine_active_roi(scan_data):
+
+    # FIXME For Co-edge, this gave a wrong scan
     
+    #Trying to pick the roi with the highest difference between maximum and minimum intensity --> biggest edge shift
+    # if max(scan_data["xmap_roi00"])-min(scan_data["xmap_roi00"])>max(scan_data["xmap_roi01"])-min(scan_data["xmap_roi01"]):
+    #     active_roi = 'xmap_roi00'
+    # else: 
+    #     active_roi = 'xmap_roi01'
 
-    for ind, data in enumerate(datas):
-        df = pd.DataFrame(data)
-        df.columns = headers[ind]
 
-        edge_start = np.round((float(df["ZapEnergy"].min())), 1)
-
-        for edge, energies in edges.items():
-            if edge_start in energies:
-                edge_actual = edge
-                edge_count[edge] += 1
-
-        
-        
-        filename = filename.split('/')[-1]
-        count = str(edge_count[edge_actual]).zfill(4)
-
-        
-        # Save 
-        if destination:
-            cwd = os.getcwd()
-
-            if not os.path.isdir(destination):
-                os.mkdir(destination)
-                
-            os.chdir(destination)
-
-            df.to_csv('{}_{}_{}.dat'.format(filename.split('.')[0], edge_actual, count))
-
-            os.chdir(cwd)
-
+    if not ('xmap_roi00' in scan_data.columns) or not ('xmap_roi01' in scan_data.columns):
+        if 'xmap_roi00' in scan_data.columns:
+            active_roi = 'xmap_roi00'
+        elif 'xmap_roi01' in scan_data.columns:
+            active_roi = 'xmap_roi01'
+    
+    elif (scan_data['xmap_roi00'].iloc[0:100].mean() < scan_data['xmap_roi00'].iloc[-100:].mean()) and (scan_data['xmap_roi01'].iloc[0:100].mean() < scan_data['xmap_roi01'].iloc[-100:].mean()):
+        if (scan_data['xmap_roi00'].iloc[:int(scan_data.shape[0]/2)].max() - scan_data['xmap_roi00'].iloc[0])/scan_data['xmap_roi00'].max() > (scan_data['xmap_roi01'].iloc[:int(scan_data.shape[0]/2)].max() - scan_data['xmap_roi01'].iloc[0])/scan_data['xmap_roi01'].max():
+            active_roi = 'xmap_roi00'
         else:
-            df.to_csv('{}_{}_{}.dat'.format(filename.split('.')[0], edge_actual, count))
+            active_roi = 'xmap_roi01'
 
-
-#Function that "collects" all the files in a folder, only accepting .dat-files from xanes-measurements
-def get_filenames(path):
+    elif scan_data['xmap_roi00'].iloc[0:100].mean() < scan_data['xmap_roi00'].iloc[-100:].mean():
+        active_roi = 'xmap_roi00'
     
+    elif scan_data['xmap_roi01'].iloc[0:100].mean() < scan_data['xmap_roi01'].iloc[-100:].mean(): 
+        active_roi = 'xmap_roi01'
+
+    else:
+        active_roi = None
+
+    return active_roi
     
-    cwd = os.getcwd()
-    
-    # Change into path provided
-    os.chdir(path)
-    
-    filenames = [os.path.join(path, filename) for filename in os.listdir() if os.path.isfile(filename) and filename[-4:] == '.dat'] #changed
-    
-    
-    
-    # Change directory back to where you ran the script from
-    os.chdir(cwd)
-    
-    return filenames
-
-def put_in_dataframe(path):
-    filenames = get_filenames(path) 
-
-    #making the column names to be used in the dataframe, making sure the first column is the ZapEnergy
-    column_names = ["ZapEnergy"]
-
-    for i in range(len(filenames)):
-        column_names.append(filenames[i])
-
-    #Taking the first file in the folder and extracting ZapEnergies and intensity from that (only need the intensity from the rest)
-    first = pd.read_csv(filenames[0], skiprows=0)
-
-    #Making a data frame with the correct columns, and will fill inn data afterwards
-    df = pd.DataFrame(columns = column_names)
-    #First putting in the 2theta-values
-    df["ZapEnergy"]=first["ZapEnergy"]
-
-    #filling in the intensities from all files into the corresponding column in the dataframe
-    for i in range(len(filenames)):
-        df2 = pd.read_csv(filenames[i])
-        df2 = df2.drop(['Mon','Det1','Det2','Det3','Det4','Det5', 'Det6','Ion1'], axis=1) #, axis=1)
-        df2 = df2.drop(['MonEx','Ion2','Htime','MusstEnc1','MusstEnc3','MusstEnc4', 'TwoTheta', 'ZCryo'], axis=1)
-        df2 = df2.drop(['ZBlower1', 'ZBlower2', 'ZSrcur'], axis=1)#, axis=19) #removing the sigma at this point
-        
-    ##############     THIS PART PICKS OUT WHICH ROI IS OF INTEREST, BUT MUST BE FIXED IF LOOKING AT THREE EDGES (roi00,roi01,roi02)    #####################
-        if 'xmap_roi01' in df2.columns: 
-            #Trying to pick the roi with the highest difference between maximum and minimum intensity --> biggest edge shift
-            if max(df2["xmap_roi00"])-min(df2["xmap_roi00"])>max(df2["xmap_roi01"])-min(df2["xmap_roi01"]):
-                df[filenames[i]]=df2["xmap_roi00"] #forMn
-            else: 
-                df[filenames[i]]=df2["xmap_roi01"] #forNi
-        else:
-            df[filenames[i]]=df2["xmap_roi00"]
-    ###############################################################################################
-
-        i=i+1
-
-
-    #print(df)
-    #If I want to make a csv-file of the raw data. Decided that was not necessary:
-    #df.to_csv('static-Mn-edge.csv') #writing it to a csv, first row is datapoint (index), second column is 2theta, and from there the scans starts
-
-
-    return df
