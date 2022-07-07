@@ -4,6 +4,8 @@ import pandas as pd
 import numpy as np
 import os
 import shutil
+import sys
+import datetime
 
 import zipfile
 import xml.etree.ElementTree as ET
@@ -316,6 +318,142 @@ def read_brml(data, options={}, index=0):
 
     return diffractogram, wavelength
     
+
+def read_htxrd(data, options={}, index=0):
+
+    required_options = ['extract_folder', 'save_folder', 'save_filename', 'adjust_time']
+    default_options = {
+        'extract_folder': 'tmp',
+        'save_folder': None,
+        'save_filename': None,
+        'adjust_time': True
+    }
+
+    if not isinstance(data['path'], list):
+        data['path'] = [data['path']]
+
+    if 'wavelength' not in data.keys():
+        data['wavelength'] = [None for i in range(len(data['path']))]
+
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+    
+    # Extract the RawData0.xml file from the brml-file
+    with zipfile.ZipFile(data['path'][index], 'r') as brml:
+        for info in brml.infolist():
+            if "RawData" in info.filename:
+                brml.extract(info.filename, options['extract_folder'])
+
+
+    # Get all filenames
+    files = os.listdir(os.path.join(options['extract_folder'], 'Experiment0'))
+
+    # initalise empty list to store all DataFrames
+    diffractograms = []
+    wavelengths = []
+    
+    active_scan = False
+    timestamps = []
+
+    # Loop through all RawData-files and extract all data and temperatures
+    for i, file in enumerate(files):
+
+        # Create all filenames as strings
+        filename = os.path.join('tmp/Experiment0/', f'RawData{i}.xml')
+
+        # Parse the .xml-files
+        tree = ET.parse(filename)
+        root = tree.getroot()
+
+        # initalise empty list to store data from this particular scan
+        diffractogram = []
+
+        for chain in root.findall('./DataRoutes/DataRoute'):
+            
+            scantypes = chain.findall('ScanInformation')
+
+            for scantype in scantypes:
+                if scantype.get('VisibleName') == 'Still (TCU1000N)':
+                    continue
+
+                else:
+                    active_scan = True
+                    if chain.get('RouteFlag') == 'Final':
+                        for scandata in chain.findall('Datum'):
+                            scandata = scandata.text.split(',')
+                            twotheta, intensity, temperature = float(scandata[2]), float(scandata[3]), float(scandata[5])
+
+                            diffractogram.append({'2th': twotheta, 'I': intensity, 'T': temperature})
+
+                        diffractogram = pd.DataFrame(diffractogram)
+                        diffractograms.append(diffractogram)
+
+
+                        if not data['wavelength'][index]:
+                            for chain in root.findall('./FixedInformation/Instrument/PrimaryTracks/TrackInfoData/MountedOptics/InfoData/Tube/WaveLengthAlpha1'):
+                                wavelength = float(chain.attrib['Value'])
+                        else:
+                            wavelength = data['wavelength'][index]
+
+                        wavelengths.append(wavelength)
+
+
+        if active_scan:
+            for chain in root.findall('./TimeStampStarted'):
+                time_start = datetime.datetime.strptime(chain.text[:-7], "%Y-%m-%dT%H:%M:%S.%f")
+            for chain in root.findall('./TimeStampFinished'):
+                time_end = datetime.datetime.strptime(chain.text[:-7], "%Y-%m-%dT%H:%M:%S.%f")
+
+
+            time_diff = time_end - time_start
+
+            if options['adjust_time']:
+                timestamps.append(time_start + time_diff/2)
+
+
+    if options['save_folder']:
+        print(options['save_folder'])
+        for i, (diffractogram, wavelength, timestamp) in enumerate(zip(diffractograms, wavelengths, timestamps)):
+            if not options['save_filename']:
+                filename = os.path.basename(data['path'][index]).split('.')[0] + '_' + str(i).zfill(4) +'.xy'
+            else:
+                filename = options['save_filename'] + '_' + str(i).zfill(4) +'.xy'
+
+
+            if not os.path.isdir(options['save_folder']):
+                os.makedirs(options['save_folder'])
+
+            save_htxrd_as_xy(diffractogram, wavelength, timestamp, filename, options['save_folder'])
+
+
+
+
+
+    shutil.rmtree(options['extract_folder'])
+
+    return diffractograms, wavelengths
+
+def save_htxrd_as_xy(diffractogram, wavelength, timestamp, filename, save_path):
+
+    headers = '\n'.join(
+        [line for line in 
+            [f'# Temperature {np.round(diffractogram["T"].mean())}',
+            f'# Wavelength {wavelength}',
+            f'# Time {timestamp}'
+            ]
+        ]
+    )
+
+    diffractogram = diffractogram.drop('T', axis=1)
+
+    with open(os.path.join(save_path, filename), 'w', newline='\n') as f:
+        for line in headers:
+            f.write(line)
+
+        f.write('\n')
+
+        diffractogram.to_csv(f, index=False, sep='\t')
+            
 
 def read_xy(data, options={}, index=0):
     
