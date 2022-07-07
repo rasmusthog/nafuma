@@ -178,7 +178,8 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
 
 
     # FIXME Handle the case when dataseries are not the same size
-
+    # FIXME Add possibility to extract TIME (for operando runs) and Blower Temp (for variable temperature runs)
+    # FIXME Add possibility to iport transmission data
     required_options = ['adjust']
     default_options = {
         'adjust': 0
