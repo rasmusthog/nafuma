@@ -5,6 +5,7 @@ import numpy as np
 import os
 import matplotlib.pyplot as plt
 import nafuma.auxillary as aux
+
 import nafuma.plotting as btp
 import nafuma.xanes as xas
 import nafuma.xanes.io as io
@@ -12,6 +13,7 @@ from scipy.signal import savgol_filter
 from datetime import datetime
 import ipywidgets as widgets
 from IPython.display import display
+
 
 
 ##Better to make a new function that loops through the files, and performing the split_xanes_scan on
@@ -249,7 +251,6 @@ def pre_edge_subtraction(data: dict, options={}):
 
 
 
-
 def post_edge_fit(data: dict, options={}):
     ''' Fit the post edge within the post_edge.limits to a polynomial of post_edge.polyorder order. Allows interactive plotting, as well as showing static plots and saving plots to drive.
     
@@ -258,6 +259,7 @@ def post_edge_fit(data: dict, options={}):
     
     
     required_options = ['log', 'logfile', 'post_edge_masks', 'post_edge_limits', 'post_edge_polyorder', 'post_edge_store_data', 'interactive', 'interactive_session_active', 'show_plots', 'save_plots', 'save_folder']
+
     default_options = {
         'log': False, 
         'logfile': f'{datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_post_edge_fit.log',
@@ -338,6 +340,7 @@ def post_edge_fit(data: dict, options={}):
             
         #adding a new column in df_background with the y-values of the background
         post_edge_fit_data.insert(1,filename,background) 
+
         
         if options['save_plots'] or options['show_plots']:
 

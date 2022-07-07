@@ -6,11 +6,9 @@ import nafuma.auxillary as aux
 from nafuma.xanes.calib import find_element
 import datetime
 
-
 def split_scan_data(data: dict, options={}) -> list:
     ''' Splits a XANES-file from BM31 into different files depending on the edge. Has the option to add intensities of all scans of same edge into the same file. 
     As of now only picks out xmap_rois (fluoresence mode) and for Mn, Fe, Co and Ni K-edges.'''
-    
 
     required_options = ['log', 'logfile', 'save', 'save_folder', 'replace', 'active_roi', 'add_rois', 'return']
 

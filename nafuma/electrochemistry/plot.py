@@ -5,59 +5,120 @@ import pandas as pd
 import numpy as np
 import math
 
+import ipywidgets as widgets
+from IPython.display import display
+
 import nafuma.electrochemistry as ec
+import nafuma.plotting as btp
+import nafuma.auxillary	as aux
 
 
-def plot_gc(path, kind, options=None):
 
-	# Prepare plot, and read and process data
-	fig, ax = prepare_gc_plot(options=options)
-	cycles = ec.io.read_data(path=path, kind=kind, options=options)
+
+def plot_gc(data, options=None):
 
 
 	# Update options
-	required_options = ['x_vals', 'y_vals', 'which_cycles', 'chg', 'dchg', 'colours', 'differentiate_charge_discharge', 'gradient']
-	default_options = {'x_vals': 'capacity', 'y_vals': 'voltage', 'which_cycles': 'all', 'chg': True, 'dchg': True, 'colours': None, 'differentiate_charge_discharge': True, 'gradient': False}
+	required_options = ['x_vals', 'y_vals', 'which_cycles', 'charge', 'discharge', 'colours', 'differentiate_charge_discharge', 'gradient', 'interactive', 'interactive_session_active', 'rc_params', 'format_params']	
+	default_options = {
+		'x_vals': 'capacity', 'y_vals': 'voltage', 
+		'which_cycles': 'all', 
+		'charge': True, 'discharge': True, 
+		'colours': None, 
+		'differentiate_charge_discharge': True, 
+		'gradient': False,
+		'interactive': False,
+		'interactive_session_active': False, 
+		'rc_params': {},
+		'format_params': {}}
 
-	options = update_options(options=options, required_options=required_options, default_options=default_options)
+	options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+	
+
+	
+	if not 'cycles' in data.keys():
+		data['cycles'] = ec.io.read_data(data=data, options=options)
 
 	# Update list of cycles to correct indices
-	update_cycles_list(cycles=cycles, options=options)
+	update_cycles_list(cycles=data['cycles'], options=options)
 
-	colours = generate_colours(cycles=cycles, options=options)
+	colours = generate_colours(cycles=data['cycles'], options=options)
+
+	if options['interactive']:
+		options['interactive'], options['interactive_session_active'] = False, True
+		plot_gc_interactive(data=data, options=options)
+		return
 
 
-	for i, cycle in enumerate(cycles):
+	# Prepare plot, and read and process data
+	
+	fig, ax = btp.prepare_plot(options=options)
+
+	for i, cycle in enumerate(data['cycles']):
 		if i in options['which_cycles']:
-			if options['chg']:
+			if options['charge']:
 				cycle[0].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][0])
 
-			if options['dchg']:
+			if options['discharge']:
 				cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
 
 
-
-	fig, ax = prettify_gc_plot(fig=fig, ax=ax, options=options)
-
-	return cycles, fig, ax
-
-
-def update_options(options, required_options, default_options):
-
-	if not options:
-		options = default_options
-	
+	if options['interactive_session_active']:
+		update_labels(options, force=True)
 	else:
-		for option in required_options:
-			if option not in options.keys():
-				options[option] = default_options[option]
+		update_labels(options)
 
-	return options
+	fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
+
+	#if options['interactive_session_active']:
 	
-def update_cycles_list(cycles, options):
 
-	if not options:
-		options['which_cycles']
+	return data['cycles'], fig, ax 
+
+
+def plot_gc_interactive(data, options):
+
+	w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(plot_gc), data=widgets.fixed(data), options=widgets.fixed(options),
+	charge=widgets.ToggleButton(value=True),
+	discharge=widgets.ToggleButton(value=True),
+	x_vals=widgets.Dropdown(options=['specific_capacity', 'capacity', 'ions', 'voltage', 'time', 'energy'], value='specific_capacity', description='X-values')
+	)
+
+	options['widget'] = w
+
+	display(w)
+
+
+def update_labels(options, force=False):
+
+	if 'xlabel' not in options.keys() or force:
+		options['xlabel'] = options['x_vals'].capitalize().replace('_', ' ')
+
+	if 'ylabel' not in options.keys() or force:
+		options['ylabel'] = options['y_vals'].capitalize().replace('_', ' ')
+		
+
+	if 'xunit' not in options.keys() or force:
+		if options['x_vals'] == 'capacity':
+			options['xunit'] = options['units']['capacity']
+		elif options['x_vals'] == 'specific_capacity':
+			options['xunit'] = f"{options['units']['capacity']} {options['units']['mass']}$^{{-1}}$"
+		elif options['x_vals'] == 'time':
+			options['xunit'] = options['units']['time']
+		elif options['x_vals'] == 'ions':
+			options['xunit'] = None
+		
+
+	if 'yunit' not in options.keys() or force:
+		if options['y_vals'] == 'voltage':
+			options['yunit'] = options['units']['voltage']
+
+
+
+		
+	
+def update_cycles_list(cycles, options: dict) -> None:
 
 	if options['which_cycles'] == 'all':
 		options['which_cycles'] = [i for i in range(len(cycles))]
@@ -81,52 +142,6 @@ def update_cycles_list(cycles, options):
 		options['which_cycles'] = [i-1 for i in range(which_cycles[0], which_cycles[1]+1)]
 
 
-	return options
-
-
-def prepare_gc_plot(options=None):
-
-
-	# First take care of the options for plotting - set any values not specified to the default values
-	required_options = ['columns', 'width', 'height', 'format', 'dpi',  'facecolor']
-	default_options = {'columns': 1, 'width': 14, 'format': 'golden_ratio', 'dpi': None, 'facecolor': 'w'}
-
-	# If none are set at all, just pass the default_options
-	if not options:
-		options = default_options
-		options['height'] = options['width'] * (math.sqrt(5) - 1) / 2
-		options['figsize'] = (options['width'], options['height'])
-	
-	
-	# If options is passed, go through to fill out the rest. 
-	else:
-		# Start by setting the width:
-		if 'width' not in options.keys():
-			options['width'] = default_options['width']
-
-		# Then set height - check options for format. If not given, set the height to the width scaled by the golden ratio - if the format is square, set the same. This should possibly allow for the tweaking of custom ratios later.
-		if 'height' not in options.keys():
-			if 'format' not in options.keys():
-				options['height'] = options['width'] * (math.sqrt(5) - 1) / 2
-			elif options['format'] == 'square':
-				options['height'] = options['width']
-
-		options['figsize'] = (options['width'], options['height'])
-
-		# After height and width are set, go through the rest of the options to make sure that all the required options are filled
-		for option in required_options:
-			if option not in options.keys():
-				options[option] = default_options[option]
-
-	fig, ax = plt.subplots(figsize=(options['figsize']), dpi=options['dpi'], facecolor=options['facecolor'])
-
-	linewidth = 1*options['columns']
-	axeswidth = 3*options['columns']
-
-	plt.rc('lines', linewidth=linewidth)
-	plt.rc('axes', linewidth=axeswidth)
-
-	return fig, ax
 
 
 def prettify_gc_plot(fig, ax, options=None):
@@ -161,12 +176,12 @@ def prettify_gc_plot(fig, ax, options=None):
 		'positions': {'xaxis': 'bottom', 'yaxis': 'left'},
 		'x_vals': 'specific_capacity', 'y_vals': 'voltage',
 		'xlabel': None, 'ylabel': None,
-		'units': None,
+		'units': {'capacity': 'mAh', 'specific_capacity': r'mAh g$^{-1}$', 'time': 's', 'current': 'mA', 'energy': 'mWh', 'mass': 'g', 'voltage': 'V'},
 		'sizes': None,
 		'title': None 	
 	}
 
-	update_options(options, required_options, default_options)
+	aux.update_options(options, required_options, default_options)
 
 
 	##################################################################

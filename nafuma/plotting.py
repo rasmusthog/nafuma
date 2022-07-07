@@ -135,7 +135,10 @@ def adjust_plot(fig, ax, options):
         ax.set_ylabel('')
         
     if not options['hide_x_labels']:
-        ax.set_xlabel(f'{options["xlabel"]}')
+        if not options['xunit']:
+            ax.set_xlabel(f'{options["xlabel"]}')
+        else:
+            ax.set_xlabel(f'{options["xlabel"]} [{options["xunit"]}]')
     else:
         ax.set_xlabel('')
 
