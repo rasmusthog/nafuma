@@ -230,6 +230,9 @@ def plot_diffractogram(data, options={}):
     # PLOT HEATMAP
     if options['heatmap']:
 
+        # Add locators for y-axis - otherwise it will tend to break (too many ticks) when switching between diffractograms and heatmap in interactive mode. These values will be updated later anyway, and is only 
+        # to allow the initial call to Seaborn to have values that are sensible.
+        # FIXME A more elegant solution to this?
         ax.yaxis.set_major_locator(MultipleLocator(100))
         ax.yaxis.set_minor_locator(MultipleLocator(50))
 
