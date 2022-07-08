@@ -412,7 +412,6 @@ def read_htxrd(data, options={}, index=0):
 
 
     if options['save_folder']:
-        print(options['save_folder'])
         for i, (diffractogram, wavelength, timestamp) in enumerate(zip(diffractograms, wavelengths, timestamps)):
             if not options['save_filename']:
                 filename = os.path.basename(data['path'][index]).split('.')[0] + '_' + str(i).zfill(4) +'.xy'
@@ -439,7 +438,8 @@ def save_htxrd_as_xy(diffractogram, wavelength, timestamp, filename, save_path):
         [line for line in 
             [f'# Temperature {np.round(diffractogram["T"].mean())}',
             f'# Wavelength {wavelength}',
-            f'# Time {timestamp}'
+            f'# Time {timestamp}',
+            '# 2th \t I'
             ]
         ]
     )
@@ -452,7 +452,7 @@ def save_htxrd_as_xy(diffractogram, wavelength, timestamp, filename, save_path):
 
         f.write('\n')
 
-        diffractogram.to_csv(f, index=False, sep='\t')
+        diffractogram.to_csv(f, index=False, header=False, sep='\t')
             
 
 def read_xy(data, options={}, index=0):
@@ -460,8 +460,10 @@ def read_xy(data, options={}, index=0):
     #if 'wavelength' not in data.keys():
     # Get wavelength from scan
 
-    if not 'wavelength' in data.keys() or data['wavelength'][index]:
-        wavelength = find_wavelength_from_xy(path=data['path'][index])
+    
+
+    if not 'wavelength' in data.keys() or not data['wavelength'][index]:
+        wavelength = read_metadata_from_xy(path=data['path'][index])['wavelength']
     else:
         wavelength = data['wavelength'][index]
 
@@ -478,6 +480,7 @@ def read_xy(data, options={}, index=0):
 
         diffractogram = pd.read_csv(f, header=None, delim_whitespace=True)
 
+
     if diffractogram.shape[1] == 2:
         diffractogram.columns = ['2th', 'I']
     elif diffractogram.shape[1] == 3:
@@ -485,6 +488,65 @@ def read_xy(data, options={}, index=0):
 
 
     return diffractogram, wavelength
+
+
+
+def read_metadata_from_xy(path):
+
+    metadata = {}
+    wavelength_dict = {'Cu': 1.54059, 'Mo': 0.71073}
+
+    with open(path, 'r') as f:
+        lines = f.readlines()
+
+        for line in lines:
+            # For .xy-files output from EVA
+            if 'Anode' in line:
+                anode = line.split()[8].strip('"')
+                metadata['wavelength'] = wavelength_dict[anode]
+
+            
+            elif 'Wavelength' in line:
+                # For .xy-files output from pyFAI integration
+                if line.split()[-1] == 'm':
+                    metadata['wavelength'] = float(line.split()[2])*10**10
+
+                else:
+                    metadata['wavelength'] = float(line.split()[-1])
+
+
+            # Get temperature - exists in .xy-files saved from HTXRD-runs in .brml-files
+            if 'Temperature' in line:
+                metadata['temperature'] = line.split()[-1]
+
+            # Get timestamp - exists in .xy-files saved from .brml-files
+            if 'Time' in line:
+                metadata['time'] = " ".join(line.split()[2:])
+
+
+
+
+    if 'wavelength' not in metadata.keys():
+        metadata['wavelength'] = None
+    if 'temperature' not in metadata.keys():
+        metadata['temperature'] = None
+    if 'time' not in metadata.keys():
+        metadata['time'] = None
+
+    return metadata
+
+
+def find_wavelength_from_poni(path):
+
+    with open(path, 'r') as f:
+        lines = f.readlines()
+
+        for line in lines:
+            if 'Wavelength' in line:
+                wavelength = float(line.split()[-1])*10**10
+
+
+    return wavelength
 
 
 
@@ -533,9 +595,7 @@ def read_data(data, options={}, index=0):
     elif file_extension in['xy', 'xye']:
         diffractogram, wavelength = read_xy(data=data, options=options, index=index)
 
-
-
-    
+   
     if options['offset'] or options['normalise']:
         # Make copy of the original intensities before any changes are made through normalisation or offset, to easily revert back if need to update.
         diffractogram['I_org'] = diffractogram['I']
@@ -704,40 +764,4 @@ def translate_wavelengths(data: pd.DataFrame, wavelength: float, to_wavelength=N
 
 
 
-def find_wavelength_from_xy(path):
 
-
-    wavelength_dict = {'Cu': 1.54059, 'Mo': 0.71073}
-
-    with open(path, 'r') as f:
-        lines = f.readlines()
-
-        for line in lines:
-            # For .xy-files output from EVA
-            if 'Anode' in line:
-                anode = line.split()[8].strip('"')
-                wavelength = wavelength_dict[anode]
-
-            # For .xy-files output from pyFAI integration
-            elif 'Wavelength' in line:
-                wavelength = float(line.split()[2])*10**10
-
-            else:
-                wavelength = None
-
-
-
-    return wavelength
-
-
-def find_wavelength_from_poni(path):
-
-    with open(path, 'r') as f:
-        lines = f.readlines()
-
-        for line in lines:
-            if 'Wavelength' in line:
-                wavelength = float(line.split()[-1])*10**10
-
-
-    return wavelength

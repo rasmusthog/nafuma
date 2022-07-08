@@ -1,6 +1,6 @@
 import seaborn as sns
 import matplotlib.pyplot as plt
-from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,AutoMinorLocator)
+from matplotlib.ticker import MultipleLocator
 
 import pandas as pd
 import numpy as np
@@ -21,13 +21,12 @@ def plot_diffractogram(data, options={}):
 
     # Update options
     required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'line', 'scatter', 'xlim', 'ylim', 'normalise', 'offset', 'offset_x', 'offset_y', 'offset_change',
-    'reflections_plot', 'reflections_indices', 'reflections_data', 'heatmap', 'cmap', 'plot_kind', 'palettes', 'interactive', 'rc_params', 'format_params', 'interactive_session_active']
+    'reflections_plot', 'reflections_indices', 'reflections_data', 'heatmap', 'cmap', 'plot_kind', 'palettes', 'highlight', 'highlight_colours', 'interactive', 'rc_params', 'format_params', 'interactive_session_active']
 
     default_options = {
-        'x_vals': '2th', 
-        'y_vals': 'I',
-        'ylabel': 'Intensity', 'xlabel': '2theta', 
-        'xunit': 'deg', 'yunit': 'a.u.',
+        'x_vals': '2th', 'y_vals': 'I',
+        'xlabel': '2$\\theta$', 'ylabel': None, 
+        'xunit': '$^{\circ}$', 'yunit': None,
         'xlim': None, 'ylim': None, 
         'normalise': True,
         'offset': True,
@@ -43,6 +42,8 @@ def plot_diffractogram(data, options={}):
         'cmap': 'viridis',
         'plot_kind': None,
         'palettes': [('qualitative', 'Dark2_8')],
+        'highlight': None,
+        'highlight_colours': ['red'],
         'interactive': False,
         'interactive_session_active': False,
         'rc_params': {},
@@ -60,14 +61,21 @@ def plot_diffractogram(data, options={}):
     if not isinstance(data['path'], list):
         data['path'] = [data['path']]
 
-   
-
+    
+    ############################################################################################################################################################
+    ##### LOADING DATA #########################################################################################################################################
+    ############################################################################################################################################################
+    
     # Check if there is some data stored already, load in data if not. This speeds up replotting in interactive mode.
     if not 'diffractogram' in data.keys():
-        # Initialise empty list for diffractograms and wavelengths
+
+        # This is to set the default values of the diffractogram y-label and -unit so that the actual yunit and ylable can switch back and forth between these and the heatmap values
+        options['diff.yunit'] = 'a.u.'
+        options['diff.ylabel'] = 'Intensity'
+
+        # Initialise empty list for diffractograms and wavelengths. If wavelength is not manually passed it should be automatically gathered from the .xy-file
         data['diffractogram'] = [None for _ in range(len(data['path']))]
-        
-        # If wavelength is not manually passed it should be automatically gathered from the .xy-file
+
         if 'wavelength' not in data.keys():
             data['wavelength'] = [None for _ in range(len(data['path']))]
         else:
@@ -75,41 +83,42 @@ def plot_diffractogram(data, options={}):
             if not isinstance(data['wavelength'], list):
                 data['wavelength'] = [data['wavelength'] for _ in range(len(data['path']))] 
 
+        # LOAD DIFFRACTOGRAMS
         for index in range(len(data['path'])):
             diffractogram, wavelength = xrd.io.read_data(data=data, options=options, index=index)
             
             data['diffractogram'][index] = diffractogram
             data['wavelength'][index] = wavelength
 
-            # FIXME This is a quick fix as the image is not reloaded when passing multiple beamline datasets
+            # FIXME This is a quick fix as the image is not reloaded when passing multiple beamline datasets. Should probably be handled in io?
             data['image'] = None
 
-        # Sets the xlim if this has not bee specified
+        
+        # Sets the xlim if this has not been specified
         if not options['xlim']:
             options['xlim'] = [data['diffractogram'][0][options['x_vals']].min(), data['diffractogram'][0][options['x_vals']].max()]
-
-        # Generate heatmap data
-        data['heatmap'], data['heatmap_xticks'], data['heatmap_xticklabels'] = generate_heatmap(data=data, options=options)
+            
+        # GENERATE HEATMAP DATA
+        data['heatmap'], data['heatmap_xticks'], data['heatmap_xticklabels'], data['heatmap_yticks'], data['heatmap_yticklabels'] = generate_heatmap(data=data, options=options)
         options['heatmap_loaded'] = True
 
         if options['heatmap']:
-            options['xlim'] = options['heatmap_xlim']
+            options['xlim'] = [options['heatmap_xlim'][0], options['heatmap_xlim'][1]]
 
+    # If data was already loaded, only do a check to see if the data is in a list or not, and if not, put it in one. This is because it will be looped over later.
     else:
         if not isinstance(data['diffractogram'], list):
             data['diffractogram'] = [data['diffractogram']]
             data['wavelength'] = [data['wavelength']]
 
+    ############################################################################################################################################################
+    ##### INTERACTIVE SESSION ##################################################################################################################################
+    ############################################################################################################################################################
 
 
-    if options['interactive_session_active']:
-        if options['offset']:
-            if (options['offset_x'] != options['current_offset_x']) or (options['offset_y'] != options['current_offset_y']):
-                for i, (diff, wl) in enumerate(zip(data['diffractogram'], data['wavelength'])):
-                    xrd.io.apply_offset(diff, wl, i, options)
 
-
-    # Start inteactive session with ipywidgets. Disables options['interactive'] in order for the interactive loop to not start another interactive session
+    # START INTERACTIVE SESSION
+    # Start inteactive session with ipywidgets. Disables options['interactive'] in order for the interactive loop to not recursively start new interactive sessions
     if options['interactive']:
         options['interactive'] = False
         options['interactive_session_active'] = True
@@ -117,21 +126,36 @@ def plot_diffractogram(data, options={}):
         return
     
     
+    # If interactive mode is already enabled, update the offsets. 
+    if options['interactive_session_active']:
+        if options['offset']:
+            if (options['offset_x'] != options['current_offset_x']) or (options['offset_y'] != options['current_offset_y']):
+                for i, (diff, wl) in enumerate(zip(data['diffractogram'], data['wavelength'])):
+                    xrd.io.apply_offset(diff, wl, i, options)
+
+    
+
+
+    ############################################################################################################################################################
+    ##### PREPARE THE PLOT AND COLOURS #########################################################################################################################
+    ############################################################################################################################################################
+    
+    # CREATE AND ASSIGN AXES
+
     # Makes a list out of reflections_data if it only passed as a dict, as it will be looped through later
     if options['reflections_data']:
         if not isinstance(options['reflections_data'], list):
             options['reflections_data'] = [options['reflections_data']]
-
-    # Determine number of subplots and height ratios between them
+    
+    
+    # Determine the grid layout based on how many sets of reflections data has been passed
     if options['reflections_data'] and len(options['reflections_data']) >= 1:
         options = determine_grid_layout(options=options)
 
-
-    # Prepare plot, and read and process data
+    # Create the Figure and Axes objects
     fig, ax = btp.prepare_plot(options=options)
 
-
-    # Assign the correct axes
+    # Assign the correct axes to the indicies, reflections and figure itself
     if options['reflections_plot'] or options['reflections_indices']:
         
         if options['reflections_indices']:
@@ -145,48 +169,154 @@ def plot_diffractogram(data, options={}):
 
         ax = ax[-1]
 
-    if len(data['path']) < 10:
+    
+    # GENERATE COLOURS
+    
+    # Limit for when it is assumed that each diffractogram should have its own colour - after 8, the default colour palette is used up and starts a new.
+    # FIXME Should probably allow for more than 8 if wanted - not a priority now
+    if len(data['path']) < 8:
         colours = btp.generate_colours(options['palettes'])
+    
+
+    # Generates the colours of a list of scans to highlight is passed. options['highlight'] and options['highlight_colour'] must be of equal length. Entries in highlight can either be a list or a single number,
+    # if the latter it will be turned into a list with the same number as element 1 and 2. 
+    elif options['highlight']:
+        # Make sure that options['highlight'] is a list
+        if not isinstance(options['highlight'], list):
+            options['highlight'] = [[options['highlight'], options['highlight']]]
+        
+        # Make sure that options['highlight_colours] is a list
+        if not isinstance(options['highlight_colours'], list):
+            options['highlight_colours'] = [options['highlight_colours']]
+
+        colours = []
+    
+        # Loop through each scan - assign the correct colour to each of the scan intervals in options['highlight']
+        for i in range(len(data['path'])):
+            assigned = False
+            for j, highlight in enumerate(options['highlight']):
+                
+                # If one of the elements in options['highlight'] is a single number (i.e. only one scan should be highlighted), this is converted into the suitable format to be handled below
+                if not isinstance(highlight, list):
+                    highlight = [highlight, highlight]
+
+                # Assigns the j-th colour if scan number (i) is within the j-th highlight-interval
+                if i >= highlight[0] and i <= highlight[1]:
+                    colours.append(options['highlight_colours'][j])
+                    assigned = True
+            
+            # Only assign black to i if not already been given a colour
+            if not assigned:
+                colours.append('black')
+
+            # Reset the 'assigned' value for the next iteration
+            assigned = False
+
+        # Make a itertools cycle out of the colours
+        colours = btp.generate_colours(colours, kind='single')
+
+
+    # If there are many scans and no highlight-options have been passed, all scans will be black
     else:
         colours = btp.generate_colours(['black'], kind='single')
 
+
+
+    ############################################################################################################################################################
+    ##### PLOT THE DATA ########################################################################################################################################
+    ############################################################################################################################################################
+
+
+    # PLOT HEATMAP
     if options['heatmap']:
+
+        ax.yaxis.set_major_locator(MultipleLocator(100))
+        ax.yaxis.set_minor_locator(MultipleLocator(50))
+
+        # Call Seaborn to plot the data
         sns.heatmap(data['heatmap'], cmap=options['cmap'], cbar=False, ax=ax)
+     
+        
+        # Set the ticks and ticklabels to match the data point number with 2th values 
         ax.set_xticks(data['heatmap_xticks'][options['x_vals']])
         ax.set_xticklabels(data['heatmap_xticklabels'][options['x_vals']])
-        ax.tick_params(axis='x', which='minor', bottom=False, top=False)
+        ax.set_yticks(data['heatmap_yticks'])
+        ax.set_yticklabels(data['heatmap_yticklabels'])
 
+        # Set the labels to the relevant values for heatmap plot
+        if not options['ylabel'] or options['ylabel'] == options['diff.ylabel']:
+            options['ylabel'] = options['heatmap.ylabel']
+        if not options['yunit'] or options['yunit'] == options['diff.yunit']:
+            options['yunit'] = options['heatmap.yunit']
+
+        ax.tick_params(axis='x', which='minor', bottom=False, top=False)
+        ax.tick_params(axis='y', which='minor', left=False, right=False)
+
+        options['hide_y_ticklabels'] = False
+        options['hide_y_ticks'] = False
+
+
+        # Toggle on the frame around the heatmap - this makes it look better together with axes ticks
+        for _, spine in ax.spines.items():
+            spine.set_visible(True)
+
+
+        if options['highlight']:
+            for i, highlight in enumerate(options['highlight']):
+                if i < len(options['highlight'])-1 or len(options['highlight']) == 1: 
+                    ax.axhline(y=highlight[1], c=options['highlight_colours'][i], ls='--', lw=0.5)
+
+
+    # PLOT DIFFRACTOGRAM
     else:
         for diffractogram in data['diffractogram']:
+
+            # Plot data as line plot
             if options['line']:
                 diffractogram.plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=next(colours), zorder=1)
         
+            # Plot data as scatter plot
             if options['scatter']:
                 ax.scatter(x=diffractogram[options['x_vals']], y = diffractogram[options['y_vals']], c=[(1,1,1,0)], edgecolors=[next(colours)], linewidths=plt.rcParams['lines.markeredgewidth'], zorder=2) #, edgecolors=np.array([next(colours)]))
 
 
+        # Set the labels to the relevant values for diffractogram plot
+        if not options['ylabel'] or options['ylabel'] == options['heatmap.ylabel']:
+            options['ylabel'] = options['diff.ylabel']
+        if not options['yunit'] or options['yunit'] == options['heatmap.yunit']:
+            options['yunit'] = options['diff.yunit']
 
+
+        options['hide_y_ticklabels'] = True
+        options['hide_y_ticks'] = True
+
+
+    # Adjust the plot to make it prettier
     fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
+ 
 
-    
-
-    # Make the reflection plots. By default, the wavelength of the first diffractogram will be used for these.
+    # PLOT REFLECTION TABLES
     if options['reflections_plot'] and options['reflections_data']:
         options['xlim'] = ax.get_xlim()
-        options['to_wavelength'] = data['wavelength'][0]
+        options['to_wavelength'] = data['wavelength'][0] # By default, the wavelength of the first diffractogram will be used for these.
         
+        # Plot each reflection table in the relevant axis
         for reflections_params, axis in zip(options['reflections_data'], ref_axes):
             plot_reflection_table(data=data, reflections_params=reflections_params, ax=axis, options=options)
 
-    # Print the reflection indices. By default, the wavelength of the first diffractogram will be used for this.
+    # Print the reflection indices. 
     if options['reflections_indices'] and options['reflections_data']:
         options['xlim'] = ax.get_xlim()
-        options['to_wavelength'] = data['wavelength'][0]
+        options['to_wavelength'] = data['wavelength'][0] # By default, the wavelength of the first diffractogram will be used for this.
 
         for reflections_params in options['reflections_data']:
             plot_reflection_indices(data=data, reflections_params=reflections_params, ax=indices_ax, options=options)
 
 
+    ############################################################################################################################################################
+    ##### UPDATE WIDGET ########################################################################################################################################
+    ############################################################################################################################################################  
+    
     if options['interactive_session_active']:
         options['current_y_offset'] = options['widget'].kwargs['offset_y']
         update_widgets(data=data, options=options)
@@ -199,10 +329,15 @@ def plot_diffractogram(data, options={}):
 
 def generate_heatmap(data, options={}):
 
-    required_options = ['x_tick_locators']
+    required_options = ['x_tick_locators', 'heatmap_y_tick_locators', 'heatmap_normalise', 'normalisation_range', 'increase_contrast']
 
     default_options = {
-        'x_tick_locators': [0.5, 0.1]
+        'x_tick_locators': [0.5, 0.1],
+        'heatmap_y_tick_locators': [10, 5], # Major ticks for every 10 scans, minor for every 5
+        'heatmap_normalise': False,
+        'normalisation_range': None,
+        'increase_contrast': False,
+        'contrast_factor': 100
     }
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -212,13 +347,25 @@ def generate_heatmap(data, options={}):
     scans = []
 
     for i, d in enumerate(data['diffractogram']):
+
+        # Find normalisation factor
+        if options['heatmap_normalise'] and options['normalisation_range']:
+            mean_background = d['I'].loc[(d['2th'] > options['normalisation_range'][0]) & (d['2th'] < options['normalisation_range'][1])].mean()
+
+            d['I'] = d['I'] / mean_background
+
+
+        if options['increase_contrast']:
+            d['I'] = d['I']**(1/options['contrast_factor'])
+
         twotheta = np.append(twotheta, d['2th'].to_numpy())
         intensities = np.append(intensities, d['I'].to_numpy())
         scans = np.append(scans, np.full(len(d['2th'].to_numpy()), int(i)))
-
+                
 
     heatmap = pd.DataFrame({'2th': twotheta, 'scan': scans, 'I': intensities})
     xrd.io.translate_wavelengths(data=heatmap, wavelength=data['wavelength'][0])
+
     min_dict = {'2th': heatmap['2th'].min(), '2th_cuka': heatmap['2th_cuka'].min(), '2th_moka': heatmap['2th_moka'].min(),
                         'q': heatmap['q'].min(), 'q2': heatmap['q2'].min(), 'q4': heatmap['q4'].min(), '1/d': heatmap['1/d'].min()}
 
@@ -235,7 +382,6 @@ def generate_heatmap(data, options={}):
     for xval in min_dict.keys():
        
        # Add xticks labels
-        
         label_max = aux.floor(max_dict[xval], roundto=options['x_tick_locators'][0])
         label_min = aux.ceil(min_dict[xval], roundto=options['x_tick_locators'][0])
         label_steps = (label_max - label_min)/options['x_tick_locators'][0]
@@ -262,7 +408,32 @@ def generate_heatmap(data, options={}):
     options['heatmap_xlim'] = xlims
 
 
-    return heatmap, xticks, xticklabels
+    # Get temperatures if HTXRD-scans
+    scan_numbers = []
+    
+    temperatures = []
+    for i, filename in enumerate(data['path']):
+        scan_numbers.append(i)
+        temperatures.append(xrd.io.read_metadata_from_xy(filename)['temperature'])
+
+    yticks = scan_numbers[0::options['heatmap_y_tick_locators'][0]]
+    yticks.append(scan_numbers[-1])
+    
+    if not temperatures[0]:
+        yticklabels = yticks
+        options['heatmap.ylabel'] = 'Scan number'
+        options['heatmap.yunit'] = None
+    
+    else:
+        yticklabels = temperatures[0::options['heatmap_y_tick_locators'][0]]
+        yticklabels.append(temperatures[-1])
+        options['heatmap.ylabel'] = 'Temperature'
+        options['heatmap.yunit'] = '$^\circ$C'
+
+
+
+
+    return heatmap, xticks, xticklabels, yticks, yticklabels
 
 
 
@@ -349,12 +520,12 @@ def plot_diffractogram_interactive(data, options):
 
     if options['reflections_data']:
         w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(plot_diffractogram), data=widgets.fixed(data), options=widgets.fixed(options), 
+        x_vals=widgets.Dropdown(options=['2th', 'd', '1/d', 'q', 'q2', 'q4', '2th_cuka', '2th_moka'], value='2th', description='X-values'),
         scatter=widgets.ToggleButton(value=False), 
         line=widgets.ToggleButton(value=True), 
         reflections_plot=widgets.ToggleButton(value=True),
         reflections_indices=widgets.ToggleButton(value=False),
         heatmap=widgets.ToggleButton(value=options['heatmap']),
-        x_vals=widgets.Dropdown(options=['2th', 'd', '1/d', 'q', 'q2', 'q4', '2th_cuka', '2th_moka'], value='2th', description='X-values'),
         xlim=options['widgets']['xlim']['w'],
         ylim=options['widgets']['ylim']['w'],
         offset_y=widgets.BoundedFloatText(value=options['offset_y'], min=-5, max=5, step=0.01, description='offset_y'),
@@ -363,10 +534,10 @@ def plot_diffractogram_interactive(data, options):
     
     else:
         w = widgets.interactive(btp.ipywidgets_update, func=widgets.fixed(plot_diffractogram), data=widgets.fixed(data), options=widgets.fixed(options), 
+        x_vals=widgets.Dropdown(options=['2th', 'd', '1/d', 'q', 'q2', 'q4', '2th_cuka', '2th_moka'], value='2th', description='X-values'),
         scatter=widgets.ToggleButton(value=False), 
         line=widgets.ToggleButton(value=True),
         heatmap=widgets.ToggleButton(value=options['heatmap']),
-        x_vals=widgets.Dropdown(options=['2th', 'd', '1/d', 'q', 'q2', 'q4', '2th_cuka', '2th_moka'], value='2th', description='X-values'),
         xlim=options['widgets']['xlim']['w'],
         ylim=options['widgets']['ylim']['w'],
         offset_y=widgets.BoundedFloatText(value=options['offset_y'], min=-5, max=5, step=0.01, description='offset_y'),
@@ -683,4 +854,3 @@ def reverse_diffractograms(diffractograms):
 
     return rev_diffractograms
 
-#def plot_heatmap():

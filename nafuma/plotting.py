@@ -55,6 +55,8 @@ def prepare_plot(options={}):
     format_params = aux.update_options(format_params, required_format_params, default_format_params)
 
 
+
+
     # Reset run commands
     plt.rcdefaults()
     
@@ -125,12 +127,15 @@ def adjust_plot(fig, ax, options):
     }
 
 
-
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
     # Set labels on x- and y-axes
     if not options['hide_y_labels']:
-        ax.set_ylabel(f'{options["ylabel"]} [{options["yunit"]}]')
+        if not options['yunit']:
+            ax.set_ylabel(f'{options["ylabel"]}') 
+        else:
+            ax.set_ylabel(f'{options["ylabel"]} [{options["yunit"]}]')
+            
     else:
         ax.set_ylabel('')
         
@@ -141,8 +146,7 @@ def adjust_plot(fig, ax, options):
             ax.set_xlabel(f'{options["xlabel"]} [{options["xunit"]}]')
     else:
         ax.set_xlabel('')
-
-
+        
     # Set multiple locators
     if options['y_tick_locators']:
         ax.yaxis.set_major_locator(MultipleLocator(options['y_tick_locators'][0]))
@@ -268,7 +272,6 @@ def ipywidgets_update(func, data, options={}, **kwargs):
 
     where key1, key2, key3 etc. are the values in the options-dictionary you want widget control of, and widget1, widget2, widget3 etc. are widgets to control these values, e.g. widgets.IntSlider(value=1, min=0, max=10)
     '''
-
 
     # Update the options-dictionary with the values from the widgets
     for key in kwargs:
