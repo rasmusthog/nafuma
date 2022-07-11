@@ -127,7 +127,7 @@ def backup_file(filename, backup_dir):
 
     # Get a list of all previous backup files with the same basename as well as the creation time for the 
     prev_backup_files = [file for file in os.listdir(backup_dir) if os.path.basename(filename.split('.')[0]) in file]
-    creation_time = datetime.strptime(time.ctime(os.path.getctime(filename)), '%a %b %d %H:%M:%S %Y').strftime("%Y-%m-%d_%H-%M-%S")
+    creation_time = datetime.strptime(time.ctime(os.path.getmtime(filename)), '%a %b %d %H:%M:%S %Y').strftime("%Y-%m-%d_%H-%M-%S")
     ext = '.' + filename.split('.')[-1]
 
     dst_basename = creation_time + '_' + filename.split('.')[0] + '_' + f'{len(prev_backup_files)}'.zfill(4) + ext
