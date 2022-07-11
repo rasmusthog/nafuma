@@ -1,6 +1,10 @@
 import json
 import numpy as np
 import os
+import shutil
+
+import time
+from datetime import datetime
 
 def update_options(options, required_options, default_options):
     ''' Takes a dictionary of options along with a list of required options and dictionary of default options, and sets all keyval-pairs of options that is not already defined to the default values'''
@@ -73,7 +77,7 @@ def floor(a, roundto=1):
 
 
 def write_log(message, options={}):
-    from datetime import datetime
+
 
     required_options = ['logfile']
     default_options = {
@@ -112,3 +116,22 @@ def move_list_element_last(filenames,string):
             del filenames[i]
             filenames.append(file)
     return filenames
+
+
+
+def backup_file(filename, backup_dir):
+    # Creates backup-folder if it does not exist
+    if not os.path.isdir(backup_dir):
+        os.makedirs(backup_dir)
+    
+
+    # Get a list of all previous backup files with the same basename as well as the creation time for the 
+    prev_backup_files = [file for file in os.listdir(backup_dir) if os.path.basename(filename.split('.')[0]) in file]
+    creation_time = datetime.strptime(time.ctime(os.path.getctime(filename)), '%a %b %d %H:%M:%S %Y').strftime("%Y-%m-%d_%H-%M-%S")
+    ext = '.' + filename.split('.')[-1]
+
+    dst_basename = creation_time + '_' + filename.split('.')[0] + '_' + f'{len(prev_backup_files)}'.zfill(4) + ext
+    dst = os.path.join(backup_dir, dst_basename)
+
+
+    shutil.copy(filename, dst)
