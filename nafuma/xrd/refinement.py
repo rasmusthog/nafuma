@@ -6,11 +6,265 @@ import re
 
 import time
 import datetime
-
 import warnings
+import json
+
+from ase import io
 
 import nafuma.auxillary as aux
 
+
+
+def make_initial_inp(data: dict, options={}):
+
+    required_options = ['filename', 'overwrite', 'include', 'save_results', 'topas_options', 'background', 'capillary', 'start', 'finish', 'exclude']
+
+    default_options = {
+        'filename': 'start.inp',
+        'overwrite': False,
+        'save_results': False,
+        'include': [], # Any files that should be included with #include
+        'topas_options': {}, 
+        'background': 7,
+        'capillary': False,
+        'interval': [None, None], # Start and finish values that TOPAS should refine on. Overrides 'start' and 'finish'
+        'start': None, # Start value only. Overridden by 'interval' if this is set.
+        'finish': None, # Finish value only. Overridden by 'interval' if this is set.
+        'exlude': [] # Excluded regions. List of lists.
+    }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+    options['topas_options'] = update_topas_options(options=options)
+
+
+    if not os.path.exists(options['filename']) or options['overwrite']:
+        with open(options['filename'], 'w') as fout:
+            write_headers(fout=fout, options=options)
+
+            fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
+            fout.write('rw_p    0    r_exp    0    r_p    0    r_wp_dash    0    r_p_dash    0    r_exp_dash    0    weighted_Durbin_Watson    0    gof    0')
+            fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
+
+            write_xdd(fout=fout, data=data, options=options)
+
+            for str in data['str']:
+                fout.write('\n\n')
+                write_str(fout=fout, str=str, options=options)
+
+           
+
+def write_xdd(fout, data, options):
+    import nafuma.xrd as xrd
+    basedir = os.path.dirname(xrd.__file__)
+
+    with open (os.path.join(basedir, 'snippets.json'), 'r') as snip:
+        snippets = json.load(snip)
+
+    topas_options = options['topas_options']
+    
+    # Write initial parameters
+    fout.write(f'xdd "{data["xdd"]}"\n')
+    fout.write('\t'+snippets['calculation_step'].format(topas_options['convolution_step'])+'\n')
+    
+    # Write background
+    fout.write('\tbkg @    ')
+    for i in range(options['background']):
+        fout.write('0    ')
+
+    # Write wavelength and LP-factor
+    fout.write('\n\n')
+    
+    fout.write('\t'+snippets['wavelength'].format(data['wavelength'])+'\n')
+    fout.write('\t'+snippets['lp_factor'].format(topas_options['lp_factor'])+'\n')
+
+    if options['capillary']:
+        fout.write('\n')
+        for i, line in enumerate(snippets['capillary']):
+            if i == 0:
+                line.format(topas_options['packing_density'])
+            if i == 1:
+                line.format(topas_options['capdia'])
+
+            fout.write('\t'+line+'\n')
+
+
+    fout.write('\n')
+    if options['interval'][0] or options['start']:
+        options['start'] = options['interval'][0] if options['interval'][0] else options['start']
+        fout.write(f'\tstart_X {options["start"]}\n')
+
+    if options['interval'][1] or options['finish']:
+        options['finish'] = options['interval'][1] if options['interval'][1] else options['finish']
+        fout.write(f'\tfinish_X {options["finish"]}\n')
+
+    if options['exclude']:
+        for exclude in options['exclude']:
+            fout.write(f'\texclude {exclude[0]} {exclude[1]}\n')
+
+
+
+def write_str(fout, str, options):
+    
+    atoms = read_cif(str)
+    print(atoms["atoms"]["Fe1"].keys())
+
+    a       = float(atoms['_cell_length_a'].split('(')[0])
+    b       = float(atoms['_cell_length_b'].split('(')[0])
+    c       = float(atoms['_cell_length_c'].split('(')[0])
+    alpha   = float(atoms['_cell_angle_alpha'].split('(')[0])
+    beta    = float(atoms['_cell_angle_beta'].split('(')[0])
+    gamma   = float(atoms['_cell_angle_gamma'].split('(')[0])
+
+
+    fout.write('#ifdef start_values\n')
+    fout.write(f'local lpa \t{a} \t;:\n')
+    fout.write(f'local lpb \t{b} \t;:\n')
+    fout.write(f'local lpc \t{c} \t;:\n')
+    fout.write(f'local lpal \t{alpha} \t;:\n')
+    fout.write(f'local lpbe \t{beta} \t;:\n')
+    fout.write(f'local lpga \t{gamma} \t;:\n\n')
+
+    fout.write('#else\n')
+    fout.write(f'local lpa \t{a}\n')
+    fout.write(f'local lpb \t{b}\n')
+    fout.write(f'local lpc \t{c}\n')
+    fout.write(f'local lpal \t{alpha}\n')
+    fout.write(f'local lpbe \t{beta}\n')
+    fout.write(f'local lpga \t{gamma}\n')
+    fout.write('#endif\n\n')
+
+    sites = list(atoms['atoms'].keys())
+
+    attrs = {'_atom_site_fract_x': 'x', '_atom_site_fract_y': 'y', '_atom_site_fract_z': 'z', '_atom_site_B_iso_or_equiv': 'beq'}
+
+    for attr in attrs:
+        for site in sites:
+            if attr in atoms["atoms"][site].keys():
+                value = atoms["atoms"][site][attr].split("(")[0]
+                value = value if value != '.' else 0.
+
+                fout.write(f'local {attrs[attr]}_{site}\t\t =\t {value} \t ;= \n')
+
+
+        fout.write('\n')
+
+
+    fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
+    fout.write(atoms['_chemical_name_common'] + f'({atoms["_space_group_name_H-M_alt"]})')
+    fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
+
+
+    fout.write('\tstr\n')
+    fout.write(f'\t\tphase_name "{atoms["_chemical_name_common"]} ({atoms["_space_group_name_H-M_alt"]})"\n')
+    fout.write(f'\t\tspace_group {atoms["_space_group_IT_number"]}\n')
+    fout.write('\t\ta = lpa ;\n')
+    fout.write('\t\tb = lpb ;\n')
+    fout.write('\t\tc = lpc ;\n')
+    fout.write('\t\tal = lpal ;\n')
+    fout.write('\t\tbe = lpbe ;\n')
+    fout.write('\t\tga = lpga ;\n')
+    fout.write('\n')
+    fout.write(f'\t\tcell_volume vol_XXXX {atoms["_cell_volume"]}\n')
+
+    for atom in atoms['atoms'].keys():
+        atom_label = atom if len(atom) == 3 else atom+' '
+
+        fout.write(f'\t\tsite {atom_label}\t x = x_{atom_label} ;\t y = y_{atom_label} ;\t z = z_{atom_label} ; occ {atoms["atoms"][atom]["_atom_site_occupancy"]}\t beq = beq_{atom_label} \t ;\n')
+
+
+    fout.write('\n')
+    fout.write('\t\tscale @ 0.0')
+    fout.write('\t\t r_bragg 1.0')
+    
+
+
+
+
+def read_cif(path):
+
+    data = {'atoms': {}} # Initialise dictionary
+    read = True # Initialise read toggle
+
+    # Lists attributes to get out of the .CIF-file. This will correspond to what VESTA writes out, not necessarily what you will find in ICSD
+    attrs = ['_chemical_name_common', '_cell', '_space_group_name_H-M_alt', '_space_group_IT_number']
+
+    # Open file
+    with open(path, 'r') as cif:
+        line = cif.readline()
+
+        # Read until encountering #End
+        while read:
+            
+            # Break loop if #End is reached
+            if not line or line.startswith('#End'):
+                read = False
+                break
+
+            # Handle loops
+            if line.lstrip().startswith('loop_'):
+                loop = []
+                line = cif.readline()
+
+                # Only handle loops with attributes that starts with _atom. Other loops are incompatible with below code due to slight differences in formatting (e.g. lineshifts)
+                while line.lstrip().startswith('_atom'):
+                    loop.append(line) # add the attributes of the loop to a list (every keywords starting with _atom)
+                    line = cif.readline() # Read next line
+
+                
+                # If there were any attributes that started with _atom - if this is empty is just means there were other attributes in this loop
+                if loop:
+                    # Read every line after the attribute listing has ended - until it encounters a new attribute, loop or #End tag
+                    # FIXME WHat a horrible condition statement - need to fix this!
+                    while line and not line.lstrip().startswith('_') and not line.lstrip().startswith('loop_') and not line.lstrip().startswith('#End') and not line=='\n':
+                        # Initialise empty dictionary for a given atom if it has not already been created in another loop
+                        if line.split()[0] not in data['atoms'].keys():
+                            data["atoms"][line.split()[0]] = {}
+
+                        # Add all the attribute / value pairs for the current loop
+                        for i, attr in enumerate(loop):
+                            data["atoms"][line.split()[0]][attr[:-1].lstrip()] = line.split()[i]
+                        
+                        # Read new line
+                        line = cif.readline()
+                
+                # If loop list was empty, keep going to the next line
+                else:
+                    line = cif.readline()
+
+            
+
+            # Handle free-standing attributes
+            elif any([line.lstrip().startswith(i) for i in attrs]):
+            #line.startswith() or line.startswith('_symmetry_space_group_name') or line.startswith('_symmetry_Int_Tables'):
+            #
+                #
+                attr, *value = line.split()
+
+                value = ' '.join([str(i) for i in value])
+
+                data[attr] = value
+                line = cif.readline()
+
+            else:
+                line = cif.readline()   
+
+
+
+    return data
+        
+
+
+
+def update_topas_options(options):
+    import nafuma.xrd as xrd
+    basedir = os.path.dirname(xrd.__file__)
+
+    with open(os.path.join(basedir, 'topas_default.json'), 'r') as default:
+        topas_defaults = json.load(default)
+
+    options['topas_options'] = aux.update_options(options=options['topas_options'], required_options=topas_defaults.keys(), default_options=topas_defaults)
+
+    return options['topas_options']
 
 def make_big_inp(data: dict, options={}):
     ''' Generates a big .INP-file with all filenames found in data["path"]. Uses a template .INP-file (which has to be generated manually from an initial refinement in TOPAS) and appends this to a large .INP-file
@@ -90,6 +344,18 @@ def make_big_inp(data: dict, options={}):
 def write_headers(fout, options):
     # FIXME Could modify this to make sure that certain combinations of options is not written, such as both do_errors and bootstrap_errors. 
 
+    headers = [
+        "A_matrix_memory_allowed_in_Mbytes", 
+        "approximate_A",
+        "bootstrap_errors",
+        "conserve_memory",
+        "continue_after_convergence",
+        "do_errors",
+        "chi2_convergence_criteria", 
+        "iters",
+        "num_runs" ]
+
+
     for file in options['include']:
         fout.write(f'#include {file} \n')
 
@@ -101,7 +367,7 @@ def write_headers(fout, options):
     fout.write('\n')
 
     for option, value in options['topas_options'].items():
-        if value:
+        if value and option in headers:
             if isinstance(value, bool):
                 fout.write(f'{option} \n')
             else:
