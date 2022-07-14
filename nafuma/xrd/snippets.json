@@ -7,7 +7,7 @@
         "local muR = (capdia/20)*linab*packing_density;",
         "Cylindrical_I_Correction(muR)"
     ],
-
+    "gauss_fwhm": "gauss_fwhm = Sqrt({} Cos(2 * Th)^4 + {} Cos(2 * Th)^2 + {});",
     "lp_factor": "LP_Factor({}) 'change the LP correction  or lh value if required",
     "wavelength": "lam ymin_on_ymax 0.0001 la 1.0 lo {} lh 0.1",
     "zero_error": "Zero_Error(zero, 0)"

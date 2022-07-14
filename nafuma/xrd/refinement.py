@@ -17,12 +17,13 @@ import nafuma.auxillary as aux
 
 def make_initial_inp(data: dict, options={}):
 
-    required_options = ['filename', 'overwrite', 'include', 'save_results', 'topas_options', 'background', 'capillary', 'start', 'finish', 'exclude']
+    required_options = ['filename', 'overwrite', 'include', 'save_results', 'save_dir', 'topas_options', 'background', 'capillary', 'start', 'finish', 'exclude']
 
     default_options = {
         'filename': 'start.inp',
         'overwrite': False,
         'save_results': False,
+        'save_dir': 'results/',
         'include': [], # Any files that should be included with #include
         'topas_options': {}, 
         'background': 7,
@@ -41,15 +42,34 @@ def make_initial_inp(data: dict, options={}):
         with open(options['filename'], 'w') as fout:
             write_headers(fout=fout, options=options)
 
+
             fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
-            fout.write('rw_p    0    r_exp    0    r_p    0    r_wp_dash    0    r_p_dash    0    r_exp_dash    0    weighted_Durbin_Watson    0    gof    0')
+            fout.write('\'START OF INP - XXXX')
+            fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
+            fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
+            fout.write('r_wp    0    r_exp    0    r_p    0    r_wp_dash    0    r_p_dash    0    r_exp_dash    0    weighted_Durbin_Watson    0    gof    0')
             fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
 
             write_xdd(fout=fout, data=data, options=options)
 
-            for str in data['str']:
+            fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
+            fout.write('\'PARAMETER DEFINITONS')
+            fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
+
+            for i, str in enumerate(data['str']):
                 fout.write('\n\n')
-                write_str(fout=fout, str=str, options=options)
+                write_params(fout=fout, data=data, options=options, index=i)
+
+
+            
+            fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
+            fout.write('\'STR DEFINITIONS')
+            fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
+
+            for i, str in enumerate(data['str']):
+                fout.write('\n\n')
+                write_str(fout=fout, data=data, options=options, index=i)
+
 
            
 
@@ -66,6 +86,19 @@ def write_xdd(fout, data, options):
     fout.write(f'xdd "{data["xdd"]}"\n')
     fout.write('\t'+snippets['calculation_step'].format(topas_options['convolution_step'])+'\n')
     
+    for include in options['include']:
+        if 'peak_width' in include:
+            with open(include, 'r') as f:
+                lines = f.readlines()
+                peak_width_params = []
+                for line in lines:
+                    param = line.split()[1][1:]
+                    peak_width_params.append(param)
+
+
+
+            fout.write('\t'+snippets['gauss_fwhm'].format(peak_width_params[0], peak_width_params[1], peak_width_params[2])+'\n')
+    
     # Write background
     fout.write('\tbkg @    ')
     for i in range(options['background']):
@@ -76,14 +109,15 @@ def write_xdd(fout, data, options):
     
     fout.write('\t'+snippets['wavelength'].format(data['wavelength'])+'\n')
     fout.write('\t'+snippets['lp_factor'].format(topas_options['lp_factor'])+'\n')
+    fout.write('\t'+snippets['zero_error']+'\n')
 
     if options['capillary']:
         fout.write('\n')
         for i, line in enumerate(snippets['capillary']):
             if i == 0:
-                line.format(topas_options['packing_density'])
+                line = line.format(topas_options['packing_density'])
             if i == 1:
-                line.format(topas_options['capdia'])
+                line = line.format(topas_options['capdia'])
 
             fout.write('\t'+line+'\n')
 
@@ -103,10 +137,19 @@ def write_xdd(fout, data, options):
 
 
 
-def write_str(fout, str, options):
-    
-    atoms = read_cif(str)
-    print(atoms["atoms"]["Fe1"].keys())
+
+def write_params(fout, data, options, index=0):
+
+    atoms = read_cif(data['str'][index])
+    if 'labels' in data.keys():
+        label = data['labels'][index]
+    else:
+        label = index
+
+
+    fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
+    fout.write(atoms['_chemical_name_common'] + f'({atoms["_space_group_name_H-M_alt"]}) - Parameters')
+    fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
 
     a       = float(atoms['_cell_length_a'].split('(')[0])
     b       = float(atoms['_cell_length_b'].split('(')[0])
@@ -116,67 +159,231 @@ def write_str(fout, str, options):
     gamma   = float(atoms['_cell_angle_gamma'].split('(')[0])
 
 
-    fout.write('#ifdef start_values\n')
-    fout.write(f'local lpa \t{a} \t;:\n')
-    fout.write(f'local lpb \t{b} \t;:\n')
-    fout.write(f'local lpc \t{c} \t;:\n')
-    fout.write(f'local lpal \t{alpha} \t;:\n')
-    fout.write(f'local lpbe \t{beta} \t;:\n')
-    fout.write(f'local lpga \t{gamma} \t;:\n\n')
+    # WRITE LATTICE PARAMETERS
+    # If start_values is defined:
+    fout.write(f'#ifdef start_values_{label}\n')
+    lpa = f'local lpa_{label} {a} ;: {a}'
+    lpb = f'local lpb_{label} {b} ;: {b}'
+    lpc = f'local lpc_{label} {c} ;: {c}'
+    fout.write('{: <55}  {: <55}  {: <55}\n'.format(lpa, lpb, lpc))
+    lpal = f'local lpal_{label} {alpha} ;: {alpha}'
+    lpbe = f'local lpbe_{label} {beta} ;: {beta}'
+    lpga = f'local lpga_{label} {gamma} ;: {gamma}'
+    fout.write('{: <55}  {: <55}  {: <55}\n'.format(lpal, lpbe, lpga))
 
+    # Otherwise
+    fout.write('\n')
     fout.write('#else\n')
-    fout.write(f'local lpa \t{a}\n')
-    fout.write(f'local lpb \t{b}\n')
-    fout.write(f'local lpc \t{c}\n')
-    fout.write(f'local lpal \t{alpha}\n')
-    fout.write(f'local lpbe \t{beta}\n')
-    fout.write(f'local lpga \t{gamma}\n')
+    lpa = f'local lpa_{label} {a}'
+    lpb = f'local lpb_{label} {b}'
+    lpc = f'local lpc_{label} {c}'
+    fout.write('{: <55}  {: <55}  {: <55}\n'.format(lpa, lpb, lpc))
+    lpal = f'local lpal_{label} {alpha}'
+    lpbe = f'local lpbe_{label} {beta}'
+    lpga = f'local lpga_{label} {gamma}'
+    fout.write('{: <55}  {: <55}  {: <55}\n'.format(lpal, lpbe, lpga))
     fout.write('#endif\n\n')
 
     sites = list(atoms['atoms'].keys())
 
-    attrs = {'_atom_site_fract_x': 'x', '_atom_site_fract_y': 'y', '_atom_site_fract_z': 'z', '_atom_site_B_iso_or_equiv': 'beq'}
+    attrs = {
+        '_atom_site_fract_x': 'x', 
+        '_atom_site_fract_y': 'y', 
+        '_atom_site_fract_z': 'z', 
+        '_atom_site_occupancy': '!occ',
+        '_atom_site_B_iso_or_equiv': '!beq'
+        }
 
-    for attr in attrs:
-        for site in sites:
+
+    # WRITE SITE PARAMETERS
+    for site in sites:
+
+        params = []
+        for attr in attrs:
             if attr in atoms["atoms"][site].keys():
                 value = atoms["atoms"][site][attr].split("(")[0]
                 value = value if value != '.' else 0.
 
-                fout.write(f'local {attrs[attr]}_{site}\t\t =\t {value} \t ;= \n')
+                params.append('{: <20} {: <20}'.format(f'local {attrs[attr]}_{site}_{label}', f' = {value} ;: {value}'))
+                #fout.write(f'local {attrs[attr]}_{site}_{label}\t\t =\t {value} \t ;= \t\t\t\t\t')
+
+        fout.write('{: <55}  {: <55}  {: <55} {: <55} {: <55}\n'.format(*params))
+
+    fout.write('\n')
+
+    fout.write('{: <55}  {: <55}  {: <55} {: <55}\n'.format(
+                                                        f'local csgc_{label}_XXXX = 200 ;: 200',
+                                                        f'local cslc_{label}_XXXX = 200 ;: 200',
+                                                        f'local sgc_{label}_XXXX = 0 ;: 0',
+                                                        f'local slc_{label}_XXXX = 0 ;: 0',
+    ))
 
 
-        fout.write('\n')
+    # fout.write(f'local csgc_{label} ;:\t\t\t\t\t')
+    # fout.write(f'local cslc_{label} ;:\t\t\t\t\t')
+    # fout.write(f'local sgc_{label} ;:\t\t\t\t\t')
+    # fout.write(f'local slc_{label} ;:\n')
 
 
+
+
+def write_str(fout, data, options, index=0):
+
+    atoms = read_cif(data['str'][index])
+    if 'labels' in data.keys():
+        label = data['labels'][index]
+    else:
+        label = index
+
+   
     fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
-    fout.write(atoms['_chemical_name_common'] + f'({atoms["_space_group_name_H-M_alt"]})')
+    fout.write('\'' + atoms['_chemical_name_common'].strip('\'') + ' ' + f'({atoms["_space_group_name_H-M_alt"]})'.replace("\'", ""))
     fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
 
 
     fout.write('\tstr\n')
-    fout.write(f'\t\tphase_name "{atoms["_chemical_name_common"]} ({atoms["_space_group_name_H-M_alt"]})"\n')
+    fout.write(f'\t\tphase_name "{atoms["_chemical_name_common"]} ({atoms["_space_group_name_H-M_alt"]})"\n'.replace('\'', ''))
     fout.write(f'\t\tspace_group {atoms["_space_group_IT_number"]}\n')
-    fout.write('\t\ta = lpa ;\n')
-    fout.write('\t\tb = lpb ;\n')
-    fout.write('\t\tc = lpc ;\n')
-    fout.write('\t\tal = lpal ;\n')
-    fout.write('\t\tbe = lpbe ;\n')
-    fout.write('\t\tga = lpga ;\n')
+    fout.write(f'\t\ta = lpa_{label} ;\n')
+    fout.write(f'\t\tb = lpb_{label} ;\n')
+    fout.write(f'\t\tc = lpc_{label} ;\n')
+    fout.write(f'\t\tal = lpal_{label} ;\n')
+    fout.write(f'\t\tbe = lpbe_{label} ;\n')
+    fout.write(f'\t\tga = lpga_{label} ;\n')
     fout.write('\n')
-    fout.write(f'\t\tcell_volume vol_XXXX {atoms["_cell_volume"]}\n')
+    fout.write(f'\t\tcell_volume\t vol_{label}_XXXX {atoms["_cell_volume"]}\n')
+    fout.write(f'\t\tcell_mass\t mass_{label}_XXXX 1\n')
+    fout.write(f'\t\tweight_percent\t wp_{label}_XXXX 100\n\n')
+    fout.write('\n')
+    fout.write('\t\tscale @ 1.0\n')
+    fout.write('\t\tr_bragg 1.0\n\n')
+
+    fout.write(f'\t\t#ifdef crystallite_size_gaussian_{label}\n')
+    fout.write(f'\t\tCS_G(csgc_{label}_XXXX)\n')
+    fout.write('\t\t#endif\n')
+    fout.write(f'\t\t#ifdef crystallite_size_lorentzian_{label}\n')
+    fout.write(f'\t\tCS_L(cslc_{label}_XXXX)\n')
+    fout.write('\t\t#endif\n\n')
+
+    fout.write(f'\t\t#ifdef strain_gaussian_{label}\n')
+    fout.write(f'\t\tStrain_G(sgc_{label}_XXXX)\n')
+    fout.write('\t\t#endif\n')
+    fout.write(f'\t\t#ifdef strain_lorentzian_{label}\n')
+    fout.write(f'\t\tStrain_L(slc_{label}_XXXX)\n')
+    fout.write('\t\t#endif\n\n')
+
+
+
+
 
     for atom in atoms['atoms'].keys():
-        atom_label = atom if len(atom) == 3 else atom+' '
 
-        fout.write(f'\t\tsite {atom_label}\t x = x_{atom_label} ;\t y = y_{atom_label} ;\t z = z_{atom_label} ; occ {atoms["atoms"][atom]["_atom_site_occupancy"]}\t beq = beq_{atom_label} \t ;\n')
+        specie = '{}{}'.format(
+                                    atoms["atoms"][atom]["_atom_site_type_symbol"], 
+                                    data['oxidation_states'][index][atoms["atoms"][atom]["_atom_site_type_symbol"]]
+        )
 
+        site = f'site {atom}'
+        x = f'\t\tx = x_{atom}_{label}'
+        y = f'\t\ty = y_{atom}_{label}'
+        z = f'\t\tz = z_{atom}_{label}'
+        occ = '\t\tocc {: <4} = occ_{}_{}'.format(specie, atom, label)
+        #occ = f'\t\tocc {atoms["atoms"][atom]["_atom_site_type_symbol"]} occ_{atom}_{label}'
+        beq = f'\t\tbeq = beq_{atom}_{label}'
+
+        # FIXME Fix alignment here at some point
+        #fout.write(f'\t\tsite {atom}\t x = x_{atom}_{label} ;\t y = y_{atom}_{label} ;\t z = z_{atom}_{label} ;\t occ {atoms["atoms"][atom]["_atom_site_type_symbol"]} occ_{atom}_{label} \t beq = beq_{atom}_{label} \t ;\n')
+        fout.write('\t\t{: <9} {: <30}; {: <30}; {: <30}; {: <30}; {: <30};'.format(site, x, y, z, occ, beq))
+        fout.write('\n')
+
+
+
+    if options['save_results']:
+        fout.write('\n\n')
+        write_output(fout=fout, data=data, options=options, index=index)
+
+
+    
+def write_output(fout, data, options, index=0):
+
+
+    filename = os.path.basename(data['xdd']).split('.')[0]
+
+    atoms = read_cif(data['str'][index])
+
+    if 'labels' in data.keys():
+        label = data['labels'][index]
+    else:
+        label = index
+
+
+    fout.write('#ifdef output\n')
+    fout.write(f'\t\tOut_Riet({options["save_dir"]}/{label}_XXXX_riet.xy)\n')
+    fout.write(f'\t\tOut_CIF_STR({options["save_dir"]}/{label}_XXXX.cif)\n')
+    fout.write(f'\t\tOut_CIF_ADPs({options["save_dir"]}/{label}_XXXX.cif)\n')
+    fout.write(f'\t\tOut_CIF_Bonds_Angles({options["save_dir"]}/{label}_XXXX.cif)\n')
+    fout.write(f'\t\tCreate_hklm_d_Th2_Ip_file({options["save_dir"]}/{label}_XXXX_hkl.dat)\n')
 
     fout.write('\n')
-    fout.write('\t\tscale @ 0.0')
-    fout.write('\t\t r_bragg 1.0')
-    
 
+    fout.write(f'out {options["save_dir"]}/{filename}_{label}.dat append\n')
+    fout.write(f'\t\tOut_String("XXXX")\n')
+
+    fout.write('\t\t{: <40} {: <40} {: <40} {: <40} {: <40} {: <40}'.format(
+                                                                    f'Out(Get(r_wp), "%11.5f")',
+                                                                    f'Out(Get(r_exp), "%11.5f")',
+                                                                    f'Out(Get(r_p), "%11.5f")',
+                                                                    f'Out(Get(r_p_dash), "%11.5f")',
+                                                                    f'Out(Get(r_exp_dash), "%11.5f")',
+                                                                    f'Out(Get(gof), "%11.5f")',
+        )
+    )
+
+    fout.write('\n')
+
+
+    fout.write('\t\t{: <40} {: <40} {: <40}'.format(
+                                                                    f'Out(vol_{label}_XXXX, "%11.5f")',
+                                                                    f'Out(mass_{label}_XXXX, "%11.5f")',
+                                                                    f'Out(wp_{label}_XXXX, "%11.5f")',
+    
+        )
+    )
+
+    
+    fout.write('\n')
+
+
+    fout.write('\t\t{: <40} {: <40} {: <40} {: <40} {: <40} {: <40}'.format(
+                                                                    f'Out(lpa_{label}, "%11.5f")',
+                                                                    f'Out(lpb_{label}, "%11.5f")',
+                                                                    f'Out(lpc_{label}, "%11.5f")',
+                                                                    f'Out(lpal_{label}, "%11.5f")',
+                                                                    f'Out(lpbe_{label}, "%11.5f")',
+                                                                    f'Out(lpga_{label}, "%11.5f")',
+    
+        )
+    )
+
+    fout.write('\n\n')
+
+    for atom in atoms['atoms']:
+        fout.write('\t\t{: <40} {: <40} {: <40} {: <40} {: <40}'.format(
+                                                                        f'Out(x_{atom}_{label}, "%11.5f")',
+                                                                        f'Out(y_{atom}_{label}, "%11.5f")',
+                                                                        f'Out(z_{atom}_{label}, "%11.5f")',
+                                                                        f'Out(occ_{atom}_{label}, "%11.5f")',
+                                                                        f'Out(beq_{atom}_{label}, "%11.5f")',
+            )
+        )
+        
+        fout.write('\n')
+    
+    fout.write('\n\n')
+
+
+
+    fout.write('#endif')
 
 
 
