@@ -249,7 +249,11 @@ def write_str(fout, data, options, index=0):
     fout.write(f'\t\tbe = lpbe_{label} ;\n')
     fout.write(f'\t\tga = lpga_{label} ;\n')
     fout.write('\n')
-    fout.write(f'\t\tcell_volume\t vol_{label}_XXXX {atoms["_cell_volume"]}\n')
+    #FIXME fix the if-statement below, so that cell-volume is the correct formula, based on lattice params and angles.
+    if '_cell_volume' not in atoms.keys():
+        atoms['_cell_volume'] = 0
+    else:
+        fout.write(f'\t\tcell_volume\t vol_{label}_XXXX {atoms["_cell_volume"]}\n')
     fout.write(f'\t\tcell_mass\t mass_{label}_XXXX 1\n')
     fout.write(f'\t\tweight_percent\t wp_{label}_XXXX 100\n\n')
     fout.write('\n')
@@ -456,7 +460,7 @@ def read_cif(path):
                 line = cif.readline()   
 
 
-
+    print(data.keys()) 
     return data
         
 
