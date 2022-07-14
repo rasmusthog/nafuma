@@ -9,8 +9,6 @@ import datetime
 import warnings
 import json
 
-from ase import io
-
 import nafuma.auxillary as aux
 
 
@@ -329,6 +327,8 @@ def write_output(fout, data, options, index=0):
     fout.write(f'out {options["save_dir"]}/{filename}_{label}.dat append\n')
     fout.write(f'\t\tOut_String("XXXX")\n')
 
+
+    # FIXME Does not write out weighted_Durbin_Watson, TOPAS complained about this
     fout.write('\t\t{: <40} {: <40} {: <40} {: <40} {: <40} {: <40}'.format(
                                                                     f'Out(Get(r_wp), "%11.5f")',
                                                                     f'Out(Get(r_exp), "%11.5f")',
@@ -476,6 +476,9 @@ def update_topas_options(options):
 def make_big_inp(data: dict, options={}):
     ''' Generates a big .INP-file with all filenames found in data["path"]. Uses a template .INP-file (which has to be generated manually from an initial refinement in TOPAS) and appends this to a large .INP-file
     while changing the filenames. '''
+
+
+    # FIXME Strip headers from initial INP file before copying it. 
 
     required_options = ['template', 'output', 'overwrite', 'backup', 'backup_dir', 'include', 'topas_options', 'save_results', 'save_dir', 'log', 'logfile']
 
@@ -635,29 +638,29 @@ def make_inp_entry(template: str, xdd: str, num: int, options: dict) -> str:
     # Replace diffractogram-path
     s = template.replace(temp_xdd, xdd).replace('XXXX', num_str)
 
-    basename = os.path.basename(xdd).split(".")[0]
+    # basename = os.path.basename(xdd).split(".")[0]
     
-    # Define regular expressions for output lines
-    regs = [r'Out_Riet\([\S]*\)',
-            r'Out_CIF_STR\([\S]*\)',
-            r'Out_CIF_ADPs\([\S]*\)',
-            r'Out_CIF_Bonds_Angles\([\S]*\)',
-            r'Out_FCF\([\S]*\)',
-            r'Create_hklm_d_Th2_Ip_file\([\S]*\)',
-            r'out(.*?)append']
+    # # Define regular expressions for output lines
+    # regs = [r'Out_Riet\([\S]*\)',
+    #         r'Out_CIF_STR\([\S]*\)',
+    #         r'Out_CIF_ADPs\([\S]*\)',
+    #         r'Out_CIF_Bonds_Angles\([\S]*\)',
+    #         r'Out_FCF\([\S]*\)',
+    #         r'Create_hklm_d_Th2_Ip_file\([\S]*\)',
+    #         r'out(.*?)append']
     
-    # Define substitute strings for output lines
-    subs = [f'Out_Riet({options["save_dir"]}/{basename}_riet.xy)',
-            f'Out_CIF_STR({options["save_dir"]}/{basename}.cif)',
-            f'Out_CIF_ADPs({options["save_dir"]}/{basename}.cif)',
-            f'Out_CIF_Bonds_Angles({options["save_dir"]}/{basename}.cif)',
-            f'Out_FCF({options["save_dir"]}/{basename}.fcf)',
-            f'Create_hklm_d_Th2_Ip_file({options["save_dir"]}/{basename}_hkl.dat)',
-            f'out \t {options["save_dir"]}/{basename}_refined_params.dat \t append']
+    # # Define substitute strings for output lines
+    # subs = [f'Out_Riet({options["save_dir"]}/{basename}_riet.xy)',
+    #         f'Out_CIF_STR({options["save_dir"]}/{basename}.cif)',
+    #         f'Out_CIF_ADPs({options["save_dir"]}/{basename}.cif)',
+    #         f'Out_CIF_Bonds_Angles({options["save_dir"]}/{basename}.cif)',
+    #         f'Out_FCF({options["save_dir"]}/{basename}.fcf)',
+    #         f'Create_hklm_d_Th2_Ip_file({options["save_dir"]}/{basename}_hkl.dat)',
+    #         f'out \t {options["save_dir"]}/{basename}_refined_params.dat \t append']
 
-    # Substitute strings in output lines
-    for reg, sub in zip(regs, subs):
-        s = re.sub(reg, sub, s)
+    # # Substitute strings in output lines
+    # for reg, sub in zip(regs, subs):
+    #     s = re.sub(reg, sub, s)
 
 
 
@@ -716,7 +719,12 @@ def refine(data: dict, options={}):
 
 
     # Create folders if they don't exist
-    paths, headers = get_paths(data['inp']), get_headers(data['inp'])
+
+    # FIXME Since the big INP files now have the same filename for all iterations, we need to adjust the code to only get unique values from the get_paths function
+    # FIXME get_headers() is also not working now. Needs to be adjusted to the new way of writing the Out-parameters    
+    paths = get_paths(data['inp']) 
+    headers = get_headers(data['inp'])
+
     
     for path in paths:
         dirname = os.path.dirname(path)
@@ -746,3 +754,14 @@ def refine(data: dict, options={}):
 
     
     subprocess.call(command, shell=True)
+
+
+
+
+
+def read_results():
+    # FIXME Write the function
+    
+    return None
+
+
