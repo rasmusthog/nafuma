@@ -539,7 +539,11 @@ def make_big_inp(data: dict, options={}):
     runlist = os.path.join(os.path.dirname(options['output']), 'runlist.txt')
     options['include'].append(runlist)
 
-    with open(options['template'], 'r') as template, open(options['output'], 'w', newline='\n') as output, open(runlist, 'w', newline='\n') as runlist:
+    with open(options['template'], 'r') as template:
+        strip_headers(template)
+
+    
+    with open('tmp_template.inp', 'r') as template, open(options['output'], 'w', newline='\n') as output, open(runlist, 'w', newline='\n') as runlist:
     
         write_headers(output, options)
 
@@ -552,6 +556,34 @@ def make_big_inp(data: dict, options={}):
             output.write('\n\n')
             
             runlist.write('#define \tUSE_'+f'{i}'.zfill(4) + '\n')
+
+    os.remove('tmp_template.inp')
+
+
+def strip_headers(fin):
+
+    line = fin.readline()
+    newlines = []
+
+    while 'r_wp' not in line:
+        if line[0] != '\'':
+            line = fin.readline()            
+        else:
+            newlines.append(line)
+            line = fin.readline()
+
+    newlines.append(line)
+    newlines = newlines + fin.readlines()
+
+    with open('tmp_template.inp', 'w') as fout:
+        for line in newlines:
+            fout.write(line)
+
+    
+
+
+
+
 
 
 
@@ -649,32 +681,6 @@ def make_inp_entry(template: str, xdd: str, num: int, options: dict) -> str:
     
     # Replace diffractogram-path
     s = template.replace(temp_xdd, xdd).replace('XXXX', num_str)
-
-    # basename = os.path.basename(xdd).split(".")[0]
-    
-    # # Define regular expressions for output lines
-    # regs = [r'Out_Riet\([\S]*\)',
-    #         r'Out_CIF_STR\([\S]*\)',
-    #         r'Out_CIF_ADPs\([\S]*\)',
-    #         r'Out_CIF_Bonds_Angles\([\S]*\)',
-    #         r'Out_FCF\([\S]*\)',
-    #         r'Create_hklm_d_Th2_Ip_file\([\S]*\)',
-    #         r'out(.*?)append']
-    
-    # # Define substitute strings for output lines
-    # subs = [f'Out_Riet({options["save_dir"]}/{basename}_riet.xy)',
-    #         f'Out_CIF_STR({options["save_dir"]}/{basename}.cif)',
-    #         f'Out_CIF_ADPs({options["save_dir"]}/{basename}.cif)',
-    #         f'Out_CIF_Bonds_Angles({options["save_dir"]}/{basename}.cif)',
-    #         f'Out_FCF({options["save_dir"]}/{basename}.fcf)',
-    #         f'Create_hklm_d_Th2_Ip_file({options["save_dir"]}/{basename}_hkl.dat)',
-    #         f'out \t {options["save_dir"]}/{basename}_refined_params.dat \t append']
-
-    # # Substitute strings in output lines
-    # for reg, sub in zip(regs, subs):
-    #     s = re.sub(reg, sub, s)
-
-
 
     return s
 
