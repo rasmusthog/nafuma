@@ -3,7 +3,7 @@ import os
 import shutil
 import subprocess
 import re
-
+import numpy as np
 import time
 import datetime
 import warnings
@@ -249,11 +249,7 @@ def write_str(fout, data, options, index=0):
     fout.write(f'\t\tbe = lpbe_{label} ;\n')
     fout.write(f'\t\tga = lpga_{label} ;\n')
     fout.write('\n')
-    #FIXME fix the if-statement below, so that cell-volume is the correct formula, based on lattice params and angles.
-    if '_cell_volume' not in atoms.keys():
-        atoms['_cell_volume'] = 0
-    else:
-        fout.write(f'\t\tcell_volume\t vol_{label}_XXXX {atoms["_cell_volume"]}\n')
+    fout.write(f'\t\tcell_volume\t vol_{label}_XXXX {atoms["_cell_volume"]}\n')
     fout.write(f'\t\tcell_mass\t mass_{label}_XXXX 1\n')
     fout.write(f'\t\tweight_percent\t wp_{label}_XXXX 100\n\n')
     fout.write('\n')
@@ -393,7 +389,7 @@ def write_output(fout, data, options, index=0):
 
 def read_cif(path):
 
-    data = {'atoms': {}} # Initialise dictionary
+    atoms = {'atoms': {}} # Initialise dictionary
     read = True # Initialise read toggle
 
     # Lists attributes to get out of the .CIF-file. This will correspond to what VESTA writes out, not necessarily what you will find in ICSD
@@ -428,12 +424,12 @@ def read_cif(path):
                     # FIXME WHat a horrible condition statement - need to fix this!
                     while line and not line.lstrip().startswith('_') and not line.lstrip().startswith('loop_') and not line.lstrip().startswith('#End') and not line=='\n':
                         # Initialise empty dictionary for a given atom if it has not already been created in another loop
-                        if line.split()[0] not in data['atoms'].keys():
-                            data["atoms"][line.split()[0]] = {}
+                        if line.split()[0] not in atoms['atoms'].keys():
+                            atoms["atoms"][line.split()[0]] = {}
 
                         # Add all the attribute / value pairs for the current loop
                         for i, attr in enumerate(loop):
-                            data["atoms"][line.split()[0]][attr[:-1].lstrip()] = line.split()[i]
+                            atoms["atoms"][line.split()[0]][attr[:-1].lstrip()] = line.split()[i]
                         
                         # Read new line
                         line = cif.readline()
@@ -453,15 +449,22 @@ def read_cif(path):
 
                 value = ' '.join([str(i) for i in value])
 
-                data[attr] = value
+                atoms[attr] = value
                 line = cif.readline()
 
             else:
                 line = cif.readline()   
 
+    if '_cell_volume' not in atoms.keys():
+        a       = float(atoms['_cell_length_a'].split('(')[0])
+        b       = float(atoms['_cell_length_b'].split('(')[0])
+        c       = float(atoms['_cell_length_c'].split('(')[0])
+        alpha   = float(atoms['_cell_angle_alpha'].split('(')[0])
+        beta    = float(atoms['_cell_angle_beta'].split('(')[0])
+        gamma   = float(atoms['_cell_angle_gamma'].split('(')[0])
 
-    print(data.keys()) 
-    return data
+        atoms['_cell_volume'] = a * b * c * np.sqrt(1-np.cos(alpha)**2 - np.cos(beta)**2 - np.cos(gamma)**2 + 2 * np.cos(alpha) * np.cos(beta) * np. cos(gamma))
+    return atoms
         
 
 
