@@ -1,4 +1,3 @@
-from email.policy import default
 import os
 import shutil
 import subprocess
@@ -8,6 +7,8 @@ import time
 import datetime
 import warnings
 import json
+
+import pandas as pd
 
 import nafuma.auxillary as aux
 
@@ -160,25 +161,25 @@ def write_params(fout, data, options, index=0):
     # WRITE LATTICE PARAMETERS
     # If start_values is defined:
     fout.write(f'#ifdef start_values_{label}\n')
-    lpa = f'local lpa_{label} {a} ;: {a}'
-    lpb = f'local lpb_{label} {b} ;: {b}'
-    lpc = f'local lpc_{label} {c} ;: {c}'
+    lpa = f'local !lpa_{label} {a} ;: {a}'
+    lpb = f'local !lpb_{label} {b} ;: {b}'
+    lpc = f'local !lpc_{label} {c} ;: {c}'
     fout.write('{: <55}  {: <55}  {: <55}\n'.format(lpa, lpb, lpc))
-    lpal = f'local lpal_{label} {alpha} ;: {alpha}'
-    lpbe = f'local lpbe_{label} {beta} ;: {beta}'
-    lpga = f'local lpga_{label} {gamma} ;: {gamma}'
+    lpal = f'local !lpal_{label} {alpha} ;: {alpha}'
+    lpbe = f'local !lpbe_{label} {beta} ;: {beta}'
+    lpga = f'local !lpga_{label} {gamma} ;: {gamma}'
     fout.write('{: <55}  {: <55}  {: <55}\n'.format(lpal, lpbe, lpga))
 
     # Otherwise
     fout.write('\n')
     fout.write('#else\n')
-    lpa = f'local lpa_{label} {a}'
-    lpb = f'local lpb_{label} {b}'
-    lpc = f'local lpc_{label} {c}'
+    lpa = f'local !lpa_{label} {a}'
+    lpb = f'local !lpb_{label} {b}'
+    lpc = f'local !lpc_{label} {c}'
     fout.write('{: <55}  {: <55}  {: <55}\n'.format(lpa, lpb, lpc))
-    lpal = f'local lpal_{label} {alpha}'
-    lpbe = f'local lpbe_{label} {beta}'
-    lpga = f'local lpga_{label} {gamma}'
+    lpal = f'local !lpal_{label} {alpha}'
+    lpbe = f'local !lpbe_{label} {beta}'
+    lpga = f'local !lpga_{label} {gamma}'
     fout.write('{: <55}  {: <55}  {: <55}\n'.format(lpal, lpbe, lpga))
     fout.write('#endif\n\n')
 
@@ -188,8 +189,8 @@ def write_params(fout, data, options, index=0):
         '_atom_site_fract_x': 'x', 
         '_atom_site_fract_y': 'y', 
         '_atom_site_fract_z': 'z', 
-        '_atom_site_occupancy': '!occ',
-        '_atom_site_B_iso_or_equiv': '!beq'
+        '_atom_site_occupancy': 'occ',
+        '_atom_site_B_iso_or_equiv': 'beq'
         }
 
 
@@ -202,7 +203,7 @@ def write_params(fout, data, options, index=0):
                 value = atoms["atoms"][site][attr].split("(")[0]
                 value = value if value != '.' else 0.
 
-                params.append('{: <20} {: <20}'.format(f'local {attrs[attr]}_{site}_{label}', f' = {value} ;: {value}'))
+                params.append('{: <20} {: <20}'.format(f'local !{attrs[attr]}_{site}_{label}', f' = {value} ;: {value}'))
                 #fout.write(f'local {attrs[attr]}_{site}_{label}\t\t =\t {value} \t ;= \t\t\t\t\t')
 
         fout.write('{: <55}  {: <55}  {: <55} {: <55} {: <55}\n'.format(*params))
@@ -210,10 +211,10 @@ def write_params(fout, data, options, index=0):
     fout.write('\n')
 
     fout.write('{: <55}  {: <55}  {: <55} {: <55}\n'.format(
-                                                        f'local csgc_{label}_XXXX = 200 ;: 200',
-                                                        f'local cslc_{label}_XXXX = 200 ;: 200',
-                                                        f'local sgc_{label}_XXXX = 0 ;: 0',
-                                                        f'local slc_{label}_XXXX = 0 ;: 0',
+                                                        f'local !csgc_{label}_XXXX = 200 ;: 200',
+                                                        f'local !cslc_{label}_XXXX = 200 ;: 200',
+                                                        f'local !sgc_{label}_XXXX = 0 ;: 0',
+                                                        f'local !slc_{label}_XXXX = 0 ;: 0',
     ))
 
 
@@ -382,12 +383,11 @@ def write_output(fout, data, options, index=0):
         )
         
         fout.write('\n')
-    
+
+    fout.write('\t\tOut_String("\\n")\n')
+    fout.write('#endif')
     fout.write('\n\n')
 
-
-
-    fout.write('#endif')
 
 
 
@@ -588,31 +588,39 @@ def write_headers(fout, options):
                 fout.write(f'{option} {value} \n')
 
 
-def get_headers(inp):
+def get_headers(inp, path):
 
     with open(inp, 'r') as inp:
-        headers = []
+        headers = ['index']
 
         line = inp.readline()
 
-        while not all(keyword in line for keyword in ['out', 'append']):
+        while not path in line:
             line = inp.readline()
 
         # Jump down to lines
         line = inp.readline()
         line = inp.readline()
 
-        while not 'Out_String' in line:
-                
+        while not '#endif' in line:
             if line.split():
-                header = line.split()[1]
-                if all(keyword in header for keyword in ['Get', '(', ')']):
-                    header = header[4:-1]
+                
+                regx = r"\([\S]*"
+                headers_line = re.findall(regx, line)
 
-                headers.append(header)
+                for i, header in enumerate(headers_line):
+                    header = header[1:-1]
+
+                    if all(keyword in header for keyword in ['Get', '(', ')']):
+                        header = header[4:-1]
+
+                    headers_line[i] = header
+
+                for header in headers_line:
+                    if header != '"\\n"':
+                        headers.append(header)
 
             line = inp.readline()
-
 
     return headers
             
@@ -726,11 +734,14 @@ def refine(data: dict, options={}):
 
     # FIXME Since the big INP files now have the same filename for all iterations, we need to adjust the code to only get unique values from the get_paths function
     # FIXME get_headers() is also not working now. Needs to be adjusted to the new way of writing the Out-parameters    
-    paths = get_paths(data['inp']) 
-    headers = get_headers(data['inp'])
-
+    paths = get_paths(data['inp'])
+    paths = aux.get_unique(paths)
     
+
+
     for path in paths:
+        headers = get_headers(data['inp'], path)
+
         dirname = os.path.dirname(path)
 
         if dirname and not os.path.isdir(dirname):
@@ -763,9 +774,10 @@ def refine(data: dict, options={}):
 
 
 
-def read_results():
-    # FIXME Write the function
+def read_results(path):
     
-    return None
+    results = pd.read_csv(path, delim_whitespace=True, index_col=0)
+    
+    return results
 
 
