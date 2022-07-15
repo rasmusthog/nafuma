@@ -135,3 +135,14 @@ def backup_file(filename, backup_dir):
 
 
     shutil.copy(filename, dst)
+
+
+def get_unique(full_list):
+
+    unique_list = []
+
+    for entry in full_list:
+        if not entry in unique_list:
+            unique_list.append(entry)
+
+    return unique_list
