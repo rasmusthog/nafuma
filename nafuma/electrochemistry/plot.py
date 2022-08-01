@@ -19,10 +19,11 @@ def plot_gc(data, options=None):
 
 
 	# Update options
-	required_options = ['x_vals', 'y_vals', 'which_cycles', 'charge', 'discharge', 'colours', 'differentiate_charge_discharge', 'gradient', 'interactive', 'interactive_session_active', 'rc_params', 'format_params']	
+	required_options = ['x_vals', 'y_vals', 'which_cycles', 'exclude_cycles', 'charge', 'discharge', 'colours', 'differentiate_charge_discharge', 'gradient', 'interactive', 'interactive_session_active', 'rc_params', 'format_params']	
 	default_options = {
 		'x_vals': 'capacity', 'y_vals': 'voltage', 
-		'which_cycles': 'all', 
+		'which_cycles': 'all',
+		'exclude_cycles': [],
 		'charge': True, 'discharge': True, 
 		'colours': None, 
 		'differentiate_charge_discharge': True, 
@@ -35,43 +36,45 @@ def plot_gc(data, options=None):
 	options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
 	
-
-	
 	if not 'cycles' in data.keys():
 		data['cycles'] = ec.io.read_data(data=data, options=options)
 
-	# Update list of cycles to correct indices
-	update_cycles_list(cycles=data['cycles'], options=options)
-
-	colours = generate_colours(cycles=data['cycles'], options=options)
-
-	if options['interactive']:
-		options['interactive'], options['interactive_session_active'] = False, True
-		plot_gc_interactive(data=data, options=options)
-		return
-
-
-	# Prepare plot, and read and process data
 	
-	fig, ax = btp.prepare_plot(options=options)
+	if not options['summary']:
+		# Update list of cycles to correct indices
+		update_cycles_list(data=data, options=options)
 
-	for i, cycle in enumerate(data['cycles']):
-		if i in options['which_cycles']:
-			if options['charge']:
-				cycle[0].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][0])
+		colours = generate_colours(cycles=data['cycles'], options=options)
 
-			if options['discharge']:
-				cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
+		if options['interactive']:
+			options['interactive'], options['interactive_session_active'] = False, True
+			plot_gc_interactive(data=data, options=options)
+			return
 
 
-	if options['interactive_session_active']:
-		update_labels(options, force=True)
-	else:
-		update_labels(options)
+		# Prepare plot, and read and process data
+		
+		fig, ax = btp.prepare_plot(options=options)
 
-	fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
+		for i, cycle in enumerate(data['cycles']):
+			if i in options['which_cycles']:
+				if options['charge']:
+					cycle[0].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][0])
 
-	#if options['interactive_session_active']:
+				if options['discharge']:
+					cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
+
+
+		if options['interactive_session_active']:
+			update_labels(options, force=True)
+		else:
+			update_labels(options)
+
+		fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
+
+	elif options['summary']:
+
+		fig, ax = 0, 0
 	
 
 	return data['cycles'], fig, ax 
@@ -118,28 +121,45 @@ def update_labels(options, force=False):
 
 		
 	
-def update_cycles_list(cycles, options: dict) -> None:
+def update_cycles_list(data, options: dict) -> None:
 
 	if options['which_cycles'] == 'all':
-		options['which_cycles'] = [i for i in range(len(cycles))]
+		options['which_cycles'] = [i for i in range(len(data['cycles']))]
 
 
-	elif type(options['which_cycles']) == list:
-		options['which_cycles'] = [i-1 for i in options['which_cycles']]
+	elif isinstance(options['which_cycles'], list):
+
+		cycles =[]
+
+		for cycle in options['which_cycles']:
+			if isinstance(cycle, int):
+				cycles.append(cycle-1)
+
+			elif isinstance(cycle, tuple):
+				interval = [i-1 for i in range(cycle[0], cycle[1]+1)]
+				cycles.extend(interval)
+
+		
+		options['which_cycles'] = cycles
 	
 	
 	# Tuple is used to define an interval - as elements tuples can't be assigned, I convert it to a list here.
-	elif type(options['which_cycles']) == tuple:
+	elif isinstance(options['which_cycles'], tuple):
 		which_cycles = list(options['which_cycles'])
 
 		if which_cycles[0] <= 0:
 			which_cycles[0] = 1
 
 		elif which_cycles[1] < 0:
-			which_cycles[1] = len(cycles)
+			which_cycles[1] = len(options['which_cycles'])
 
 
 		options['which_cycles'] = [i-1 for i in range(which_cycles[0], which_cycles[1]+1)]
+
+	
+	for i, cycle in enumerate(options['which_cycles']):
+		if cycle in options['exclude_cycles']:
+			del options['which_cycles'][i]
 
 
 
