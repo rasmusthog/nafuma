@@ -52,7 +52,6 @@ def read_neware(path, options={}):
 	elif path.endswith('csv'):
 		df = pd.read_csv(path)
 
-
 	return df
 
 
@@ -243,10 +242,6 @@ def splice_cycles(df, options: dict) -> pd.DataFrame:
 							
 							df[column].loc[df['steps'] == steps_indices[1]] += add
 
-
-
-				 
-
 	return df
 
 
@@ -297,13 +292,12 @@ def process_neware_data(df, options={}):
 		# Initiate cycles list
 		cycles = []
 
+
+
 		# Loop through all the cycling steps, change the current and capacities in the 
 		for i in range(df["cycle"].max()):
 
 			sub_df = df.loc[df['cycle'] == i+1].copy()
-
-			#sub_df.loc[dchg_mask, 'current']  *= -1
-			#sub_df.loc[dchg_mask, 'capacity'] *= -1
 
 			chg_df = sub_df.loc[chg_mask]
 			dchg_df = sub_df.loc[dchg_mask]
@@ -328,7 +322,8 @@ def process_neware_data(df, options={}):
 
 			cycles.append((chg_df, dchg_df))
 
-			return cycles
+
+		return cycles
 
 
 	elif options['summary']:
@@ -341,7 +336,13 @@ def process_neware_data(df, options={}):
 		if options['splice_cycles']:
 			df = splice_cycles(df=df, options=options)
 
-		return df
+
+		chg_df = df.loc[df['status'] == 'CC Chg']
+		dchg_df = df.loc[df['status'] == 'CC DChg']
+
+		cycles = [chg_df, dchg_df]
+
+		return cycles
 
 
 
