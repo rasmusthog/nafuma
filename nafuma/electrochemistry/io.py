@@ -7,10 +7,10 @@ import os
 import nafuma.auxillary as aux
 from sympy import re
 
-def read_data(data, options=None):
+def read_data(data, options={}):
 
 	if data['kind'] == 'neware':
-		df = read_neware(data['path'])
+		df = read_neware(data['path'], options=options)
 		cycles = process_neware_data(df=df, options=options)
 
 	elif data['kind'] == 'batsmall':
@@ -25,7 +25,7 @@ def read_data(data, options=None):
 
 
 
-def read_neware(path, summary=False):
+def read_neware(path, options={}):
 	''' Reads electrochemistry data, currently only from the Neware battery cycler. Will convert to .csv if the filetype is .xlsx,
 	which is the file format the Neware provides for the backup data. In this case it matters if summary is False or not. If file
 	type is .csv, it will just open the datafile and it does not matter if summary is False or not.'''
@@ -34,17 +34,18 @@ def read_neware(path, summary=False):
 	# FIXME Do a check if a .csv-file already exists even if the .xlsx is passed
 
 	# Convert from .xlsx to .csv to make readtime faster
-	if path.split('.')[-1] == 'xlsx':
-		csv_details = ''.join(path.split('.')[:-1]) + '_details.csv'
-		csv_summary = ''.join(path.split('.')[:-1]) + '_summary.csv'
+	if path.endswith('xlsx'):
+		csv_details = ''.join(path[:-5]) + '_details.csv'
+		csv_summary = ''.join(path[:-5]) + '_summary.csv'
 
+	
 		if not os.path.isfile(csv_summary):
 			Xlsx2csv(path, outputencoding="utf-8").convert(csv_summary, sheetid=3)
 
 		if not os.path.isfile(csv_details):
 			Xlsx2csv(path, outputencoding="utf-8").convert(csv_details, sheetid=4)
 
-		if summary:
+		if options['summary']:
 			df = pd.read_csv(csv_summary)
 		else:
 			df = pd.read_csv(csv_details)
