@@ -36,26 +36,26 @@ def plot_gc(data, options=None):
 	options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
 	
+	# Read data if not already loaded
 	if not 'cycles' in data.keys():
 		data['cycles'] = ec.io.read_data(data=data, options=options)
 
 	
+	# Update list of cycles to correct indices
+	update_cycles_list(data=data, options=options)
+
+	if options['interactive']:
+		options['interactive'], options['interactive_session_active'] = False, True
+		plot_gc_interactive(data=data, options=options)
+		return
+
+
+	# Prepare plot
+	fig, ax = btp.prepare_plot(options=options)
+	colours = generate_colours(cycles=data['cycles'], options=options)
+
 	if not options['summary']:
-		# Update list of cycles to correct indices
-		update_cycles_list(data=data, options=options)
-
-		colours = generate_colours(cycles=data['cycles'], options=options)
-
-		if options['interactive']:
-			options['interactive'], options['interactive_session_active'] = False, True
-			plot_gc_interactive(data=data, options=options)
-			return
-
-
-		# Prepare plot, and read and process data
 		
-		fig, ax = btp.prepare_plot(options=options)
-
 		for i, cycle in enumerate(data['cycles']):
 			if i in options['which_cycles']:
 				if options['charge']:
@@ -70,12 +70,17 @@ def plot_gc(data, options=None):
 		else:
 			update_labels(options)
 
-		fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
 
 	elif options['summary']:
 
-		fig, ax = 0, 0
+		# FIXME To begin, the default is that y-values correspond to x-values. This should probably be implemented in more logical and consistent manner in the future.
+		if options['charge']:
+			data['cycles'][0].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][0], kind='scatter', s=plt.rcParams['lines.markersize'])
+			data['cycles'][1].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][1], kind='scatter', s=plt.rcParams['lines.markersize'])
+
 	
+
+	fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
 
 	return data['cycles'], fig, ax 
 
