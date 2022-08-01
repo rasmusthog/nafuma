@@ -1,0 +1,15 @@
+{
+    "A_matrix_memory_allowed_in_Mbytes": null,
+    "approximate_A": false,
+    "bootstrap_errors": null,
+    "capdia": 0.5,
+    "chi2_convergence_criteria": 0.001,
+    "conserve_memory": false,
+    "continue_after_convergence": false,
+    "convolution_step": 1,
+    "do_errors": false,
+    "iters": 100000,
+    "lp_factor": 90,
+    "num_runs": null,
+    "packing_density": 0.5
+}
