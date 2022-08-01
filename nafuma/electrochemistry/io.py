@@ -206,6 +206,47 @@ def splice_cycles(df, options: dict) -> pd.DataFrame:
 					add = df['specific_capacity'].iloc[i-1]
 					df['specific_capacity'].iloc[i:last_chg] = df['specific_capacity'].iloc[i:last_chg] + add
 
+
+	if options['kind'] == 'neware':
+		
+		if options['summary']:
+			for i in range(df['cycle'].max()):
+				sub_df = df.loc[df['cycle'] == i+1].copy()
+
+				if sub_df['status'].loc[sub_df['status'] == 'CC Chg'].count() > 1:
+					indices = sub_df.index[sub_df['status'] == 'CC Chg']
+					
+					add_columns = ['capacity', 'specific_capacity', 'ions', 'energy', 'cycle_time']
+					
+					for column in add_columns:
+						if column in df.columns:
+							df[column].iloc[indices[-1]] = df[column].iloc[indices[-1]] + df[column].iloc[indices[0]]
+
+					df.drop(index=indices[0], inplace=True)
+					df.reset_index(inplace=True, drop=True)
+
+		else:
+			for i in range(df['cycle'].max()):
+				sub_df = df.loc[df['cycle'] == i+1].copy()
+				sub_chg_df = sub_df.loc[sub_df['status'] == 'CC Chg'].copy()
+
+				steps_indices = sub_chg_df['steps'].unique()
+
+				if len(steps_indices) > 1:
+
+					add_columns = ['capacity', 'specific_capacity', 'ions', 'energy', 'cycle_time']
+
+					for column in add_columns:
+						if column in df.columns:
+							# Extract the maximum value from the first of the two cycles by accessing the column value of the highest index of the first cycle
+							add = df[column].iloc[df.loc[df['steps'] == steps_indices[0]].index.max()]
+							
+							df[column].loc[df['steps'] == steps_indices[1]] += add
+
+
+
+				 
+
 	return df
 
 
@@ -244,6 +285,9 @@ def process_neware_data(df, options={}):
 		df = add_columns(df=df, options=options) # adds columns to the DataFrame if active material weight and/or molecular weight has been passed in options
 
 		df = unit_conversion(df=df, options=options) # converts all units from the old units to the desired units
+
+		if options['splice_cycles']:
+			df = splice_cycles(df=df, options=options)
 
 
 		# Creates masks for charge and discharge curves
@@ -293,6 +337,9 @@ def process_neware_data(df, options={}):
 
 		df = add_columns(df=df, options=options)
 		df = unit_conversion(df=df, options=options)
+
+		if options['splice_cycles']:
+			df = splice_cycles(df=df, options=options)
 
 		return df
 
