@@ -1,4 +1,3 @@
-from email.policy import default
 import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
@@ -50,7 +49,7 @@ def read_neware(path, options={}):
 		else:
 			df = pd.read_csv(csv_details)
 
-	elif path.split('.')[-1] == 'csv':
+	elif path.endswith('csv'):
 		df = pd.read_csv(path)
 
 
@@ -237,56 +236,66 @@ def process_neware_data(df, options={}):
 	options['kind'] = 'neware'
 
 
-	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
-	set_units(options=options) # sets options['units']
-	options['old_units'] = get_old_units(df=df, options=options)
-	
-	df = add_columns(df=df, options=options) # adds columns to the DataFrame if active material weight and/or molecular weight has been passed in options
+	if not options['summary']:
+		# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
+		set_units(options=options) # sets options['units']
+		options['old_units'] = get_old_units(df=df, options=options)
+		
+		df = add_columns(df=df, options=options) # adds columns to the DataFrame if active material weight and/or molecular weight has been passed in options
 
-	df = unit_conversion(df=df, options=options) # converts all units from the old units to the desired units
-
-
-	# Creates masks for charge and discharge curves
-	chg_mask = df['status'] == 'CC Chg'
-	dchg_mask = df['status'] == 'CC DChg'
-
-	# Initiate cycles list
-	cycles = []
-
-	# Loop through all the cycling steps, change the current and capacities in the 
-	for i in range(df["cycle"].max()):
-
-		sub_df = df.loc[df['cycle'] == i+1].copy()
-
-		#sub_df.loc[dchg_mask, 'current']  *= -1
-		#sub_df.loc[dchg_mask, 'capacity'] *= -1
-
-		chg_df = sub_df.loc[chg_mask]
-		dchg_df = sub_df.loc[dchg_mask]
-
-		# Continue to next iteration if the charge and discharge DataFrames are empty (i.e. no current)
-		if chg_df.empty and dchg_df.empty:
-			continue
+		df = unit_conversion(df=df, options=options) # converts all units from the old units to the desired units
 
 
-		# Reverses the discharge curve if specified
-		if options['reverse_discharge']:
-			max_capacity = dchg_df['capacity'].max() 
-			dchg_df['capacity'] = np.abs(dchg_df['capacity'] - max_capacity)
+		# Creates masks for charge and discharge curves
+		chg_mask = df['status'] == 'CC Chg'
+		dchg_mask = df['status'] == 'CC DChg'
 
-			if 'specific_capacity' in df.columns:
-				max_capacity = dchg_df['specific_capacity'].max() 
-				dchg_df['specific_capacity'] = np.abs(dchg_df['specific_capacity'] - max_capacity)
+		# Initiate cycles list
+		cycles = []
 
-				if 'ions' in df.columns:
-					max_capacity = dchg_df['ions'].max() 
-					dchg_df['ions'] = np.abs(dchg_df['ions'] - max_capacity)
+		# Loop through all the cycling steps, change the current and capacities in the 
+		for i in range(df["cycle"].max()):
 
-		cycles.append((chg_df, dchg_df))
+			sub_df = df.loc[df['cycle'] == i+1].copy()
+
+			#sub_df.loc[dchg_mask, 'current']  *= -1
+			#sub_df.loc[dchg_mask, 'capacity'] *= -1
+
+			chg_df = sub_df.loc[chg_mask]
+			dchg_df = sub_df.loc[dchg_mask]
+
+			# Continue to next iteration if the charge and discharge DataFrames are empty (i.e. no current)
+			if chg_df.empty and dchg_df.empty:
+				continue
 
 
+			# Reverses the discharge curve if specified
+			if options['reverse_discharge']:
+				max_capacity = dchg_df['capacity'].max() 
+				dchg_df['capacity'] = np.abs(dchg_df['capacity'] - max_capacity)
 
-	return cycles
+				if 'specific_capacity' in df.columns:
+					max_capacity = dchg_df['specific_capacity'].max() 
+					dchg_df['specific_capacity'] = np.abs(dchg_df['specific_capacity'] - max_capacity)
+
+					if 'ions' in df.columns:
+						max_capacity = dchg_df['ions'].max() 
+						dchg_df['ions'] = np.abs(dchg_df['ions'] - max_capacity)
+
+			cycles.append((chg_df, dchg_df))
+
+			return cycles
+
+
+	elif options['summary']:
+		set_units(options=options)
+		options['old_units'] = get_old_units(df=df, options=options)
+
+		df = add_columns(df=df, options=options)
+		df = unit_conversion(df=df, options=options)
+
+		return df
+
 
 
 def process_biologic_data(df, options=None):
@@ -403,30 +412,84 @@ def unit_conversion(df, options):
 
 
 	if options['kind'] == 'neware':
-		df['Current({})'.format(options['old_units']['current'])] = df['Current({})'.format(options['old_units']['current'])] * unit_tables.current()[options['old_units']['current']].loc[options['units']['current']]
-		df['Voltage({})'.format(options['old_units']['voltage'])] = df['Voltage({})'.format(options['old_units']['voltage'])] * unit_tables.voltage()[options['old_units']['voltage']].loc[options['units']['voltage']]
-		df['Capacity({})'.format(options['old_units']['capacity'])] = df['Capacity({})'.format(options['old_units']['capacity'])] * unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']]
-		df['Energy({})'.format(options['old_units']['energy'])] = df['Energy({})'.format(options['old_units']['energy'])] * unit_tables.energy()[options['old_units']['energy']].loc[options['units']['energy']]
-		df['CycleTime({})'.format(options['units']['time'])] = df.apply(lambda row : convert_time_string(row['Relative Time(h:min:s.ms)'], unit=options['units']['time']), axis=1)
-		df['RunTime({})'.format(options['units']['time'])] = df.apply(lambda row : convert_datetime_string(row['Real Time(h:min:s.ms)'], reference=df['Real Time(h:min:s.ms)'].iloc[0], unit=options['units']['time']), axis=1)
-		columns = ['status', 'jump', 'cycle', 'steps', 'current', 'voltage', 'capacity', 'energy']
+		
+		if options['summary']:
+			# Add the charge and discharge energy columns to get a single energy column 
+			df[f'Energy({options["old_units"]["energy"]})'] = df[f'Chg Eng({options["old_units"]["energy"]})'] + df[f'DChg Eng({options["old_units"]["energy"]})']
+			
+			df[f'Starting current({options["old_units"]["current"]})'] 	= df[f'Starting current({options["old_units"]["current"]})'] 	* unit_tables.current()[options['old_units']['current']].loc[options['units']['current']]
+			df[f'Start Volt({options["old_units"]["voltage"]})'] 		= df[f'Start Volt({options["old_units"]["voltage"]})'] 			* unit_tables.voltage()[options['old_units']['voltage']].loc[options['units']['voltage']]
+			df[f'Capacity({options["old_units"]["capacity"]})'] 		= df[f'Capacity({options["old_units"]["capacity"]})'] 			* unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']]
+			df[f'Energy({options["old_units"]["energy"]})'] 			= df[f'Energy({options["old_units"]["energy"]})'] 				* unit_tables.energy()[options['old_units']['energy']].loc[options['units']['energy']]
+			df[f'CycleTime({options["units"]["time"]})'] 				= df.apply(lambda row : convert_time_string(row['Relative Time(h:min:s.ms)'], unit=options['units']['time']), axis=1)
+			df[f'RunTime({options["units"]["time"]})'] 					= df.apply(lambda row : convert_datetime_string(row['Real Time'], reference=df['Real Time'].iloc[0], ref_time=df[f'CycleTime({options["units"]["time"]})'].iloc[0],unit=options['units']['time']), axis=1)
 
-		if 'SpecificCapacity({}/mg)'.format(options['old_units']['capacity']) in df.columns:
-			df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] = df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] * unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']] / unit_tables.mass()['mg'].loc[options['units']["mass"]]
-			columns.append('specific_capacity')
+
+			# Drop all undesireable columns
+			df.drop(
+				[
+					'Chnl',
+					'Original step',
+					f'End Volt({options["old_units"]["voltage"]})',
+					f'Termination current({options["old_units"]["current"]})',
+					'Relative Time(h:min:s.ms)',
+					'Real Time',
+					'Continuous Time(h:min:s.ms)',
+					f'Net discharge capacity({options["old_units"]["capacity"]})',
+					f'Chg Cap({options["old_units"]["capacity"]})',
+					f'DChg Cap({options["old_units"]["capacity"]})',
+					f'Net discharge energy({options["old_units"]["energy"]})',
+					f'Chg Eng({options["old_units"]["energy"]})', 
+					f'DChg Eng({options["old_units"]["energy"]})'
+				],
+				axis=1, inplace=True
+			)
+
+			columns = ['cycle', 'steps', 'status', 'voltage', 'current', 'capacity']
+
+
+
+
+			# Add column labels for specific capacity and ions if they exist
+			if 'SpecificCapacity({}/mg)'.format(options['old_units']['capacity']) in df.columns:
+				df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] = df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] * unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']] / unit_tables.mass()['mg'].loc[options['units']["mass"]]
+				columns.append('specific_capacity')
 
 			if 'IonsExtracted' in df.columns:
 				columns.append('ions')
 
+			# Append energy column label here as it was the last column to be generated
+			columns.append('energy')
+			columns.append('cycle_time')
+			columns.append('runtime')
+
+			# Apply new column labels 
+			df.columns = columns
+	
+
+		else:
+			df['Current({})'.format(options['old_units']['current'])] = df['Current({})'.format(options['old_units']['current'])] * unit_tables.current()[options['old_units']['current']].loc[options['units']['current']]
+			df['Voltage({})'.format(options['old_units']['voltage'])] = df['Voltage({})'.format(options['old_units']['voltage'])] * unit_tables.voltage()[options['old_units']['voltage']].loc[options['units']['voltage']]
+			df['Capacity({})'.format(options['old_units']['capacity'])] = df['Capacity({})'.format(options['old_units']['capacity'])] * unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']]
+			df['Energy({})'.format(options['old_units']['energy'])] = df['Energy({})'.format(options['old_units']['energy'])] * unit_tables.energy()[options['old_units']['energy']].loc[options['units']['energy']]
+			df['CycleTime({})'.format(options['units']['time'])] = df.apply(lambda row : convert_time_string(row['Relative Time(h:min:s.ms)'], unit=options['units']['time']), axis=1)
+			df['RunTime({})'.format(options['units']['time'])] = df.apply(lambda row : convert_datetime_string(row['Real Time(h:min:s.ms)'], reference=df['Real Time(h:min:s.ms)'].iloc[0],  ref_time=df[f'CycleTime({options["units"]["time"]})'].iloc[0], unit=options['units']['time']), axis=1)
+			columns = ['status', 'jump', 'cycle', 'steps', 'current', 'voltage', 'capacity', 'energy']
+
+			if 'SpecificCapacity({}/mg)'.format(options['old_units']['capacity']) in df.columns:
+				df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] = df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] * unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']] / unit_tables.mass()['mg'].loc[options['units']["mass"]]
+				columns.append('specific_capacity')
+
+			if 'IonsExtracted' in df.columns:
+				columns.append('ions')
+
+			columns.append('cycle_time')
+			columns.append('time')
 
 
-		columns.append('cycle_time')
-		columns.append('time')
+			df.drop(['Record number', 'Relative Time(h:min:s.ms)', 'Real Time(h:min:s.ms)'], axis=1, inplace=True)
 
-
-		df.drop(['Record number', 'Relative Time(h:min:s.ms)', 'Real Time(h:min:s.ms)'], axis=1, inplace=True)
-
-		df.columns = columns
+			df.columns = columns
 
 	if options['kind'] == 'biologic':
 		df['time/{}'.format(options['old_units']['time'])] = df["time/{}".format(options['old_units']["time"])] * unit_tables.time()[options['old_units']["time"]].loc[options['units']['time']]
@@ -488,13 +551,13 @@ def get_old_units(df: pd.DataFrame, options: dict) -> dict:
 	if options['kind']=='neware':
 
 		for column in df.columns:
-			if 'Voltage' in column:
+			if 'Voltage' in column or 'Start Volt' in column:
 				voltage = column.split('(')[-1].strip(')')
-			elif 'Current' in column:
+			elif 'Current' in column or 'Starting current' in column:
 				current = column.split('(')[-1].strip(')')
 			elif 'Capacity' in column:
 				capacity = column.split('(')[-1].strip(')')
-			elif 'Energy' in column:
+			elif 'Energy' in column or 'Eng' in column:
 				energy = column.split('(')[-1].strip(')')
 
 		old_units = {'voltage': voltage, 'current': current, 'capacity': capacity, 'energy': energy}
@@ -521,7 +584,7 @@ def get_old_units(df: pd.DataFrame, options: dict) -> dict:
 def convert_time_string(time_string, unit='ms'):
 	''' Convert time string from Neware-data with the format hh:mm:ss.xx to any given unit'''
 
-	h, m, s = time_string.split(':')  
+	h, m, s = time_string.split(':')
 	ms = float(s)*1000 + int(m)*1000*60 + int(h)*1000*60*60
 
 	factors = {'ms': 1, 's': 1/1000, 'min': 1/(1000*60), 'h': 1/(1000*60*60)}
@@ -532,7 +595,7 @@ def convert_time_string(time_string, unit='ms'):
 
 
 
-def convert_datetime_string(datetime_string, reference, unit='s'):
+def convert_datetime_string(datetime_string, reference, ref_time, unit='s'):
 	''' Convert time string from Neware-data with the format yyy-mm-dd hh:mm:ss to any given unit'''
 
 	from datetime import datetime
@@ -555,7 +618,7 @@ def convert_datetime_string(datetime_string, reference, unit='s'):
 
 	factors = {'ms': 1000, 's': 1, 'min': 1/(60), 'h': 1/(60*60)}
 
-	time = s * factors[unit]
+	time = s * factors[unit] + ref_time
 
 	return time
 
