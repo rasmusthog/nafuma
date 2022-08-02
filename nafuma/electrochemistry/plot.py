@@ -75,8 +75,17 @@ def plot_gc(data, options=None):
 
 		# FIXME To begin, the default is that y-values correspond to x-values. This should probably be implemented in more logical and consistent manner in the future.
 		if options['charge']:
-			data['cycles'][0].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][0], kind='scatter', s=plt.rcParams['lines.markersize'])
-			data['cycles'][1].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][1], kind='scatter', s=plt.rcParams['lines.markersize'])
+			data['cycles'][0].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][0], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
+			#
+			
+		if options['discharge']:
+			data['cycles'][1].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][1], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
+
+
+		if options['interactive_session_active']:
+			update_labels(options, force=True)
+		else:
+			update_labels(options)
 
 	
 
