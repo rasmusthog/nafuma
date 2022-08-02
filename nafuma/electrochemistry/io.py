@@ -258,14 +258,15 @@ def process_neware_data(df, options={}):
 	active_materiale_weight: weight of the active material (in mg) used in the cell. 
 	molecular_weight: the molar mass (in g mol^-1) of the active material, to calculate the number of ions extracted. Assumes one electron per Li+/Na+-ion """
 	
-	required_options = ['units', 'active_material_weight', 'molecular_weight', 'reverse_discharge', 'splice_cycles']
+	required_options = ['units', 'active_material_weight', 'molecular_weight', 'reverse_discharge', 'splice_cycles', 'increment_cycles_from']
 	
 	default_options = {
 		'units': None, 
 		'active_material_weight': None, 
 		'molecular_weight': None, 
 		'reverse_discharge': False, 
-		'splice_cycles': None}
+		'splice_cycles': None,
+		'increment_cycles_from': None}  # index
 
 
 	aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -280,6 +281,9 @@ def process_neware_data(df, options={}):
 		df = add_columns(df=df, options=options) # adds columns to the DataFrame if active material weight and/or molecular weight has been passed in options
 
 		df = unit_conversion(df=df, options=options) # converts all units from the old units to the desired units
+
+		if options['increment_cycles_from']:
+			df['cycle'].iloc[options['increment_cycles_from']:] += 1
 
 		if options['splice_cycles']:
 			df = splice_cycles(df=df, options=options)
@@ -460,6 +464,13 @@ def unit_conversion(df, options):
 
 
 	if options['kind'] == 'neware':
+
+
+		record_number = 'Data serial number' if 'Data serial number' in df.columns else 'Record number'
+		relative_time = 'Relative Time(h:min:s.ms)' if 'Relative Time(h:min:s.ms)' in df.columns else 'Relative Time'
+		continuous_time = 'Continuous Time(h:min:s.ms)' if 'Continuous Time(h:min:s.ms)' in df.columns else 'Continuous Time'
+		real_time = 'Real Time(h:min:s:ms)' if 'Real Time(h:min:s:ms)' in df.columns else 'Real Time'
+	
 		
 		if options['summary']:
 			# Add the charge and discharge energy columns to get a single energy column 
@@ -469,29 +480,31 @@ def unit_conversion(df, options):
 			df[f'Start Volt({options["old_units"]["voltage"]})'] 		= df[f'Start Volt({options["old_units"]["voltage"]})'] 			* unit_tables.voltage()[options['old_units']['voltage']].loc[options['units']['voltage']]
 			df[f'Capacity({options["old_units"]["capacity"]})'] 		= df[f'Capacity({options["old_units"]["capacity"]})'] 			* unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']]
 			df[f'Energy({options["old_units"]["energy"]})'] 			= df[f'Energy({options["old_units"]["energy"]})'] 				* unit_tables.energy()[options['old_units']['energy']].loc[options['units']['energy']]
-			df[f'CycleTime({options["units"]["time"]})'] 				= df.apply(lambda row : convert_time_string(row['Relative Time(h:min:s.ms)'], unit=options['units']['time']), axis=1)
-			df[f'RunTime({options["units"]["time"]})'] 					= df.apply(lambda row : convert_datetime_string(row['Real Time'], reference=df['Real Time'].iloc[0], ref_time=df[f'CycleTime({options["units"]["time"]})'].iloc[0],unit=options['units']['time']), axis=1)
+			df[f'CycleTime({options["units"]["time"]})'] 				= df.apply(lambda row : convert_time_string(row[relative_time], unit=options['units']['time']), axis=1)
+			df[f'RunTime({options["units"]["time"]})'] 					= df.apply(lambda row : convert_datetime_string(row[real_time], reference=df[real_time].iloc[0], ref_time=df[f'CycleTime({options["units"]["time"]})'].iloc[0],unit=options['units']['time']), axis=1)
 
+
+
+			droplist = [
+				'Chnl',
+				'Original step',
+				f'End Volt({options["old_units"]["voltage"]})',
+				f'Termination current({options["old_units"]["current"]})',
+				relative_time,
+				real_time,
+				continuous_time,
+				f'Net discharge capacity({options["old_units"]["capacity"]})',
+				f'Chg Cap({options["old_units"]["capacity"]})',
+				f'DChg Cap({options["old_units"]["capacity"]})',
+				f'Net discharge energy({options["old_units"]["energy"]})',
+				f'Chg Eng({options["old_units"]["energy"]})', 
+				f'DChg Eng({options["old_units"]["energy"]})'
+			]
 
 			# Drop all undesireable columns
-			df.drop(
-				[
-					'Chnl',
-					'Original step',
-					f'End Volt({options["old_units"]["voltage"]})',
-					f'Termination current({options["old_units"]["current"]})',
-					'Relative Time(h:min:s.ms)',
-					'Real Time',
-					'Continuous Time(h:min:s.ms)',
-					f'Net discharge capacity({options["old_units"]["capacity"]})',
-					f'Chg Cap({options["old_units"]["capacity"]})',
-					f'DChg Cap({options["old_units"]["capacity"]})',
-					f'Net discharge energy({options["old_units"]["energy"]})',
-					f'Chg Eng({options["old_units"]["energy"]})', 
-					f'DChg Eng({options["old_units"]["energy"]})'
-				],
-				axis=1, inplace=True
-			)
+			for drop in droplist:
+				if drop in df.columns:
+					df.drop(drop, axis=1, inplace=True)
 
 			columns = ['cycle', 'steps', 'status', 'voltage', 'current', 'capacity']
 
@@ -520,8 +533,8 @@ def unit_conversion(df, options):
 			df['Voltage({})'.format(options['old_units']['voltage'])] = df['Voltage({})'.format(options['old_units']['voltage'])] * unit_tables.voltage()[options['old_units']['voltage']].loc[options['units']['voltage']]
 			df['Capacity({})'.format(options['old_units']['capacity'])] = df['Capacity({})'.format(options['old_units']['capacity'])] * unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']]
 			df['Energy({})'.format(options['old_units']['energy'])] = df['Energy({})'.format(options['old_units']['energy'])] * unit_tables.energy()[options['old_units']['energy']].loc[options['units']['energy']]
-			df['CycleTime({})'.format(options['units']['time'])] = df.apply(lambda row : convert_time_string(row['Relative Time(h:min:s.ms)'], unit=options['units']['time']), axis=1)
-			df['RunTime({})'.format(options['units']['time'])] = df.apply(lambda row : convert_datetime_string(row['Real Time(h:min:s.ms)'], reference=df['Real Time(h:min:s.ms)'].iloc[0],  ref_time=df[f'CycleTime({options["units"]["time"]})'].iloc[0], unit=options['units']['time']), axis=1)
+			df['CycleTime({})'.format(options['units']['time'])] = df.apply(lambda row : convert_time_string(row[relative_time], unit=options['units']['time']), axis=1)
+			df['RunTime({})'.format(options['units']['time'])] = df.apply(lambda row : convert_datetime_string(row[real_time], reference=df[real_time].iloc[0],  ref_time=df[f'CycleTime({options["units"]["time"]})'].iloc[0], unit=options['units']['time']), axis=1)
 			columns = ['status', 'jump', 'cycle', 'steps', 'current', 'voltage', 'capacity', 'energy']
 
 			if 'SpecificCapacity({}/mg)'.format(options['old_units']['capacity']) in df.columns:
@@ -535,7 +548,11 @@ def unit_conversion(df, options):
 			columns.append('time')
 
 
-			df.drop(['Record number', 'Relative Time(h:min:s.ms)', 'Real Time(h:min:s.ms)'], axis=1, inplace=True)
+			droplist = [record_number, relative_time, real_time]
+
+			for drop in droplist:
+				if drop in df.columns:
+					df.drop(drop, axis=1, inplace=True)
 
 			df.columns = columns
 
