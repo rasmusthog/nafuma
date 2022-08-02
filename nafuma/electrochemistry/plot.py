@@ -4,6 +4,9 @@ from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,AutoMinorLoca
 import pandas as pd
 import numpy as np
 import math
+import os
+import shutil
+from PIL import Image
 
 import ipywidgets as widgets
 from IPython.display import display
@@ -19,11 +22,12 @@ def plot_gc(data, options=None):
 
 
 	# Update options
-	required_options = ['x_vals', 'y_vals', 'which_cycles', 'exclude_cycles', 'charge', 'discharge', 'colours', 'differentiate_charge_discharge', 'gradient', 'interactive', 'interactive_session_active', 'rc_params', 'format_params']	
+	required_options = ['x_vals', 'y_vals', 'which_cycles', 'exclude_cycles', 'show_plot', 'charge', 'discharge', 'colours', 'differentiate_charge_discharge', 'gradient', 'interactive', 'interactive_session_active', 'rc_params', 'format_params', 'save_gif', 'save_path', 'fps']	
 	default_options = {
 		'x_vals': 'capacity', 'y_vals': 'voltage', 
 		'which_cycles': 'all',
 		'exclude_cycles': [],
+		'show_plot': True,
 		'charge': True, 'discharge': True, 
 		'colours': None, 
 		'differentiate_charge_discharge': True, 
@@ -31,7 +35,11 @@ def plot_gc(data, options=None):
 		'interactive': False,
 		'interactive_session_active': False, 
 		'rc_params': {},
-		'format_params': {}}
+		'format_params': {},
+		'save_gif': False,
+		'save_path': 'animation.gif',
+		'fps': 1
+		}
 
 	options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
@@ -50,28 +58,69 @@ def plot_gc(data, options=None):
 		return
 
 
-	# Prepare plot
-	fig, ax = btp.prepare_plot(options=options)
-	colours = generate_colours(cycles=data['cycles'], options=options)
 
+	colours = generate_colours(cycles=data['cycles'], options=options)
 	if not options['summary']:
 		
-		for i, cycle in enumerate(data['cycles']):
-			if i in options['which_cycles']:
-				if options['charge']:
-					cycle[0].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][0])
+		if options['show_plot']:
+			# Prepare plot
+			fig, ax = btp.prepare_plot(options=options)
+			for i, cycle in enumerate(data['cycles']):
+				if i in options['which_cycles']:
+					if options['charge']:
+						cycle[0].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][0])
 
-				if options['discharge']:
-					cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
-
-
-		if options['interactive_session_active']:
-			update_labels(options, force=True)
-		else:
-			update_labels(options)
+					if options['discharge']:
+						cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
 
 
-	elif options['summary']:
+			if options['interactive_session_active']:
+				update_labels(options, force=True)
+			else:
+				update_labels(options)
+
+		
+		
+		if options['save_gif'] and not options['interactive_session_active']:
+			if not os.path.isdir('tmp'):
+				os.makedirs('tmp')
+
+			for i, cycle in enumerate(data['cycles']):
+				if i in options['which_cycles']:
+					giffig, gifax = btp.prepare_plot(options=options)
+
+					if options['charge']:
+						cycle[0].plot(x=options['x_vals'], y=options['y_vals'], ax=gifax, c=colours[i][0])
+					if options['discharge']:
+						cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=gifax, c=colours[i][1])
+
+					gifax.text(x=options['xlim'][1]*0.8, y=3, s=f'{i+1}')
+					update_labels(options)
+
+					giffig, gifax = btp.adjust_plot(fig=giffig, ax=gifax, options=options)
+
+					plt.savefig(os.path.join('tmp', str(i+1).zfill(4)+'.png'))
+					plt.close()
+
+				
+			img_paths = [os.path.join('tmp', path) for path in os.listdir('tmp') if path.endswith('png')]
+			frames = []
+			for path in img_paths:
+				frame = Image.open(path)
+				frames.append(frame)
+
+					
+			frames[0].save(options['save_path'], format='GIF', append_images=frames[1:], save_all=True, duration=len(data['cycles'])/options['fps'], loop=0)
+
+			shutil.rmtree('tmp')
+
+
+
+
+	elif options['summary'] and options['show_plot']:
+		# Prepare plot
+		fig, ax = btp.prepare_plot(options=options)
+		
 
 		mask = []
 		for i in range(data['cycles'][0].shape[0]):
@@ -97,9 +146,11 @@ def plot_gc(data, options=None):
 
 	
 
-	fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
-
-	return data['cycles'], fig, ax 
+	if options['show_plot']:
+		fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
+		return data['cycles'], fig, ax
+	else:
+		return data['cycles'], None, None
 
 
 def plot_gc_interactive(data, options):
