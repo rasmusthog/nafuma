@@ -284,8 +284,6 @@ def process_neware_data(df, options={}):
 
 		df = unit_conversion(df=df, options=options) # converts all units from the old units to the desired units
 
-		print(df.iloc[1:10])
-
 		if options['increment_cycles_from']:
 			df['cycle'].iloc[options['increment_cycles_from']:] += 1
 
