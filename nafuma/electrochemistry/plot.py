@@ -73,13 +73,21 @@ def plot_gc(data, options=None):
 
 	elif options['summary']:
 
+		mask = []
+		for i in range(data['cycles'][0].shape[0]):
+			if i+1 in options['which_cycles']:
+				mask.append(True)
+			else:
+				mask.append(False)
+
+
 		# FIXME To begin, the default is that y-values correspond to x-values. This should probably be implemented in more logical and consistent manner in the future.
 		if options['charge']:
-			data['cycles'][0].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][0], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
+			data['cycles'][0].loc[mask].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][0], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
 			#
 			
 		if options['discharge']:
-			data['cycles'][1].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][1], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
+			data['cycles'][1].loc[mask].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][1], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
 
 
 		if options['interactive_session_active']:
