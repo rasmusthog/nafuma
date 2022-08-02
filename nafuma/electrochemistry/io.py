@@ -475,7 +475,7 @@ def unit_conversion(df, options):
 		record_number = 'Data serial number' if 'Data serial number' in df.columns else 'Record number'
 		relative_time = 'Relative Time(h:min:s.ms)' if 'Relative Time(h:min:s.ms)' in df.columns else 'Relative Time'
 		continuous_time = 'Continuous Time(h:min:s.ms)' if 'Continuous Time(h:min:s.ms)' in df.columns else 'Continuous Time'
-		real_time = 'Real Time(h:min:s:ms)' if 'Real Time(h:min:s:ms)' in df.columns else 'Real Time'
+		real_time = 'Real Time(h:min:s.ms)' if 'Real Time(h:min:s.ms)' in df.columns else 'Real Time'
 	
 		
 		if options['summary']:
