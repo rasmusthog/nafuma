@@ -266,7 +266,9 @@ def process_neware_data(df, options={}):
 		'molecular_weight': None, 
 		'reverse_discharge': False, 
 		'splice_cycles': None,
-		'increment_cycles_from': None}  # index
+		'increment_cycles_from': None,# index
+		'delete_datapoints': None, # list of indices
+		}  
 
 
 	aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -282,8 +284,14 @@ def process_neware_data(df, options={}):
 
 		df = unit_conversion(df=df, options=options) # converts all units from the old units to the desired units
 
+		print(df.iloc[1:10])
+
 		if options['increment_cycles_from']:
 			df['cycle'].iloc[options['increment_cycles_from']:] += 1
+
+		if options['delete_datapoints']:
+			for datapoint in options['delete_datapoints']:
+				df.drop(index=datapoint, inplace=True)
 
 		if options['splice_cycles']:
 			df = splice_cycles(df=df, options=options)
