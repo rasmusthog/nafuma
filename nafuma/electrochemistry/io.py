@@ -258,7 +258,7 @@ def process_neware_data(df, options={}):
 	active_materiale_weight: weight of the active material (in mg) used in the cell. 
 	molecular_weight: the molar mass (in g mol^-1) of the active material, to calculate the number of ions extracted. Assumes one electron per Li+/Na+-ion """
 	
-	required_options = ['units', 'active_material_weight', 'molecular_weight', 'reverse_discharge', 'splice_cycles', 'increment_cycles_from']
+	required_options = ['units', 'active_material_weight', 'molecular_weight', 'reverse_discharge', 'splice_cycles', 'increment_cycles_from', 'delete_datapoints']
 	
 	default_options = {
 		'units': None, 
