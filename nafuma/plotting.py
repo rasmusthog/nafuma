@@ -182,8 +182,13 @@ def adjust_plot(fig, ax, options):
     # Hide x- and y-ticks:
     if options['hide_y_ticks']:
         ax.tick_params(axis='y', direction='in', which='both', left=False, right=False)
+    else:
+        ax.tick_params(axis='y', direction='in', which='both', left=True, right=True)
+
     if options['hide_x_ticks']:
         ax.tick_params(axis='x', direction='in', which='both', bottom=False, top=False)
+    else:
+        ax.tick_params(axis='x', direction='in', which='both', bottom=True, top=True)
 
 
           
