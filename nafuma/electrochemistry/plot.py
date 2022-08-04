@@ -85,8 +85,15 @@ def plot_gc(data, options=None):
 			if not os.path.isdir('tmp'):
 				os.makedirs('tmp')
 
+			# Scale image to make GIF smaller
+			options['format_params']['width'] = 7.5
+			options['format_params']['height'] = 3
+
+			options['format_params']['dpi'] = 200
+
 			for i, cycle in enumerate(data['cycles']):
 				if i in options['which_cycles']:
+					
 					giffig, gifax = btp.prepare_plot(options=options)
 
 					if options['charge']:
@@ -109,8 +116,7 @@ def plot_gc(data, options=None):
 				frame = Image.open(path)
 				frames.append(frame)
 
-					
-			frames[0].save(options['save_path'], format='GIF', append_images=frames[1:], save_all=True, duration=len(data['cycles'])/options['fps'], loop=0)
+			frames[0].save(options['save_path'], format='GIF', append_images=frames[1:], save_all=True, duration=(1/options['fps'])*1000, loop=0)
 
 			shutil.rmtree('tmp')
 
@@ -129,6 +135,12 @@ def plot_gc(data, options=None):
 			else:
 				mask.append(False)
 
+		if len(mask) > len(data['cycles'][1]):
+			del mask[-1]
+			data['cycles'][0].drop(data['cycles'][0].tail(1).index, inplace=True)
+
+
+		
 
 		# FIXME To begin, the default is that y-values correspond to x-values. This should probably be implemented in more logical and consistent manner in the future.
 		if options['charge']:
