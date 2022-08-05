@@ -127,28 +127,29 @@ def plot_gc(data, options=None):
 		# Prepare plot
 		fig, ax = btp.prepare_plot(options=options)
 		
-
 		mask = []
-		for i in range(data['cycles'][0].shape[0]):
+		for i in range(data['cycles'].shape[0]):
 			if i+1 in options['which_cycles']:
 				mask.append(True)
 			else:
 				mask.append(False)
 
-		if len(mask) > len(data['cycles'][1]):
+
+		# Drop the last row if it is midway through a charge in order to avoid mismatch of length of mask and dataset.
+		if len(mask) > data['cycles'].shape[0]:
 			del mask[-1]
-			data['cycles'][0].drop(data['cycles'][0].tail(1).index, inplace=True)
+			data['cycles'].drop(data['cycles'].tail(1).index, inplace=True)
 
-
-		
 
 		# FIXME To begin, the default is that y-values correspond to x-values. This should probably be implemented in more logical and consistent manner in the future.
 		if options['charge']:
-			data['cycles'][0].loc[mask].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][0], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
+			yval = 'charge_' + options['x_vals']
+			data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][0], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
 			#
 			
 		if options['discharge']:
-			data['cycles'][1].loc[mask].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][1], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
+			yval = 'discharge_' + options['x_vals']
+			data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][1], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
 
 
 		if options['interactive_session_active']:
