@@ -342,18 +342,31 @@ def process_neware_data(df, options={}):
 
 		df = add_columns(df=df, options=options)
 		df = unit_conversion(df=df, options=options)
-		#df = calculate_efficiency(df=df, options=options)
+		
 
 		if options['splice_cycles']:
 			df = splice_cycles(df=df, options=options)
 
 
 		chg_df = df.loc[df['status'] == 'CC Chg']
+		chg_df.reset_index(inplace=True)
 		dchg_df = df.loc[df['status'] == 'CC DChg']
+		dchg_df.reset_index(inplace=True)
 
-		cycles = [chg_df, dchg_df]
+		# Construct new DataFrame
+		new_df = pd.DataFrame(chg_df["cycle"])
+		new_df.insert(1,'charge_capacity',chg_df['capacity']) 
+		new_df.insert(1,'charge_specific_capacity',chg_df['specific_capacity'])
+		new_df.insert(1,'discharge_capacity',dchg_df['capacity'])
+		new_df.insert(1,'discharge_specific_capacity',dchg_df['specific_capacity'])
+		new_df.insert(1,'charge_energy',chg_df['energy'])
+		new_df.insert(1,'charge_specific_energy',chg_df['specific_energy'])
+		new_df.insert(1,'discharge_energy',dchg_df['energy'])
+		new_df.insert(1,'discharge_specific_energy',dchg_df['specific_energy'])
 
-		return cycles
+		new_df = calculate_efficiency(df=new_df, options=options)
+
+		return new_df
 
 
 
@@ -462,9 +475,23 @@ def add_columns(df, options):
 	return df
 
 
-#def calculate_efficiency(df, options):
-#
-#	df['coulombic_efficiency'] = 
+def calculate_efficiency(df: pd.DataFrame, options: dict) -> pd.DataFrame:
+
+	
+	default_options = {
+		'reference_index': 0
+	}
+
+	options = aux.update_options(options=options, required_options=default_options.keys(), default_options=default_options)
+
+	df['charge_capacity_fade'] 		= (df['charge_capacity'] / df['charge_capacity'].iloc[options['reference_index']])*100
+	df['discharge_capacity_fade'] 	= (df['discharge_capacity'] / df['discharge_capacity'].iloc[options['reference_index']])*100
+
+	df['coulombic_efficiency'] 		= (df['discharge_capacity'] / df['charge_capacity'])*100
+	df['energy_efficiency'] 		= (df['discharge_energy'] / df['charge_energy'])*100
+
+
+	return df
 
 
 def unit_conversion(df, options):
