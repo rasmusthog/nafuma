@@ -342,6 +342,7 @@ def process_neware_data(df, options={}):
 
 		df = add_columns(df=df, options=options)
 		df = unit_conversion(df=df, options=options)
+		#df = calculate_efficiency(df=df, options=options)
 
 		if options['splice_cycles']:
 			df = splice_cycles(df=df, options=options)
@@ -427,8 +428,13 @@ def process_biologic_data(df, options=None):
 def add_columns(df, options):
 
 	if options['kind'] == 'neware':
+
+		if options['summary']:
+			df[f'Energy({options["old_units"]["energy"]})'] = np.abs(df[f'Net discharge energy({options["old_units"]["energy"]})'])
+
 		if options['active_material_weight']:
-			df["SpecificCapacity({}/mg)".format(options['old_units']["capacity"])] = df["Capacity({})".format(options['old_units']['capacity'])] / (options['active_material_weight'])
+			df[f"SpecificCapacity({options['old_units']['capacity']}/mg)"] = df["Capacity({})".format(options['old_units']['capacity'])] / (options['active_material_weight'])
+			df[f"SpecificEnergy({options['old_units']['energy']}/mg)"] = df["Energy({})".format(options['old_units']['energy'])] / (options['active_material_weight'])
 
 			if options['molecular_weight']:
 				faradays_constant = 96485.3365 # [F] = C mol^-1 = As mol^-1
@@ -456,6 +462,11 @@ def add_columns(df, options):
 	return df
 
 
+#def calculate_efficiency(df, options):
+#
+#	df['coulombic_efficiency'] = 
+
+
 def unit_conversion(df, options):
 	from . import unit_tables
 
@@ -479,9 +490,7 @@ def unit_conversion(df, options):
 	
 		
 		if options['summary']:
-			# Add the charge and discharge energy columns to get a single energy column 
-			df[f'Energy({options["old_units"]["energy"]})'] = df[f'Chg Eng({options["old_units"]["energy"]})'] + df[f'DChg Eng({options["old_units"]["energy"]})']
-			
+			df[f'Energy({options["old_units"]["energy"]})'] 			= df[f'Energy({options["old_units"]["energy"]})']				* unit_tables.energy()[options['old_units']['energy']].loc[options['units']['energy']]
 			df[f'Starting current({options["old_units"]["current"]})'] 	= df[f'Starting current({options["old_units"]["current"]})'] 	* unit_tables.current()[options['old_units']['current']].loc[options['units']['current']]
 			df[f'Start Volt({options["old_units"]["voltage"]})'] 		= df[f'Start Volt({options["old_units"]["voltage"]})'] 			* unit_tables.voltage()[options['old_units']['voltage']].loc[options['units']['voltage']]
 			df[f'Capacity({options["old_units"]["capacity"]})'] 		= df[f'Capacity({options["old_units"]["capacity"]})'] 			* unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']]
@@ -512,9 +521,7 @@ def unit_conversion(df, options):
 				if drop in df.columns:
 					df.drop(drop, axis=1, inplace=True)
 
-			columns = ['cycle', 'steps', 'status', 'voltage', 'current', 'capacity']
-
-
+			columns = ['cycle', 'steps', 'status', 'voltage', 'current', 'capacity', 'energy']
 
 
 			# Add column labels for specific capacity and ions if they exist
@@ -522,15 +529,19 @@ def unit_conversion(df, options):
 				df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] = df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] * unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']] / unit_tables.mass()['mg'].loc[options['units']["mass"]]
 				columns.append('specific_capacity')
 
+			if f'SpecificEnergy({options["old_units"]["energy"]}/mg)' in df.columns:
+				df[f'SpecificEnergy({options["old_units"]["energy"]}/mg)'] = df[f'SpecificEnergy({options["old_units"]["energy"]}/mg)'] * unit_tables.energy()[options['old_units']['energy']].loc[options['units']['energy']] / unit_tables.mass()['mg'].loc[options['units']["mass"]]
+				columns.append('specific_energy')
+
 			if 'IonsExtracted' in df.columns:
 				columns.append('ions')
 
 			# Append energy column label here as it was the last column to be generated
-			columns.append('energy')
 			columns.append('cycle_time')
 			columns.append('runtime')
 
 			# Apply new column labels 
+			print(df.columns, columns)
 			df.columns = columns
 	
 
