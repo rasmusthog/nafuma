@@ -1,3 +1,4 @@
+from pickle import MARK
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,AutoMinorLocator)
 
@@ -142,14 +143,23 @@ def plot_gc(data, options=None):
 
 
 		# FIXME To begin, the default is that y-values correspond to x-values. This should probably be implemented in more logical and consistent manner in the future.
-		if options['charge']:
-			yval = 'charge_' + options['x_vals']
-			data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][0], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
-			#
+		if options['x_vals'] in ['coulombic_efficiency', 'energy_efficiency']:
+			data['cycles'].loc[mask].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][0], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
+			if options['limit']:
+				ax.axhline(y=options['limit'], ls='--', c='black')
+
+		else:
+			if options['charge']:
+				yval = 'charge_' + options['x_vals']
+				data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][0], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
 			
-		if options['discharge']:
-			yval = 'discharge_' + options['x_vals']
-			data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][1], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
+			if options['discharge']:
+				yval = 'discharge_' + options['x_vals']
+				data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][1], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
+
+
+			if options['limit']:
+				ax.axhline(y=options['limit'], ls='--', c='black')
 
 
 		if options['interactive_session_active']:
