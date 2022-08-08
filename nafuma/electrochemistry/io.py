@@ -6,6 +6,12 @@ import os
 import nafuma.auxillary as aux
 from sympy import re
 
+
+# FIXME This is not good practice, but a temporary fix as I don't have time to understand what causes the SettingWithCopyWarning.
+# Read this: https://www.dataquest.io/blog/settingwithcopywarning/
+pd.set_option('mode.chained_assignment', None)
+
+
 def read_data(data, options={}):
 
 	if data['kind'] == 'neware':
@@ -382,11 +388,22 @@ def process_biologic_data(df, options=None):
 		'splice_cycles': None}
 
 
+	# Check if the DataFrame contains GC or CV data.
+	# FIXME This might not be a very rigorous method of checking. E.g. Rest has mode == 3, so if loading a short GC with many Rest-datapoints, the mean will be 2 and it will be treated as CV. For now manual override is sufficient
+	if not 'mode' in options.keys():
+		options['mode'] = 'GC' if int(df['mode'].mean()) == 1 else 'CV'
+		
 	aux.update_options(options=options, required_options=required_options, default_options=default_options)
 	options['kind'] = 'biologic'
 
 	# Pick out necessary columns
-	df = df[['Ns changes', 'Ns', 'time/s', 'Ewe/V', 'Energy charge/W.h', 'Energy discharge/W.h', '<I>/mA',  'Capacity/mA.h', 'cycle number']].copy()
+	headers = [
+		'Ns changes', 'Ns', 'time/s', 'Ewe/V', 'Energy charge/W.h', 'Energy discharge/W.h', '<I>/mA',  'Capacity/mA.h', 'cycle number' ] if options['mode'] == 'GC' else [
+		'ox/red', 'time/s', 'control/V', 'Ewe/V', '<I>/mA', 'cycle number', '(Q-Qo)/C', 'P/W'
+		]
+
+
+	df = df[headers].copy()
 
 	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
 	set_units(options)
@@ -396,10 +413,15 @@ def process_biologic_data(df, options=None):
 
 	df = unit_conversion(df=df, options=options)
 
-	# Creates masks for charge and discharge curves
-	chg_mask = (df['status'] == 1) & (df['status_change'] != 1)
-	dchg_mask = (df['status'] == 2) & (df['status_change'] != 1)
 
+	# Creates masks for charge and discharge curves
+	if options['mode'] == 'GC':
+		chg_mask = (df['status'] == 1) & (df['status_change'] != 1)
+		dchg_mask = (df['status'] == 2) & (df['status_change'] != 1)
+
+	elif options['mode'] == 'CV':
+		chg_mask = (df['status'] == 1) # oxidation
+		dchg_mask = (df['status'] == 0) # reduction
 
 	# Initiate cycles list
 	cycles = []
@@ -419,7 +441,7 @@ def process_biologic_data(df, options=None):
 		if chg_df.empty and dchg_df.empty:
 			continue
 
-		if options['reverse_discharge']:
+		if options['mode'] == 'GC' and options['reverse_discharge']:
 			max_capacity = dchg_df['capacity'].max() 
 			dchg_df['capacity'] = np.abs(dchg_df['capacity'] - max_capacity)
 
@@ -431,8 +453,12 @@ def process_biologic_data(df, options=None):
 					max_capacity = dchg_df['ions'].max() 
 					dchg_df['ions'] = np.abs(dchg_df['ions'] - max_capacity)
 
+		
+		if options['mode'] == 'CV':
+			chg_df = chg_df.sort_values(by='voltage').reset_index(drop=True)
+			dchg_df = dchg_df.sort_values(by='voltage', ascending=False).reset_index(drop=True)
+		
 		cycles.append((chg_df, dchg_df))
-
 
 
 	return cycles
@@ -568,7 +594,6 @@ def unit_conversion(df, options):
 			columns.append('runtime')
 
 			# Apply new column labels 
-			print(df.columns, columns)
 			df.columns = columns
 	
 
@@ -584,6 +609,11 @@ def unit_conversion(df, options):
 			if 'SpecificCapacity({}/mg)'.format(options['old_units']['capacity']) in df.columns:
 				df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] = df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] * unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']] / unit_tables.mass()['mg'].loc[options['units']["mass"]]
 				columns.append('specific_capacity')
+
+			if f'SpecificEnergy({options["old_units"]["energy"]}/mg)' in df.columns:
+				df[f'SpecificEnergy({options["old_units"]["energy"]}/mg)'] = df[f'SpecificEnergy({options["old_units"]["energy"]}/mg)'] * unit_tables.energy()[options['old_units']['energy']].loc[options['units']['energy']] / unit_tables.mass()['mg'].loc[options['units']["mass"]]
+				columns.append('specific_energy')
+
 
 			if 'IonsExtracted' in df.columns:
 				columns.append('ions')
@@ -601,21 +631,34 @@ def unit_conversion(df, options):
 			df.columns = columns
 
 	if options['kind'] == 'biologic':
-		df['time/{}'.format(options['old_units']['time'])] = df["time/{}".format(options['old_units']["time"])] * unit_tables.time()[options['old_units']["time"]].loc[options['units']['time']]
-		df["Ewe/{}".format(options['old_units']["voltage"])] = df["Ewe/{}".format(options['old_units']["voltage"])] * unit_tables.voltage()[options['old_units']["voltage"]].loc[options['units']['voltage']]
-		df["<I>/{}".format(options['old_units']["current"])] = df["<I>/{}".format(options['old_units']["current"])] * unit_tables.current()[options['old_units']["current"]].loc[options['units']['current']]
+		for column in df.columns:
+			if 'time' in column:
+				df['time/{}'.format(options['old_units']['time'])] = df["time/{}".format(options['old_units']["time"])] * unit_tables.time()[options['old_units']["time"]].loc[options['units']['time']]
+			
+			if 'Ewe' in column:
+				df["Ewe/{}".format(options['old_units']["voltage"])] = df["Ewe/{}".format(options['old_units']["voltage"])] * unit_tables.voltage()[options['old_units']["voltage"]].loc[options['units']['voltage']]
+
+			if '<I>' in column:
+				df["<I>/{}".format(options['old_units']["current"])] = df["<I>/{}".format(options['old_units']["current"])] * unit_tables.current()[options['old_units']["current"]].loc[options['units']['current']]
 		
-		capacity = options['old_units']['capacity'].split('h')[0] + '.h'
-		df["Capacity/{}".format(capacity)] = df["Capacity/{}".format(capacity)] * (unit_tables.capacity()[options['old_units']["capacity"]].loc[options['units']["capacity"]])
+			if 'Capacity' in column:
+				capacity = options['old_units']['capacity'].split('h')[0] + '.h'
+				df["Capacity/{}".format(capacity)] = df["Capacity/{}".format(capacity)] * (unit_tables.capacity()[options['old_units']["capacity"]].loc[options['units']["capacity"]])
 
-		columns = ['status_change', 'status', 'time', 'voltage', 'energy_charge', 'energy_discharge', 'current', 'capacity', 'cycle']
+		
 
-		if 'SpecificCapacity({}/mg)'.format(options['old_units']['capacity']) in df.columns:
-			df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] = df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] * unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']] / unit_tables.mass()['mg'].loc[options['units']["mass"]]
-			columns.append('specific_capacity')
+		columns = [
+			'status_change', 'status', 'time', 'voltage', 'energy_charge', 'energy_discharge', 'current', 'capacity', 'cycle'] if options['mode'] == 'GC' else [	# GC headers
+			'status', 'time', 'control_voltage', 'voltage', 'current', 'cycle', 'charge', 'power' 	# CV headers
+		]
 
-			if 'IonsExtracted' in df.columns:
-				columns.append('ions')
+		if options['mode'] == 'GC':
+			if 'SpecificCapacity({}/mg)'.format(options['old_units']['capacity']) in df.columns:
+				df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] = df['SpecificCapacity({}/mg)'.format(options['old_units']['capacity'])] * unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']] / unit_tables.mass()['mg'].loc[options['units']["mass"]]
+				columns.append('specific_capacity')
+
+				if 'IonsExtracted' in df.columns:
+					columns.append('ions')
 
 		df.columns = columns
 
@@ -674,19 +717,18 @@ def get_old_units(df: pd.DataFrame, options: dict) -> dict:
 
 	if options['kind'] == 'biologic':
 
+		old_units = {}
 		for column in df.columns:
 			if 'time' in column:
-				time = column.split('/')[-1]
+				old_units['time'] = column.split('/')[-1]
 			elif 'Ewe' in column:
-				voltage = column.split('/')[-1]
+				old_units['voltage'] = column.split('/')[-1]
 			elif 'Capacity' in column:
-				capacity = column.split('/')[-1].replace('.', '')
+				old_units['capacity'] = column.split('/')[-1].replace('.', '')
 			elif 'Energy' in column:
-				energy = column.split('/')[-1].replace('.', '')
+				old_units['energy'] = column.split('/')[-1].replace('.', '')
 			elif '<I>' in column:
-				current = column.split('/')[-1]
-
-		old_units = {'voltage': voltage, 'current': current, 'capacity': capacity, 'energy': energy, 'time': time}
+				old_units['current'] = column.split('/')[-1]
 	
 	return old_units
 
