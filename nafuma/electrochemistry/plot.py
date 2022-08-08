@@ -23,10 +23,12 @@ def plot_gc(data, options=None):
 
 
 	# Update options
-	required_options = ['x_vals', 'y_vals', 'which_cycles', 'exclude_cycles', 'show_plot', 'charge', 'discharge', 'colours', 'differentiate_charge_discharge', 'gradient', 'interactive', 'interactive_session_active', 'rc_params', 'format_params', 'save_gif', 'save_path', 'fps']	
+	required_options = ['force_reload', 'x_vals', 'y_vals', 'which_cycles', 'limit', 'exclude_cycles', 'show_plot', 'charge', 'discharge', 'colours', 'differentiate_charge_discharge', 'gradient', 'interactive', 'interactive_session_active', 'rc_params', 'format_params', 'save_gif', 'save_path', 'fps']	
 	default_options = {
+		'force_reload': False,
 		'x_vals': 'capacity', 'y_vals': 'voltage', 
 		'which_cycles': 'all',
+		'limit': None, # Limit line to be drawn
 		'exclude_cycles': [],
 		'show_plot': True,
 		'charge': True, 'discharge': True, 
@@ -46,7 +48,7 @@ def plot_gc(data, options=None):
 
 	
 	# Read data if not already loaded
-	if not 'cycles' in data.keys():
+	if not 'cycles' in data.keys() or options['force_reload']:
 		data['cycles'] = ec.io.read_data(data=data, options=options)
 
 	
@@ -102,7 +104,7 @@ def plot_gc(data, options=None):
 					if options['discharge']:
 						cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=gifax, c=colours[i][1])
 
-					gifax.text(x=options['xlim'][1]*0.8, y=3, s=f'{i+1}')
+					gifax.text(x=gifax.get_xlim()[1]*0.8, y=3, s=f'{i+1}')
 					update_labels(options)
 
 					giffig, gifax = btp.adjust_plot(fig=giffig, ax=gifax, options=options)
@@ -188,6 +190,107 @@ def plot_gc_interactive(data, options):
 
 	display(w)
 
+
+
+
+def plot_cv(data, options):
+
+	# Update options
+	required_options = ['force_reload', 'x_vals', 'y_vals', 'which_cycles', 'limit', 'exclude_cycles', 'show_plot', 'charge', 'discharge', 'colours', 'differentiate_charge_discharge', 'gradient', 'interactive', 'interactive_session_active', 'rc_params', 'format_params', 'save_gif', 'save_path', 'fps']	
+	default_options = {
+		'force_reload': False,
+		'x_vals': 'voltage', 'y_vals': 'current', 
+		'which_cycles': 'all',
+		'limit': None, # Limit line to be drawn
+		'exclude_cycles': [],
+		'show_plot': True,
+		'charge': True, 'discharge': True, 
+		'colours': None, 
+		'differentiate_charge_discharge': True, 
+		'gradient': False,
+		'interactive': False,
+		'interactive_session_active': False, 
+		'rc_params': {},
+		'format_params': {},
+		'save_gif': False,
+		'save_path': 'animation.gif',
+		'fps': 1
+		}
+
+	options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+	
+	# Read data if not already loaded
+	if not 'cycles' in data.keys() or options['force_reload']:
+		data['cycles'] = ec.io.read_data(data=data, options=options)
+
+	
+	# Update list of cycles to correct indices
+	update_cycles_list(data=data, options=options)
+
+	colours = generate_colours(cycles=data['cycles'], options=options)
+
+	if options['show_plot']:
+		# Prepare plot
+		fig, ax = btp.prepare_plot(options=options)
+		for i, cycle in enumerate(data['cycles']):
+			if i in options['which_cycles']:
+				if options['charge']:
+					cycle[0].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][0])
+
+				if options['discharge']:
+					cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
+
+		update_labels(options)
+
+	
+	
+	if options['save_gif'] and not options['interactive_session_active']:
+		if not os.path.isdir('tmp'):
+			os.makedirs('tmp')
+
+		# Scale image to make GIF smaller
+		options['format_params']['width'] = 7.5
+		options['format_params']['height'] = 3
+
+		options['format_params']['dpi'] = 200
+
+		for i, cycle in enumerate(data['cycles']):
+			if i in options['which_cycles']:
+				
+				giffig, gifax = btp.prepare_plot(options=options)
+
+				if options['charge']:
+					cycle[0].plot(x=options['x_vals'], y=options['y_vals'], ax=gifax, c=colours[i][0])
+				if options['discharge']:
+					cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=gifax, c=colours[i][1])
+
+				gifax.text(x=gifax.get_xlim()[1]*0.8, y=3, s=f'{i+1}')
+				update_labels(options)
+
+				giffig, gifax = btp.adjust_plot(fig=giffig, ax=gifax, options=options)
+
+				plt.savefig(os.path.join('tmp', str(i+1).zfill(4)+'.png'))
+				plt.close()
+
+			
+		img_paths = [os.path.join('tmp', path) for path in os.listdir('tmp') if path.endswith('png')]
+		frames = []
+		for path in img_paths:
+			frame = Image.open(path)
+			frames.append(frame)
+
+		frames[0].save(options['save_path'], format='GIF', append_images=frames[1:], save_all=True, duration=(1/options['fps'])*1000, loop=0)
+
+		shutil.rmtree('tmp')
+
+
+
+	if options['show_plot']:
+		fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
+		return data['cycles'], fig, ax
+	else:
+		return data['cycles'], None, None
 
 def update_labels(options, force=False):
 
