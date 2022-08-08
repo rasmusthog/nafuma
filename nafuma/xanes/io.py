@@ -189,9 +189,10 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
     # FIXME Handle the case when dataseries are not the same size
     # FIXME Add possibility to extract TIME (for operando runs) and Blower Temp (for variable temperature runs)
     # FIXME Add possibility to iport transmission data
-    required_options = ['adjust']
+    required_options = ['adjust', 'mode']
     default_options = {
-        'adjust': 0
+        'adjust': 0,
+        'mode': 'fluoresence'
     }
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -211,11 +212,15 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
 
         scan_data = pd.read_csv(filename, skiprows=1)
 
-        if not options['active_roi']:
-            scan_data = scan_data[[determine_active_roi(scan_data)]]
-        else:
-            scan_data = scan_data[options['active_roi']]
-            
+        if options['mode'] == 'fluoresence':
+            if not options['active_roi']:
+                scan_data = scan_data[[determine_active_roi(scan_data)]]
+            else:
+                scan_data = scan_data[options['active_roi']]
+
+        elif options['mode'] == 'transmission':
+            scan_data = scan_data['Ion2'] / scan_data['Ion1']
+
         xanes_data = pd.concat([xanes_data, scan_data], axis=1)
 
 
