@@ -1,1 +1,1 @@
-from . import io, calib, edges
+from . import io, calib, plot, edges

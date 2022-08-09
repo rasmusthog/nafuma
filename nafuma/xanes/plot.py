@@ -17,9 +17,12 @@ def plot_xanes(data, options=None):
 
 
 	# Update options
-	required_options = ['which_scans', 'colours', 'gradient', 'rc_params', 'format_params']	
+	required_options = ['which_scans', 'xlabel', 'ylabel', 'xunit', 'yunit', 'exclude_scans', 'colours', 'gradient', 'rc_params', 'format_params']	
 	default_options = {
 		'which_scans': 'all', 
+        'xlabel': 'Energy', 'ylabel': 'Intensity',
+        'xunit': 'keV', 'yunit': 'arb. u.',
+        'exclude_scans': [],
 		'colours': None, 
 		'gradient': False,
 		'rc_params': {},
@@ -27,69 +30,111 @@ def plot_xanes(data, options=None):
 
 	options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
+	print(options['xunit'])
+
 	
 	if not 'xanes_data' in data.keys():
 		data['xanes_data'] = xas.io.load_data(data=data, options=options)
 
 	# Update list of cycles to correct indices
-	update_scans_list(scans=data['path'], options=options)
+	update_scans_list(data=data, options=options)
 
-	colours = generate_colours(cycles=data['cycles'], options=options)
-
-	if options['interactive']:
-		options['interactive'], options['interactive_session_active'] = False, True
-		plot_gc_interactive(data=data, options=options)
-		return
+	colours = generate_colours(scans=data['path'], options=options)
 
 
 	# Prepare plot, and read and process data
 	
 	fig, ax = btp.prepare_plot(options=options)
 
-	for i, cycle in enumerate(data['cycles']):
-		if i in options['which_cycles']:
-			if options['charge']:
-				cycle[0].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][0])
+	for i, path in enumerate(data['path']):
+		if i in options['which_scans']:
+			data['xanes_data'].plot(x='ZapEnergy', y=path, ax=ax, c=colours[i])
 
-			if options['discharge']:
-				cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
-
-
-	if options['interactive_session_active']:
-		update_labels(options, force=True)
-	else:
-		update_labels(options)
 
 	fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
 
 	#if options['interactive_session_active']:
 	
 
-	return data['cycles'], fig, ax 
+	return fig, ax 
 
 
 
 
 
-def update_scans_list(scans, options: dict) -> None:
+def update_scans_list(data, options: dict) -> None:
 
 	if options['which_scans'] == 'all':
-		options['which_scans'] = [i for i in range(len(scans))]
+		options['which_scans'] = [i for i in range(len(data['path']))]
 
 
-	elif type(options['which_scans']) == list:
-		options['which_scans'] = [i-1 for i in options['which_scans']]
+	elif isinstance(options['which_scans'], list):
+
+		scans =[]
+
+		for scan in options['which_scans']:
+			if isinstance(scan, int):
+				scans.append(scan-1)
+
+			elif isinstance(scan, tuple):
+				interval = [i-1 for i in range(scan[0], scan[1]+1)]
+				scans.extend(interval)
+
+		
+		options['which_scans'] = scans
 	
 	
 	# Tuple is used to define an interval - as elements tuples can't be assigned, I convert it to a list here.
-	elif type(options['which_cycles']) == tuple:
-		which_cycles = list(options['which_cycles'])
+	elif isinstance(options['which_scans'], tuple):
+		which_scans = list(options['which_scans'])
 
-		if which_cycles[0] <= 0:
-			which_cycles[0] = 1
+		if which_scans[0] <= 0:
+			which_scans[0] = 1
 
-		elif which_cycles[1] < 0:
-			which_cycles[1] = len(cycles)
+		elif which_scans[1] < 0:
+			which_scans[1] = len(options['which_scans'])
 
 
-		options['which_cycles'] = [i-1 for i in range(which_cycles[0], which_cycles[1]+1)]
+		options['which_scans'] = [i-1 for i in range(which_scans[0], which_scans[1]+1)]
+
+	
+	for i, scan in enumerate(options['which_scans']):
+		if scan in options['exclude_scans']:
+			del options['which_scans'][i]
+
+
+
+
+def generate_colours(scans, options):
+    # FIXME Make this a generalised function and use this instead of this and in the electrochemsitry submodule
+
+	# Assign colours from the options dictionary if it is defined, otherwise use standard colours.
+	if options['colours']:
+		colour = options['colours']
+	
+	else:
+		#colour =  (214/255, 143/255, 214/255) # Plum Web (#D68FD6), coolors.co
+		colour = (90/255, 42/255, 39/255) # Caput Mortuum(#5A2A27), coolors.co
+
+	# If gradient is enabled, find start and end points for each colour
+	if options['gradient']:
+
+		add = min([(1-x)*0.75 for x in colour])
+
+		colour_start = colour
+		colour_end = [x+add for x in colour]
+
+
+	# Generate lists of colours
+	colours = []
+	
+	for scan_number in range(0, len(scans)):
+		if options['gradient']:
+			weight_start = (len(scans) - scan_number)/len(scans)
+			weight_end = scan_number/len(scans)
+
+			colour = [weight_start*start_colour + weight_end*end_colour for start_colour, end_colour in zip(colour_start, colour_end)]
+			
+		colours.append(colour)
+
+	return colours
