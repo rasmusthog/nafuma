@@ -240,11 +240,12 @@ def save_data(data: dict, options={}) -> None:
 
 
 
-def load_data(path: str):
+def load_data(data: dict, options={}) -> dict:
+    # FIXME Let this function be called by read_data() if some criterium is passed
 
     data = {}
 
-    data['xanes_data'] = pd.read_csv(path, sep='\t')
+    data['xanes_data'] = pd.read_csv(data['path'], sep='\t')
     data['path'] = data['xanes_data'].columns.to_list()
     data['path'].remove('ZapEnergy')
 
