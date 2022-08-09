@@ -81,10 +81,19 @@ def split_scan_data(data: dict, options={}) -> list:
         
 
         for i, scan_data in enumerate(scan_datas):
-            
+
+            if 'ZapEnergy' not in headers[i]:
+                if options['log']:
+                    aux.write_log(message=f'... No valid scan data found... ({i+1}/{len(scan_datas)})', options=options)
+                continue
+                        
             xanes_df = pd.DataFrame(scan_data).apply(pd.to_numeric)
             xanes_df.columns = headers[i]
+
+            
             edge = find_element({'xanes_data_original': xanes_df})
+        
+                
 
             if options['log']:
                 aux.write_log(message=f'... Starting data clean-up ({edge}-edge)... ({i+1}/{len(scan_datas)})', options=options)
@@ -183,6 +192,66 @@ def split_scan_data(data: dict, options={}) -> list:
 
 
 
+def save_data(data: dict, options={}) -> None:
+
+    required_options = ['save_folder', 'overwrite', 'log', 'logfile', 'filename']
+
+    default_options = {
+        'log': False,
+        'logfile': f'{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_save_files.log',
+        'save_folder': 'saved_scans',
+        'overwrite': False,
+        'filename': f'{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_exported_data.dat',
+        }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+
+    # Check if there is any data to be saved
+    if not 'xanes_data' in data.keys():
+        if options['log']:
+             aux.write_log(message=f'There is not saved scan data in data. Exiting without saving...', options=options)
+
+        return None
+    
+    if not isinstance(data['xanes_data'], pd.DataFrame):
+        if options['log']:
+             aux.write_log(message=f'data["xanes_data"] has an invalid format. Exiting without saving...', options=options)
+
+        return None
+
+
+    # Make folder(s) if it/they do(es)n't exist
+    if not os.path.exists(options['save_folder']):
+        if options['log']:
+             aux.write_log(message=f'Destination folder does not exist. Creating folder...', options=options)
+
+        os.makedirs(options['save_folder'])
+
+
+
+    if os.path.exists(os.path.join('save_folder', options['filename'])):
+        if not options['overwrite']:
+            if options['log']:
+                aux.write_log(message=f'File already exists and overwrite disabled. Exiting without saving...', options=options)
+            return None
+        
+    data['xanes_data'].to_csv(os.path.join(options['save_folder'], options['filename']), sep='\t', index=False)
+
+
+
+def load_data(path: str):
+
+    data = {}
+
+    data['xanes_data'] = pd.read_csv(path, sep='\t')
+    data['path'] = data['xanes_data'].columns.to_list()
+    data['path'].remove('ZapEnergy')
+
+
+    return data
+
+
 def read_data(data: dict, options={}) -> pd.DataFrame:
 
 
@@ -219,7 +288,7 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
                 scan_data = scan_data[options['active_roi']]
 
         elif options['mode'] == 'transmission':
-            scan_data = scan_data['Ion2'] / scan_data['Ion1']
+            scan_data = scan_data['MonEx'] / scan_data['Ion2']
 
         xanes_data = pd.concat([xanes_data, scan_data], axis=1)
 
