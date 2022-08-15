@@ -23,7 +23,7 @@ def plot_gc(data, options=None):
 
 
 	# Update options
-	required_options = ['force_reload', 'x_vals', 'y_vals', 'which_cycles', 'limit', 'exclude_cycles', 'show_plot', 'charge', 'discharge', 'colours', 'differentiate_charge_discharge', 'gradient', 'interactive', 'interactive_session_active', 'rc_params', 'format_params', 'save_gif', 'save_path', 'fps']	
+	required_options = ['force_reload', 'x_vals', 'y_vals', 'which_cycles', 'limit', 'exclude_cycles', 'show_plot', 'summary', 'charge', 'discharge', 'colours', 'differentiate_charge_discharge', 'gradient', 'interactive', 'interactive_session_active', 'rc_params', 'format_params', 'save_gif', 'save_path', 'fps']	
 	default_options = {
 		'force_reload': False,
 		'x_vals': 'capacity', 'y_vals': 'voltage', 
@@ -31,6 +31,7 @@ def plot_gc(data, options=None):
 		'limit': None, # Limit line to be drawn
 		'exclude_cycles': [],
 		'show_plot': True,
+		'summary': False,
 		'charge': True, 'discharge': True, 
 		'colours': None, 
 		'differentiate_charge_discharge': True, 

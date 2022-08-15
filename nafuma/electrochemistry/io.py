@@ -70,7 +70,9 @@ def read_batsmall(path):
 	Output:
 	df: pandas DataFrame containing the data as-is, but without additional NaN-columns.'''
 
-	df = pd.read_csv(path, skiprows=2, sep='\t')
+
+	# FIXME Now it is hardcoded that the decimal is a comma. It should do a check, as datasets can vary depending on the system settings of the machine that does the data conversion
+	df = pd.read_csv(path, skiprows=2, sep='\t', decimal=',')
 	df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
 
 	return df
@@ -133,8 +135,10 @@ def process_batsmall_data(df, options=None):
 
 	df = unit_conversion(df=df, options=options)
 
+
 	if options['splice_cycles']:
 		df = splice_cycles(df=df, options=options)
+
 
 	# Replace NaN with empty string in the Comment-column and then remove all steps where the program changes - this is due to inconsistent values for current  
 	df[["comment"]] = df[["comment"]].fillna(value={'comment': ''})
@@ -694,11 +698,23 @@ def get_old_units(df: pd.DataFrame, options: dict) -> dict:
 	
 	if options['kind'] == 'batsmall':
 
-		time = df.columns[0].split()[-1].strip('[]')
-		voltage = df.columns[1].split()[-1].strip('[]')
-		current = df.columns[2].split()[-1].strip('[]')
-		capacity, mass = df.columns[4].split()[-1].strip('[]').split('/')
-		old_units = {'time': time, 'current': current, 'voltage': voltage, 'capacity': capacity, 'mass': mass}
+		old_units = {}
+
+		for column in df.columns:
+			if 'TT [' in column:
+				old_units['time'] = column.split()[-1].strip('[]')
+			elif 'U [' in column:
+				old_units['voltage'] = column.split()[-1].strip('[]')
+			elif 'I [' in column:
+				old_units['current'] = column.split()[-1].strip('[]')
+			elif 'C [' in column:
+				old_units['capacity'], old_units['mass'] = column.split()[-1].strip('[]').split('/')
+
+		# time = df.columns[0].split()[-1].strip('[]')
+		# voltage = df.columns[1].split()[-1].strip('[]')
+		# current = df.columns[2].split()[-1].strip('[]')
+		# capacity, mass = df.columns[4].split()[-1].strip('[]').split('/')
+		# old_units = {'time': time, 'current': current, 'voltage': voltage, 'capacity': capacity, 'mass': mass}
 
 	if options['kind']=='neware':
 
