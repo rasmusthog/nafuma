@@ -280,7 +280,7 @@ def load_data(path: str) -> dict:
         data['e0_diff'] = {}
 
         for path, edge_position in zip(data['path'], edge_positions):
-            data['e0_diff'][path] = edge_position
+            data['e0_diff'][path] = float(edge_position)
 
     
 
