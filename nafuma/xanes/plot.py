@@ -4,6 +4,7 @@ from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,AutoMinorLoca
 import pandas as pd
 import numpy as np
 import math
+import datetime
 
 #import ipywidgets as widgets
 #from IPython.display import display
@@ -13,7 +14,7 @@ import nafuma.plotting as btp
 import nafuma.auxillary	as aux
 
 
-def plot_xanes(data, options=None):
+def plot_xanes(data, options={}):
 
 
 	# Update options
@@ -29,8 +30,6 @@ def plot_xanes(data, options=None):
 		'format_params': {}}
 
 	options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
-
-	print(options['xunit'])
 
 	
 	if not 'xanes_data' in data.keys():
@@ -58,6 +57,28 @@ def plot_xanes(data, options=None):
 
 	return fig, ax 
 
+
+def pick_out_scans(metadata: dict, timestamp: list):
+
+	# If either start or end are None, set to way back when or way into the future
+	if not timestamp[0]:
+		timestamp[0] = datetime.datetime.strptime('1970 01 01 00:00:00', '%Y %m %d %H:%M:%S')
+	else:
+		timestamp[0] = datetime.datetime.strptime(timestamp[0], "%d.%b %y %H.%M.%S")
+	if not timestamp[1]:
+		timestamp[1] = datetime.datetime.strptime('3000 01 01 00:00:00', '%Y %m %d %H:%M:%S')
+	else:
+		timestamp[1] = datetime.datetime.strptime(timestamp[1], "%d.%b %y %H.%M.%S")
+
+	scans = []
+	for i, time in enumerate(metadata['time']):
+		if time >= timestamp[0] and time <= timestamp[1]:
+			scans.append(i)
+
+
+	return scans
+
+		
 
 
 
