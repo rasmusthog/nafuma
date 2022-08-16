@@ -462,8 +462,6 @@ def smoothing(data: dict, options={}):
         # Make plots ...
         if options['save_plots'] or options['show_plots']:
 
-            
-
             edge_pos = estimate_edge_position(data=data, options=options)
             step_length = data['xanes_data']['ZapEnergy'].iloc[1] - data['xanes_data']['ZapEnergy'].iloc[0]
 
@@ -563,8 +561,8 @@ def estimate_edge_position(data: dict, options={}, index=0):
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
 
     #making new dataframe to keep the differentiated data
-    df_diff = pd.DataFrame(data['xanes_data_original']["ZapEnergy"])
-    df_diff[data['path'][index]]=data['xanes_data_original'][data['path'][index]].diff(periods=options['periods'])
+    df_diff = pd.DataFrame(data['xanes_data']["ZapEnergy"])
+    df_diff[data['path'][index]]=data['xanes_data'][data['path'][index]].diff(periods=options['periods'])
 
     #shifting column values up so that average differential fits right between the points used in the calculation
     df_diff[data['path'][index]]=df_diff[data['path'][index]].shift(-int(options['periods']/2))
