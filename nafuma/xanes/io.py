@@ -236,19 +236,53 @@ def save_data(data: dict, options={}) -> None:
                 aux.write_log(message=f'File already exists and overwrite disabled. Exiting without saving...', options=options)
             return None
         
-    data['xanes_data'].to_csv(os.path.join(options['save_folder'], options['filename']), sep='\t', index=False)
+    with open(os.path.join(options['save_folder'], options['filename']), 'w') as f:
+
+        if 'e0_diff' in data.keys():
+            f.write(f'# Number of header lines: {len(data["path"])+1} \n')
+
+            for i, (path, e0) in enumerate(data['e0_diff'].items()):
+                f.write(f'# Scan_{i} \t {e0} \n')
+       
+        else:
+            f.write(f'# Number of header lines: {1}')
+        
+
+        data['xanes_data'].to_csv(f, sep='\t', index=False)
+
+
+    #data['xanes_data'].to_csv(os.path.join(options['save_folder'], options['filename']), sep='\t', index=False)
 
 
 
-def load_data(data: dict, options={}) -> dict:
+def load_data(path: str) -> dict:
     # FIXME Let this function be called by read_data() if some criterium is passed
 
     data = {}
 
-    data['xanes_data'] = pd.read_csv(data['path'], sep='\t')
+
+    with open(path, 'r') as f:
+        line = f.readline()
+        header_lines = int(line.split()[-1])
+
+        if header_lines > 1:
+            edge_positions = []
+            line = f.readline()
+            while line[0] == '#':
+                edge_positions.append(line.split()[-1])
+                line = f.readline()
+
+    data['xanes_data'] = pd.read_csv(path, sep='\t', skiprows=header_lines)
     data['path'] = data['xanes_data'].columns.to_list()
     data['path'].remove('ZapEnergy')
 
+    if header_lines > 1:
+        data['e0_diff'] = {}
+
+        for path, edge_position in zip(data['path'], edge_positions):
+            data['e0_diff'][path] = edge_position
+
+    
 
     return data
 
