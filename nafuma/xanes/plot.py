@@ -38,16 +38,19 @@ def plot_xanes(data, options={}):
 	# Update list of cycles to correct indices
 	update_scans_list(data=data, options=options)
 
-	colours = generate_colours(scans=data['path'], options=options)
-
+	colours = generate_colours(scans=options['which_scans'], options=options)
 
 	# Prepare plot, and read and process data
 	
 	fig, ax = btp.prepare_plot(options=options)
 
+
+	# Add counter to pick out correct colour
+	counter = 0
 	for i, path in enumerate(data['path']):
 		if i in options['which_scans']:
-			data['xanes_data'].plot(x='ZapEnergy', y=path, ax=ax, c=colours[i])
+			data['xanes_data'].plot(x='ZapEnergy', y=path, ax=ax, c=colours[counter])
+			counter += 1
 
 
 	fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
