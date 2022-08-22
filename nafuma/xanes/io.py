@@ -341,7 +341,10 @@ def read_metadata(data: dict, options={}) -> dict:
     default_options = {
         'get_temperature': True,
         'get_timestamp': True,
-        'adjust_time': False
+        'adjust_time': False,
+        'convert_time': False,
+        'reference_time': None,
+        'time_unit': 's'
     }
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -371,12 +374,27 @@ def read_metadata(data: dict, options={}) -> dict:
             timestamps.append(time)
 
 
+    if options['reference_time'] and options['convert_time']:
+        from . import unit_tables
+        new_times = []
+
+        if isinstance(options['reference_time'], str):
+            options['reference_time'] = datetime.datetime.strptime(options['reference_time'], "%d.%b %y %H.%M.%S")
+        
+        for time in timestamps:
+            new_time = (time.timestamp() - options['reference_time'].timestamp()) * unit_tables.time()['s'].loc[options['time_unit']]        
+
+            new_times.append(new_time)
+
+
+        timestamps = new_times
+
+
+
+
     metadata = {'time': timestamps, 'temperature': temperatures}
 
     return metadata
-
-
-
 
 
 
