@@ -71,8 +71,19 @@ def read_batsmall(path):
 	df: pandas DataFrame containing the data as-is, but without additional NaN-columns.'''
 
 
-	# FIXME Now it is hardcoded that the decimal is a comma. It should do a check, as datasets can vary depending on the system settings of the machine that does the data conversion
-	df = pd.read_csv(path, skiprows=2, sep='\t', decimal=',')
+	# Determine if decimal point is . or ,
+	with open(path, 'r') as f:
+		for i, line in enumerate(f):
+			if i == 10:
+				values = line.split()
+				if len(values[1].split('.')) == 2:
+					decimal_point = '.'
+				elif len(values[1].split(',')) == 2:
+					decimal_point = ','
+				
+
+
+	df = pd.read_csv(path, skiprows=2, sep='\t', decimal=decimal_point)
 	df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
 
 	return df
