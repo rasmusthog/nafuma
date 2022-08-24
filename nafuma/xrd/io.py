@@ -16,8 +16,14 @@ import nafuma.auxillary as aux
 
 def get_image_array(path):
 
-    image = fabio.open(path)
-    image_array = image.data
+    beamline_extension = ['.edf', '.cbf', '.mar3450']
+
+    if path.endswith(tuple(beamline_extension)):
+        image = fabio.open(path)
+        image_array = image.data
+
+    elif path.endswith('.dat'):
+        image_array = np.loadtxt(path, skiprows=1, delimiter=';')
 
     return image_array
 
@@ -185,6 +191,7 @@ def process_2d_scans(data: dict, options={}):
 
     scans = int(len(all_imgs) / options['scans'])
 
+
     assert scans - (len(all_imgs) / options['scans']) == 0
 
 
@@ -194,6 +201,7 @@ def process_2d_scans(data: dict, options={}):
     for i in range(scans):
         img = []
         dark = []
+
         for i in range(options['scans']):
             img.append(all_imgs.pop(0))
 
@@ -206,15 +214,18 @@ def process_2d_scans(data: dict, options={}):
             darks.append(dark)
 
 
-    img_avgs = []        
-    for img in imgs:
+    img_avgs = []
+    headers = []
+    for img, dark in zip(imgs,darks):
         img_avg = average_images(img)
+        header = get_image_headers(img[0])
         
         if options['darks']:
             dark_avg = average_images(dark)
             img_avg = subtract_dark(img_avg, dark_avg)
 
         img_avgs.append(img_avg)
+        headers.append(header)
 
 
     if options['save']:
@@ -222,7 +233,9 @@ def process_2d_scans(data: dict, options={}):
             os.makedirs(options['save_folder'])
 
         for i, img in enumerate(img_avgs):
-            np.savetxt(os.path.join(options['save_folder'], options['save_filename']+f'{i}'.zfill(4)+options['save_extension']), img, fmt='%.1f', delimiter=";")
+            with open(os.path.join(options['save_folder'], options['save_filename']+f'{i}'.zfill(4)+options['save_extension']), 'w') as f:
+                f.write(f'# Time: {headers[i]["time"]}\n')
+                np.savetxt(f, img, fmt='%.2f', delimiter=";")
 
 
     
