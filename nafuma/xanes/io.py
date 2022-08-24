@@ -336,7 +336,7 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
 
 def read_metadata(data: dict, options={}) -> dict:
 
-    required_options = ['get_temperature', 'get_timestamp', 'adjust_time']
+    required_options = ['get_temperature', 'get_timestamp', 'adjust_time', 'convert_time', 'time_unit', 'reference_time']
 
     default_options = {
         'get_temperature': True,
