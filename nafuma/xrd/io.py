@@ -160,6 +160,82 @@ def generate_image_list(path, options=None):
     }
 
 
+def process_2d_scans(data: dict, options={}):
+
+    default_options = {
+        'scans': 15, # number of scans per image
+        'img_filename': 'img_',
+        'extension': '.edf',
+        'darks': True, # whether there are darks
+        'dark_filename': 'dark_',
+        'save': False,
+        'save_folder': './average/',
+        'save_filename': 'avg_',
+        'save_extension': '.dat'
+    }
+
+    options = aux.update_options(options=options, required_options=default_options.keys(), default_options=default_options)
+
+
+    all_imgs = [os.path.join(data['path'], img) for img in os.listdir(data['path']) if img.endswith(options['extension']) and img.startswith(options['img_filename'])]
+
+    if options['darks']:
+        all_darks = [os.path.join(data['path'], img) for img in os.listdir(data['path']) if img.endswith(options['extension']) and img.startswith(options['dark_filename'])]
+
+
+    scans = int(len(all_imgs) / options['scans'])
+
+    assert scans - (len(all_imgs) / options['scans']) == 0
+
+
+    imgs = []
+    darks = []
+
+    for i in range(scans):
+        img = []
+        dark = []
+        for i in range(options['scans']):
+            img.append(all_imgs.pop(0))
+
+            if options['darks']:
+                dark.append(all_darks.pop(0))
+
+        imgs.append(img)
+        
+        if options['darks']:
+            darks.append(dark)
+
+
+    img_avgs = []        
+    for img in imgs:
+        img_avg = average_images(img)
+        
+        if options['darks']:
+            dark_avg = average_images(dark)
+            img_avg = subtract_dark(img_avg, dark_avg)
+
+        img_avgs.append(img_avg)
+
+
+    if options['save']:
+        if not os.path.isdir(options['save_folder']):
+            os.makedirs(options['save_folder'])
+
+        for i, img in enumerate(img_avgs):
+            np.savetxt(os.path.join(options['save_folder'], options['save_filename']+f'{i}'.zfill(4)+options['save_extension']), img, fmt='%.1f', delimiter=";")
+
+
+    
+    return img_avgs
+
+
+
+        
+
+
+
+
+
 def average_images(images):
     ''' Takes a list of path to image files, reads them and averages them before returning the average image'''
 
