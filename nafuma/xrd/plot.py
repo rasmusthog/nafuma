@@ -5,9 +5,12 @@ from matplotlib.ticker import MultipleLocator
 import pandas as pd
 import numpy as np
 import math
+import os
+import shutil
 
 import ipywidgets as widgets
 from IPython.display import display
+from PIL import Image
 
 import nafuma.xrd as xrd
 import nafuma.auxillary as aux
@@ -856,4 +859,60 @@ def reverse_diffractograms(diffractograms):
         rev_diffractograms.append(diffractograms.pop())
 
     return rev_diffractograms
+
+
+
+def make_animation(data: dict, options={}):
+
+    default_options = {
+        'cmap': 'inferno',
+        'contrast': False,
+        'contrast_factor': 1/3,
+        'save_path': 'diff_animation.gif',
+        'fps': 5
+    }
+
+    options = aux.update_options(options=options, default_options=default_options, required_options=default_options.keys())
+
+    if not isinstance(data['path'], list):
+        data['path'] = aux.get_filenames(data['path'], ext='dat')
+
+    
+    if not os.path.isdir('tmp'):
+        os.makedirs('tmp')
+    
+	# Scale image to make GIF smaller
+    # 
+    options['format_params']['width'] = 5
+    options['format_params']['height'] = 5
+
+    options['format_params']['dpi'] = 200
+
+    for i, scan in enumerate(data['path']):
+            
+        giffig, gifax = btp.prepare_plot(options=options)
+
+        img = xrd.io.get_image_array(scan)
+        
+        if options['contrast']:
+            img[img < 0] = 0.00000001
+            img = np.log(img)
+            img[img < 0] = 0
+
+        gifax.imshow(img, cmap=options['cmap'])
+
+        plt.savefig(os.path.join('tmp', str(i+1).zfill(4)+'.png'))
+        plt.close()
+
+        
+    img_paths = aux.get_filenames('tmp', ext='png')
+    
+    frames = []
+    for path in img_paths:
+        frame = Image.open(path)
+        frames.append(frame)
+
+    frames[0].save(options['save_path'], format='GIF', append_images=frames[1:], save_all=True, duration=(1/options['fps'])*1000, loop=0)
+
+    shutil.rmtree('tmp')
 
