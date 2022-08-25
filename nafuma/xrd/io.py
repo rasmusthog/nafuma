@@ -35,6 +35,37 @@ def get_image_headers(path):
     return image.header
 
 
+
+def integrate_scans(data: dict, options={}):
+
+    default_options = {
+        'extension': '.dat',
+        'save': True,
+        'integration_save_folder': './integrated/',
+        'integration_save_filename': None,
+    }
+
+    options = aux.update_options(options=options, required_options=default_options.keys(), default_options=default_options)
+
+
+    if not isinstance(data['path'], list):
+        imgs = aux.get_filenames(data['path'], ext=options['extension'])
+
+
+    diffractograms, wavelengths = [], []
+    for img in imgs:
+        data['image'] = get_image_array(img)
+
+        options['integration_save_filename'] = os.path.basename(img).split('.')[0] + '_int.xy'
+
+        diff, wl = integrate_1d(data=data, options=options)
+
+        diffractograms.append(diff)
+        wavelengths.append(wl)
+    
+    return diffractograms, wavelengths
+
+
 def integrate_1d(data, options={}, index=0):
     ''' Integrates an image file to a 1D diffractogram. 
 
@@ -48,17 +79,17 @@ def integrate_1d(data, options={}, index=0):
     df: DataFrame contianing 1D diffractogram if option 'return' is True
     ''' 
 
-    required_options = ['unit', 'npt', 'save', 'save_filename', 'save_extension', 'save_folder', 'overwrite', 'extract_folder', 'error_model']
+    required_options = ['unit', 'npt', 'save', 'integration_save_filename', 'save_extension', 'integration_save_folder', 'overwrite', 'extract_folder', 'error_model']
 
     default_options = {
         'unit': '2th_deg', 
-        'npt': 3000,
+        'npt': 5000,
         'extract_folder': 'tmp',
         'error_model': None,
         'save': False,
-        'save_filename': None,
+        'integration_save_filename': None,
         'save_extension': '_integrated.xy',
-        'save_folder': '.',
+        'integration_save_folder': '.',
         'overwrite': False}
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -68,7 +99,7 @@ def integrate_1d(data, options={}, index=0):
     
 
     # Get image array from filename if not passed
-    if 'image' not in data.keys() or not data['image']:
+    if 'image' not in data.keys() or not isinstance(data['image'], np.ndarray):
         data['image'] = get_image_array(data['path'][index])
 
 
@@ -89,8 +120,8 @@ def integrate_1d(data, options={}, index=0):
     if not os.path.isdir(options['extract_folder']):
         os.makedirs(options['extract_folder'])
 
-    if not os.path.isdir(options['save_folder']):
-        os.makedirs(options['save_folder'])
+    if not os.path.isdir(options['integration_save_folder']):
+        os.makedirs(options['integration_save_folder'])
 
     
 
@@ -104,10 +135,6 @@ def integrate_1d(data, options={}, index=0):
     if not options['save']:
         os.remove(filename)
         shutil.rmtree(f'tmp')
-
-
-    # Reset this option
-    options['save_folder'] = None
     
     return diffractogram, wavelength
     
@@ -122,19 +149,18 @@ def make_filename(options, path=None):
     elif options['save']:
 
         # Case 1: No filename is given. 
-        if not options['save_filename']:
+        if not options['integration_save_filename']:
             # If a path is given instead of an image array, the path is taken as the trunk of the savename
             if path:
                 # Make filename by joining the save_folder, the filename (with extension deleted) and adding the save_extension
-                filename = os.path.join(options['save_folder'], os.path.split(path)[-1].split('.')[0] + options['save_extension'])
+                filename = os.path.join(options['integration_save_folder'], os.path.split(path)[-1].split('.')[0] + options['save_extension'])
             else:
                 # Make filename just "integrated.dat" in the save_folder
-                filename = os.path.join(options['save_folder'], 'integrated.xy')
+                filename = os.path.join(options['integration_save_folder'], 'integrated.xy')
 
 
         else:
-            filename = os.path.join(options['save_folder'], options['save_filename'])
-
+            filename = os.path.join(options['integration_save_folder'], options['integration_save_filename'])
 
         if not options['overwrite']:
             trunk = filename.split('.')[0]
@@ -216,9 +242,10 @@ def process_2d_scans(data: dict, options={}):
 
     img_avgs = []
     headers = []
+
     for img, dark in zip(imgs,darks):
         img_avg = average_images(img)
-        header = get_image_headers(img[0])
+        header = get_image_headers(img[0])  
         
         if options['darks']:
             dark_avg = average_images(dark)
@@ -233,12 +260,12 @@ def process_2d_scans(data: dict, options={}):
             os.makedirs(options['save_folder'])
 
         for i, img in enumerate(img_avgs):
-            with open(os.path.join(options['save_folder'], options['save_filename']+f'{i}'.zfill(4)+options['save_extension']), 'w') as f:
-                f.write(f'# Time: {headers[i]["time"]}\n')
-                np.savetxt(f, img, fmt='%.2f', delimiter=";")
+            if options['save_extension'] == '.dat':
+                with open(os.path.join(options['save_folder'], options['save_filename']+f'{i}'.zfill(4)+options['save_extension']), 'w') as f:
+                    f.write(f'# Time: {headers[i]["time"]}\n')
+                    np.savetxt(f, img, fmt='%.2f', delimiter=";")
+                
 
-
-    
     return img_avgs
 
 
