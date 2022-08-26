@@ -228,7 +228,7 @@ def process_2d_scans(data: dict, options={}):
         img = []
         dark = []
 
-        for i in range(options['scans']):
+        for j in range(options['scans']):
             img.append(all_imgs.pop(0))
 
             if options['darks']:
@@ -240,7 +240,7 @@ def process_2d_scans(data: dict, options={}):
             darks.append(dark)
 
 
-    img_avgs = []
+    img_avgs = [] 
     headers = []
 
     for img, dark in zip(imgs,darks):
@@ -679,6 +679,9 @@ def strip_headers_from_xy(path: str, filename=None) -> None:
         for line in lines:
             if line[0] == '#':
                 headerlines += 1
+            elif line[0] == "\'":
+                headerlines += 1
+
             else:
                 xy.append(line)
 
