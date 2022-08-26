@@ -362,6 +362,10 @@ def generate_heatmap(data, options={}):
 
 
         if options['increase_contrast']:
+
+            if d['I'].min() < 0:
+                d['I'] = d['I'] - d['I'].min()
+
             d['I'] = d['I']**(1/options['contrast_factor'])
 
         twotheta = np.append(twotheta, d['2th'].to_numpy())
@@ -418,23 +422,29 @@ def generate_heatmap(data, options={}):
     scan_numbers = []
     
     temperatures = []
-    for i, filename in enumerate(data['path']):
-        scan_numbers.append(i)
-        temperatures.append(xrd.io.read_metadata_from_xy(filename)['temperature'])
+    
+    # FIXME This is a very bad check for whether it is HTXRD or not - it bascailly just excludes any files that has a .poni-file passed. Make more rigorous in future!
+    if not 'calibrant' in data.keys():
+        for i, filename in enumerate(data['path']):
+            scan_numbers.append(i)
+            temperatures.append(xrd.io.read_metadata_from_xy(filename)['temperature'])
 
-    yticks = scan_numbers[0::options['heatmap_y_tick_locators'][0]]
-    yticks.append(scan_numbers[-1])
-    
-    if not temperatures[0]:
-        yticklabels = yticks
-        options['heatmap.ylabel'] = 'Scan number'
-        options['heatmap.yunit'] = None
-    
+        yticks = scan_numbers[0::options['heatmap_y_tick_locators'][0]]
+        yticks.append(scan_numbers[-1])
+
+        if not temperatures[0]:
+            yticklabels = yticks
+            options['heatmap.ylabel'] = 'Scan number'
+            options['heatmap.yunit'] = None
+
+        else:
+            yticklabels = temperatures[0::options['heatmap_y_tick_locators'][0]]
+            yticklabels.append(temperatures[-1])
+            options['heatmap.ylabel'] = 'Temperature'
+            options['heatmap.yunit'] = '$^\circ$C'
+
     else:
-        yticklabels = temperatures[0::options['heatmap_y_tick_locators'][0]]
-        yticklabels.append(temperatures[-1])
-        options['heatmap.ylabel'] = 'Temperature'
-        options['heatmap.yunit'] = '$^\circ$C'
+        yticks, yticklabels = None, None
 
 
 
