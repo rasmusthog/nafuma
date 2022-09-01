@@ -367,8 +367,13 @@ def read_metadata(data: dict, options={}) -> dict:
         if options['get_timestamp']:
 
             with open(filename, 'r') as f:
-                time = f.readline().strip('# Time: ')
-                time = datetime.datetime.strptime(time, "%a %b %d %H:%M:%S %Y ")
+                #time = f.readline().strip('# Time: ') #<-- Previous code
+                time = f.readline().split('# Time:  ')[-1] #Hope this does not fuck you up, Rasmus - but I needed another space here
+                split_operator=time[-9] #This should be the operator that splits hours, minutes and seconds
+                if split_operator == ".":
+                    time = datetime.datetime.strptime(time, "%a %b %d %H.%M.%S %Y ")
+                if split_operator == ":":
+                    time = datetime.datetime.strptime(time, "%a %b %d %H:%M:%S %Y ")
 
             if options['adjust_time']:
                 time_elapsed = scan_data['Htime'].iloc[-1] - scan_data['Htime'].iloc[0]
