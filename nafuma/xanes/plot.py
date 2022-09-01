@@ -64,14 +64,22 @@ def plot_xanes(data, options={}):
 def pick_out_scans(metadata: dict, timestamp: list):
 
 	# If either start or end are None, set to way back when or way into the future
+	split_operator=timestamp[0][-3] #Adding this to enable reading of both "." and ":" as operators to split hour:minute:second
+
 	if not timestamp[0]:
 		timestamp[0] = datetime.datetime.strptime('1970 01 01 00:00:00', '%Y %m %d %H:%M:%S')
 	else:
-		timestamp[0] = datetime.datetime.strptime(timestamp[0], "%d.%b %y %H.%M.%S")
+		if split_operator == ".":
+			timestamp[0] = datetime.datetime.strptime(timestamp[0], "%d.%b %y %H.%M.%S")
+		if split_operator == ":":
+			timestamp[0] = datetime.datetime.strptime(timestamp[0], "%d.%b %y %H:%M:%S")
 	if not timestamp[1]:
 		timestamp[1] = datetime.datetime.strptime('3000 01 01 00:00:00', '%Y %m %d %H:%M:%S')
 	else:
-		timestamp[1] = datetime.datetime.strptime(timestamp[1], "%d.%b %y %H.%M.%S")
+		if split_operator == ".":
+			timestamp[1] = datetime.datetime.strptime(timestamp[1], "%d.%b %y %H.%M.%S")
+		if split_operator == ":":
+			timestamp[1] = datetime.datetime.strptime(timestamp[1], "%d.%b %y %H:%M:%S")
 
 	scans = []
 	for i, time in enumerate(metadata['time']):
