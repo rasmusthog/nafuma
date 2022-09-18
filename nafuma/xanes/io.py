@@ -10,7 +10,7 @@ def split_scan_data(data: dict, options={}) -> list:
     ''' Splits a XANES-file from BM31 into different files depending on the edge. Has the option to add intensities of all scans of same edge into the same file. 
     As of now only picks out xmap_rois (fluoresence mode) and for Mn, Fe, Co and Ni K-edges.'''
 
-    required_options = ['log', 'logfile', 'save', 'save_folder', 'replace', 'active_roi', 'add_rois', 'return']
+    required_options = ['log', 'logfile', 'save', 'save_folder', 'replace', 'active_roi', 'add_rois', 'return', 'skip_if_no_roi']
 
     default_options = {
         'log': False,
@@ -20,7 +20,8 @@ def split_scan_data(data: dict, options={}) -> list:
         'replace': False, # whether to replace the files if they already exist
         'active_roi': None,
         'add_rois': False, # Whether to add the rois of individual scans of the same edge together
-        'return': True
+        'return': True,
+        'skip_if_no_roi': True
     }
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -100,10 +101,14 @@ def split_scan_data(data: dict, options={}) -> list:
 
 
             if not ('xmap_roi00' in headers[i]) and (not 'xmap_roi01' in headers[i]):
+                if options['skip_if_no_roi']:
+                    if options['log']:
+                        aux.write_log(message='... ... Did not find fluoresence data. Skipping...', options=options)
+                    continue 
                 if options['log']:
-                    aux.write_log(message='... ... Did not find fluoresence data. Skipping...', options=options)
+                    aux.write_log(message='... ... Did not find fluoresence data, but still proceeding ...', options=options)
 
-                continue 
+                    
 
             
             
@@ -362,8 +367,13 @@ def read_metadata(data: dict, options={}) -> dict:
         if options['get_timestamp']:
 
             with open(filename, 'r') as f:
-                time = f.readline().strip('# Time: ')
-                time = datetime.datetime.strptime(time, "%a %b %d %H:%M:%S %Y ")
+                #time = f.readline().strip('# Time: ') #<-- Previous code
+                time = f.readline().split('# Time:  ')[-1] #Hope this does not fuck you up, Rasmus - but I needed another space here
+                split_operator=time[-9] #This should be the operator that splits hours, minutes and seconds
+                if split_operator == ".":
+                    time = datetime.datetime.strptime(time, "%a %b %d %H.%M.%S %Y ")
+                if split_operator == ":":
+                    time = datetime.datetime.strptime(time, "%a %b %d %H:%M:%S %Y ")
 
             if options['adjust_time']:
                 time_elapsed = scan_data['Htime'].iloc[-1] - scan_data['Htime'].iloc[0]
