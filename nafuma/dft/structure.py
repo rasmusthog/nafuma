@@ -3,6 +3,7 @@ import re
 import pandas as pd
 import numpy as np
 from scipy.optimize import curve_fit
+import warnings
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator, FormatStrFormatter,AutoMinorLocator)
@@ -20,6 +21,9 @@ from ase.units import kJ
 from ase.eos import EquationOfState
 import os
 import os.path
+
+import nafuma.auxillary as aux
+import nafuma.plotting as btp
 
 
 def read_eos_data(path, options):
@@ -70,15 +74,21 @@ def read_eos_data(path, options):
     # Fit data to Equation of State using ASEs EquationOfState object. Makes a DataFrame out of the data points of the fitted curve. Also makes a ditionary of the equilibrium constants, 
     #then packages everything in a list which is returned by the function.
     eos = EquationOfState(dft_df['Volume'].values, dft_df['Energy'].values, eos=options['eos'])
-    v0, e0, B = eos.fit()
     
-    eos_df = pd.DataFrame(data={'Volume': eos.getplotdata()[4], 'Energy': eos.getplotdata()[5]}) 
+    try:
+        v0, e0, B = eos.fit()
+        eos_df = pd.DataFrame(data={'Volume': eos.getplotdata()[4], 'Energy': eos.getplotdata()[5]}) 
 
-    equilibrium_constants = {'v0': v0, 'e0': e0,'B': B/kJ * 1.0e24} 
+        equilibrium_constants = {'v0': v0, 'e0': e0,'B': B/kJ * 1.0e24} 
     
-    data = [dft_df, eos_df, equilibrium_constants, label]
-    
-    return data
+        data = [dft_df, eos_df, equilibrium_constants, label]
+
+        return data
+
+    except:
+        warnings.warn(f'WARNING: Unable to fit EoS curve for {label}')
+
+        return [None, None, None, label]
     
 
 def read_eos_datas(path, options):
@@ -107,7 +117,9 @@ def read_eos_datas(path, options):
     for dir in dirs:
         subdir = os.path.join(path, dir)
         data = read_eos_data(subdir, options)
-        datas.append(data)
+
+        if isinstance(data[0], pd.DataFrame):
+            datas.append(data)
 
         
     # Sorts the data if sort is enabled.
@@ -160,12 +172,17 @@ def plot_eos_data(path, options):
     highlight: Takes a list, either of booleans to highlight certain bars (must be the same length as the number of data sets). Alternatively can contain only names of the datasets to highlight. Defaults to None.'''
 
 
+
+    # FIXME A lot of refactoring required to tidy this up
+
     required_options = ['plot_kind', 'highlight', 
                         'reference', 
                         'eos', 'sort_by',
-                        'curve_colours',
-                        'bar_colours',
-                        'marker_cycle',
+                        'colours',
+                        'xlabel', 'ylabel', 
+                        'xunit', 'yunit',
+                        'palettes',
+                        'markers',
                         'ylim',
                         'legend_map',
                         'rc_params',
@@ -178,9 +195,11 @@ def plot_eos_data(path, options):
         'reference': 0,  # Whether the energy should be relative to some reference energy (typically lowest energy)
         'eos': 'birchmurnaghan', # what type of EoS curve to fit the data to. Options: murnaghan, birch, birchmurnaghan, vinet, pouriertarantola
         'sort_by': 'e0', # whether the data should be sorted or not - relevant for bar plots, but also for the order of the entries in the legend in the EoScruve plot
-        'curve_colours': [('qualitative', 'Dark2_8'), ('qualitative', 'Paired_12')], # a set of two colour cycles from the palettable package. Requires many colours for the EoScurve plot
-        'bar_colours': [('qualitative', 'Dark2_3'), ('qualitative', 'Pastel2_3')], # set of two colour cycles from the palettable package. Extracts first element of each to make the highlighted and subdued colours respectively. Should be replaced in future by explicit passing of colours
-        'marker_cycle': ('o', '*', '^', 'v', 'd', 'H', '8', '>', 'P', 'X'), # marker styles for the EoScurve plot
+        'colours': None,
+        'xlabel': 'Volume', 'ylabel': 'Energy',
+        'xunit': 'Å$^3$', 'yunit': 'eV',
+        'palettes': [('qualitative', 'Dark2_8'), ('qualitative', 'Paired_12')], # a set of two colour cycles from the palettable package. Requires many colours for the EoScurve plot
+        'markers': ('o', '*', '^', 'v', 'd', 'H', '8', '>', 'P', 'X'), # marker styles for the EoScurve plot
         'ylim': None, # y-limits (ist)
         'legend': True,
         'legend_map': None, # a dictionary with mappings between the folder names and what should appear in the legend
@@ -198,15 +217,15 @@ def plot_eos_data(path, options):
     if options['plot_kind'] == 'EoScurve':
         
         # Fetches a figure and axes object from the prepare_plot() function
-        fig, ax = prepare_plot(options=options)
+        fig, ax = btp.prepare_plot(options=options)
         
         # Make an cyclic iterable of markers to be used for the calculated data points. 
-        marker_cycle = itertools.cycle(options['marker_cycle'])
+        marker_cycle = itertools.cycle(options['markers'])
     
         
         # Creates a list of all the colours that is passed in the colour_cycles argument. Then makes cyclic iterables of these. 
         colour_collection = []
-        for cycle in options['curve_colours']:
+        for cycle in options['palettes']:
             mod = importlib.import_module("palettable.colorbrewer.%s" % cycle[0])
             colour = getattr(mod, cycle[1]).mpl_colors
             colour_collection = colour_collection + colour
@@ -239,16 +258,18 @@ def plot_eos_data(path, options):
                 dft_df.plot.scatter(x=1, y=2, ax=ax, marker=markers[-1], color=colours[-1], s=20)
                 eos_df.plot(x=0, y=1, ax=ax, color=colours[-1], label='_', ls='--')
         
-            
+        options['labels'] = labels
+
         if options['legend']:
             options['legend_content'] = [labels, colours, markers]
+
 
         
     ### PLOT THE BAR PLOTS
     elif options['plot_kind'] == 'EoSbars':
         
         # Fetches a figure and axes object from the prepare_plot() function
-        fig, ax = prepare_plot(options=options)
+        fig, ax = btp.prepare_plot(options=options)
         
         e0 = []
         labels = []
@@ -257,7 +278,7 @@ def plot_eos_data(path, options):
         # Pick out colour for highlighting (NB! These colours are not passed as arguments, but could be in future)
        
         bar_colours = []
-        for cycle in options['bar_colours']:
+        for cycle in options['palettes']:
             mod = importlib.import_module("palettable.colorbrewer.%s" % cycle[0])
             bar_colours.append(getattr(mod, cycle[1]).mpl_colors[0])
 
@@ -301,7 +322,9 @@ def plot_eos_data(path, options):
         plt.xticks(range(len(e0)), labels, rotation=90)
         
             
-    fig, ax = prettify_plot(fig=fig, ax=ax, options=options)
+    fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
+
+    return datas, fig, ax
         
     
     
