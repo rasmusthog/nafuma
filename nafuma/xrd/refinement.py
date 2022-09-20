@@ -16,7 +16,7 @@ import nafuma.auxillary as aux
 
 def make_initial_inp(data: dict, options={}):
 
-    required_options = ['filename', 'overwrite', 'include', 'save_results', 'save_dir', 'topas_options', 'background', 'capillary', 'start', 'finish', 'exclude']
+    required_options = ['filename', 'overwrite', 'include', 'save_results', 'save_dir', 'topas_options', 'background', 'capillary', 'th2_offset', 'fit_peak_width', 'start', 'finish', 'exclude']
 
     default_options = {
         'filename': 'start.inp',
@@ -27,10 +27,12 @@ def make_initial_inp(data: dict, options={}):
         'topas_options': {}, 
         'background': 7,
         'capillary': False,
+        'th2_offset': False,
+        'fit_peak_width': False,
         'interval': [None, None], # Start and finish values that TOPAS should refine on. Overrides 'start' and 'finish'
         'start': None, # Start value only. Overridden by 'interval' if this is set.
         'finish': None, # Finish value only. Overridden by 'interval' if this is set.
-        'exlude': [] # Excluded regions. List of lists.
+        'exclude': [] # Excluded regions. List of lists.
     }
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -68,6 +70,23 @@ def make_initial_inp(data: dict, options={}):
             for i, str in enumerate(data['str']):
                 fout.write('\n\n')
                 write_str(fout=fout, data=data, options=options, index=i)
+
+
+    with open(options['filename'], 'r') as fin:
+        
+        lines = []
+        for statement in data['define_statements']:
+            lines.append(f'\'#define {statement}\n')
+
+        lines.append('\n')
+
+        lines += fin.readlines()
+
+    
+    with open(options['filename'], 'w') as fout:
+        for line in lines:
+            fout.write(line)
+
 
 
            
@@ -108,7 +127,13 @@ def write_xdd(fout, data, options):
     
     fout.write('\t'+snippets['wavelength'].format(data['wavelength'])+'\n')
     fout.write('\t'+snippets['lp_factor'].format(topas_options['lp_factor'])+'\n')
-    fout.write('\t'+snippets['zero_error']+'\n')
+    
+    if options['th2_offset']:
+        fout.write('\n')
+        for line in snippets['th2_offset']:
+            fout.write('\t'+line+'\n')
+    else:
+        fout.write('\t'+snippets['zero_error']+'\n')
 
     if options['capillary']:
         fout.write('\n')
@@ -139,6 +164,9 @@ def write_xdd(fout, data, options):
 
 def write_params(fout, data, options, index=0):
 
+    # List to include #define-statements at top of INP-file
+    data['define_statements'] = []
+
     atoms = read_cif(data['str'][index])
     if 'labels' in data.keys():
         label = data['labels'][index]
@@ -161,6 +189,7 @@ def write_params(fout, data, options, index=0):
     # WRITE LATTICE PARAMETERS
     # If start_values is defined:
     fout.write(f'#ifdef start_values_{label}\n')
+    data['define_statements'].append(f'start_values_{label}')
     lpa = f'local !lpa_{label} {a} ;: {a}'
     lpb = f'local !lpb_{label} {b} ;: {b}'
     lpc = f'local !lpc_{label} {c} ;: {c}'
@@ -228,6 +257,12 @@ def write_params(fout, data, options, index=0):
 
 def write_str(fout, data, options, index=0):
 
+    import nafuma.xrd as xrd
+    basedir = os.path.dirname(xrd.__file__)
+
+    with open (os.path.join(basedir, 'snippets.json'), 'r') as snip:
+        snippets = json.load(snip)
+
     atoms = read_cif(data['str'][index])
     if 'labels' in data.keys():
         label = data['labels'][index]
@@ -256,18 +291,24 @@ def write_str(fout, data, options, index=0):
     fout.write('\n')
     fout.write('\t\tscale @ 1.0\n')
     fout.write('\t\tr_bragg 1.0\n\n')
+    if options['fit_peak_width']:
+        fout.write('\t\t'+snippets['fit_peak_width']+'\n\n')
 
     fout.write(f'\t\t#ifdef crystallite_size_gaussian_{label}\n')
+    data['define_statements'].append(f'crystallite_size_gaussian_{label}')
     fout.write(f'\t\tCS_G(csgc_{label}_XXXX)\n')
     fout.write('\t\t#endif\n')
     fout.write(f'\t\t#ifdef crystallite_size_lorentzian_{label}\n')
+    data['define_statements'].append(f'crystallite_size_lorentzian_{label}')
     fout.write(f'\t\tCS_L(cslc_{label}_XXXX)\n')
     fout.write('\t\t#endif\n\n')
 
     fout.write(f'\t\t#ifdef strain_gaussian_{label}\n')
+    data['define_statements'].append(f'strain_gaussian_{label}')
     fout.write(f'\t\tStrain_G(sgc_{label}_XXXX)\n')
     fout.write('\t\t#endif\n')
     fout.write(f'\t\t#ifdef strain_lorentzian_{label}\n')
+    data['define_statements'].append(f'strain_lorentzian_{label}')
     fout.write(f'\t\tStrain_L(slc_{label}_XXXX)\n')
     fout.write('\t\t#endif\n\n')
 
@@ -277,10 +318,16 @@ def write_str(fout, data, options, index=0):
 
     for atom in atoms['atoms'].keys():
 
-        specie = '{}{}'.format(
+        if 'oxidation_states' in data.keys():
+            specie = '{}{}'.format(
                                     atoms["atoms"][atom]["_atom_site_type_symbol"], 
                                     data['oxidation_states'][index][atoms["atoms"][atom]["_atom_site_type_symbol"]]
-        )
+            )
+        else:
+            specie = '{}'.format(
+                                    atoms["atoms"][atom]["_atom_site_type_symbol"] 
+            )
+
 
         site = f'site {atom}'
         x = f'\t\tx = x_{atom}_{label}'
@@ -317,11 +364,11 @@ def write_output(fout, data, options, index=0):
 
 
     fout.write('#ifdef output\n')
-    fout.write(f'\t\tOut_Riet({options["save_dir"]}/{label}_XXXX_riet.xy)\n')
-    fout.write(f'\t\tOut_CIF_STR({options["save_dir"]}/{label}_XXXX.cif)\n')
-    fout.write(f'\t\tOut_CIF_ADPs({options["save_dir"]}/{label}_XXXX.cif)\n')
-    fout.write(f'\t\tOut_CIF_Bonds_Angles({options["save_dir"]}/{label}_XXXX.cif)\n')
-    fout.write(f'\t\tCreate_hklm_d_Th2_Ip_file({options["save_dir"]}/{label}_XXXX_hkl.dat)\n')
+    fout.write(f'\t\tOut_Riet({options["save_dir"]}/{filename}_{label}_XXXX_riet.xy)\n')
+    fout.write(f'\t\tOut_CIF_STR({options["save_dir"]}/{filename}_{label}_XXXX.cif)\n')
+    fout.write(f'\t\tOut_CIF_ADPs({options["save_dir"]}/{filename}_{label}_XXXX.cif)\n')
+    fout.write(f'\t\tOut_CIF_Bonds_Angles({options["save_dir"]}/{filename}_{label}_XXXX.cif)\n')
+    fout.write(f'\t\tCreate_hklm_d_Th2_Ip_file({options["save_dir"]}/{filename}_{label}_XXXX_hkl.dat)\n')
 
     fout.write('\n')
 
@@ -381,6 +428,20 @@ def write_output(fout, data, options, index=0):
         fout.write('\n')
 
     fout.write('\t\tOut_String("\\n")\n')
+
+    if options['fit_peak_width']:
+        fout.write(f'out {options["save_dir"]}/{filename}_peak_width.dat\n')
+        fout.write('\t\tOut_String("prm !ad = \t\t")\n')
+        fout.write('\t\tOut(ad)')
+        fout.write('\tOut_String(";\\n")\n')
+        fout.write('\t\tOut_String("prm !bd = \t\t")\n')
+        fout.write('\t\tOut(bd)')
+        fout.write('\tOut_String(";\\n")\n')
+        fout.write('\t\tOut_String("prm !cd = \t\t")\n')
+        fout.write('\t\tOut(cd)')
+        fout.write('\tOut_String(";")\n')
+    
+
     fout.write('#endif')
     fout.write('\n\n')
 
@@ -785,7 +846,23 @@ def refine(data: dict, options={}):
 
 def read_results(path):
     
-    results = pd.read_csv(path, delim_whitespace=True, index_col=0)
+    results = pd.read_csv(path, delim_whitespace=True, index_col=0, header=None)
+
+    atoms = int((results.shape[1] - 15) / 5)
+
+    headers = [
+        'r_wp', 'r_exp', 'r_p', 'r_p_dash', 'r_exp_dash', 'gof',
+        'vol', 'mass', 'wp',
+        'a', 'b', 'c', 'alpha', 'beta', 'gamma',
+    ]
+
+
+    labels = ['x', 'y', 'z', 'occ', 'beq']
+    for i in range(atoms):
+        for label in labels:
+            headers.append(f'atom_{i+1}_{label}')
+
+    results.columns = headers
     
     return results
 
