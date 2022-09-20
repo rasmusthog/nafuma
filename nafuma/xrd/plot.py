@@ -926,3 +926,79 @@ def make_animation(data: dict, options={}):
 
     shutil.rmtree('tmp')
 
+
+
+def plot_refinement(data, options={}):
+
+
+    required_options = ['diff_offset', 'index', 'title', 'xlim', 'r_wp', 'r_exp', 'wp']
+
+    default_options = {
+        'diff_offset': .10,
+        'index': -1,
+        'title': None,
+        'xlim': None,
+        'r_wp': True,
+        'r_exp': False,
+        'wp': False,
+    }
+
+    options = aux.update_options(options=options, default_options=default_options, required_options=required_options)
+
+    df = pd.read_csv(data['path'], delim_whitespace=True, header=None)
+    df.columns = ['2th', 'Yobs', 'Ycalc', 'diff']
+    df['diff'] = df['diff'] - options['diff_offset']*(df['Yobs'].max() - df['Yobs'].min())
+    
+
+    if not isinstance(data['results'], list):
+        data['results'] = [data['results']]
+
+    results = {
+        'vol': [],
+        'mass': [],
+        'wp': [],
+        'a': [],
+        'b': [],
+        'c': [],
+        'alpha': [],
+        'beta': [],
+        'gamma': []
+    }
+
+    for result in data['results']:
+        result = xrd.refinement.read_results(path=result)
+
+        r_wp = result['r_wp'].iloc[options['index']]
+        r_exp = result['r_exp'].iloc[options['index']]
+
+        for attr in results.keys():
+            results[attr].append(result[attr].iloc[options['index']])
+
+    fig, ax = plt.subplots(figsize=(20,10))
+
+    df.plot(x='2th', y='Yobs', kind='scatter', ax=ax, c='black', marker='$\u25EF$')
+    df.plot(x='2th', y='Ycalc', ax=ax, c='red')
+    df.plot(x='2th', y='diff', ax=ax)
+    
+    if options['r_wp']:
+        ax.text(x=0.7*df['2th'].max(), y=0.7*df['Yobs'].max(), s='R$_{wp}$ = '+f'{r_wp}', fontsize=20)
+    
+    if options['r_exp']:
+        ax.text(x=0.70*df['2th'].max(), y=0.60*df['Yobs'].max(), s='R$_{exp}$ = '+f'{r_exp}', fontsize=20)
+
+
+    if options['wp']:
+        for i, (result, label) in enumerate(zip(data['results'], options['labels'])):
+            ax.text(x=0.7*df['2th'].max(), y=(0.9-0.1*i)*df['Yobs'].max(), s=f'{label}: {np.round(float(results["wp"][i]), 2)}%', fontsize=20)
+
+    if options['title']:
+        ax.set_title(options['title'], size=30)
+
+    if options['xlim']:
+        ax.set_xlim(options['xlim'])
+    else:
+        ax.set_xlim([df['2th'].min(), df['2th'].max()])
+
+    ax.tick_params(which='both', labelleft=False, left=False, labelsize=20, direction='in')
+    ax.set_ylabel('Intensity [arb. u.]', size=20)
+    ax.set_xlabel('2$\\theta$ [$^{\circ}$]', size=20)
