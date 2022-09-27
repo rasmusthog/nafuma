@@ -24,7 +24,7 @@ def plot_diffractogram(data, options={}):
 
     # Update options
     required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'line', 'scatter', 'xlim', 'ylim', 'normalise', 'offset', 'offset_x', 'offset_y', 'offset_change',
-    'reflections_plot', 'reflections_indices', 'reflections_data', 'heatmap', 'cmap', 'plot_kind', 'palettes', 'highlight', 'highlight_colours', 'interactive', 'rc_params', 'format_params', 'interactive_session_active']
+    'reflections_plot', 'reflections_indices', 'reflections_data', 'heatmap', 'cmap', 'plot_kind', 'palettes', 'highlight', 'highlight_colours', 'interactive', 'rc_params', 'format_params', 'interactive_session_active', 'plot_diff']
 
     default_options = {
         'x_vals': '2th', 'y_vals': 'I',
@@ -51,6 +51,7 @@ def plot_diffractogram(data, options={}):
         'interactive_session_active': False,
         'rc_params': {},
         'format_params': {},
+        'plot_diff': False,
         }
 
     if 'offset_y' not in options.keys():
@@ -86,15 +87,25 @@ def plot_diffractogram(data, options={}):
             if not isinstance(data['wavelength'], list):
                 data['wavelength'] = [data['wavelength'] for _ in range(len(data['path']))] 
 
+        
+        
+        
         # LOAD DIFFRACTOGRAMS
-        for index in range(len(data['path'])):
-            diffractogram, wavelength = xrd.io.read_data(data=data, options=options, index=index)
-            
-            data['diffractogram'][index] = diffractogram
-            data['wavelength'][index] = wavelength
+        
+        if 'htxrd' in data.keys() and data['htxrd']:
+            data['diffractogram'], data['wavelength'] = xrd.io.read_htxrd(data=data, options=options, index=0)
+        
+        else:
+            for index in range(len(data['path'])):
+                diffractogram, wavelength = xrd.io.read_data(data=data, options=options, index=index)
 
-            # FIXME This is a quick fix as the image is not reloaded when passing multiple beamline datasets. Should probably be handled in io?
-            data['image'] = None
+
+                data['diffractogram'][index] = diffractogram
+                data['wavelength'][index] = wavelength
+
+
+                # FIXME This is a quick fix as the image is not reloaded when passing multiple beamline datasets. Should probably be handled in io?
+                data['image'] = None
 
         
         # Sets the xlim if this has not been specified
@@ -106,7 +117,12 @@ def plot_diffractogram(data, options={}):
         options['heatmap_loaded'] = True
 
         if options['heatmap']:
-            options['xlim'] = [options['heatmap_xlim'][0], options['heatmap_xlim'][1]]
+            xlim_start_frac, xlim_end_frac = options['xlim'][0] / data['diffractogram'][0][options['x_vals']].max(), options['xlim'][1] / data['diffractogram'][0][options['x_vals']].max()
+            options['xlim'] = [options['heatmap_xlim'][0]*xlim_start_frac, options['heatmap_xlim'][1]*xlim_end_frac]
+
+        if options['heatmap_reverse']:
+            data['heatmap'] = data['heatmap'].iloc[::-1]
+            data['heatmap_yticklabels'] = data['heatmap_yticklabels'][::-1]
 
     # If data was already loaded, only do a check to see if the data is in a list or not, and if not, put it in one. This is because it will be looped over later.
     else:
@@ -177,8 +193,12 @@ def plot_diffractogram(data, options={}):
     
     # Limit for when it is assumed that each diffractogram should have its own colour - after 8, the default colour palette is used up and starts a new.
     # FIXME Should probably allow for more than 8 if wanted - not a priority now
-    if len(data['path']) < 8:
-        colours = btp.generate_colours(options['palettes'])
+    if len(data['path']) <= 8:
+        if 'colours' in options.keys():
+            colours = btp.generate_colours(options['colours'], kind='single')
+
+        else:
+            colours = btp.generate_colours(options['palettes'])
     
 
     # Generates the colours of a list of scans to highlight is passed. options['highlight'] and options['highlight_colour'] must be of equal length. Entries in highlight can either be a list or a single number,
@@ -254,6 +274,8 @@ def plot_diffractogram(data, options={}):
             options['ylabel'] = options['heatmap.ylabel']
         if not options['yunit'] or options['yunit'] == options['diff.yunit']:
             options['yunit'] = options['heatmap.yunit']
+        
+        
 
         ax.tick_params(axis='x', which='minor', bottom=False, top=False)
         ax.tick_params(axis='y', which='minor', left=False, right=False)
@@ -269,7 +291,7 @@ def plot_diffractogram(data, options={}):
 
         if options['highlight']:
             for i, highlight in enumerate(options['highlight']):
-                if i < len(options['highlight'])-1 or len(options['highlight']) == 1: 
+                if i < len(options['highlight']) or len(options['highlight']) == 1: 
                     ax.axhline(y=highlight[1], c=options['highlight_colours'][i], ls='--', lw=0.5)
 
 
@@ -295,6 +317,14 @@ def plot_diffractogram(data, options={}):
 
         options['hide_y_ticklabels'] = True
         options['hide_y_ticks'] = True
+
+    
+        if options['plot_diff'] and len(data['path']) == 2:
+            diff = data['diffractogram'][0]
+            diff['I'] = diff['I'] - data['diffractogram'][1]['I']
+            diff['I'] = diff['I'] - 0.5
+
+            diff.plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=next(colours))
 
 
     # Adjust the plot to make it prettier
@@ -418,6 +448,7 @@ def generate_heatmap(data, options={}):
     options['heatmap_xlim'] = xlims
 
 
+
     # Get temperatures if HTXRD-scans
     scan_numbers = []
     
@@ -463,6 +494,8 @@ def generate_heatmap(data, options={}):
 def determine_grid_layout(options):
 
 
+    #aspect_ratio = int(options['format_params']['aspect_ratio'].split(':')[0]) / int(options['format_params']['aspect_ratio'].split(':')[1])
+
     nrows = 1 if not options['reflections_indices'] else 2
 
     if options['reflections_plot']:
@@ -470,7 +503,9 @@ def determine_grid_layout(options):
             nrows += 1
 
     options['format_params']['nrows'] = nrows
-    options['format_params']['grid_ratio_height'] = [1 for i in range(nrows-1)]+[10]
+
+    if not 'grid_ratio_height' in options['format_params'].keys():
+        options['format_params']['grid_ratio_height'] = [0.6 for i in range(nrows-1)]+[10]
 
     return options
 
@@ -794,7 +829,8 @@ def plot_reflection_table(data, reflections_params, ax=None, options={}):
         'label': None
     }
 
-    if 'colour' in data.keys():
+
+    if 'colour' in reflections_params.keys():
         options['reflections_colour'] = reflections_params['colour']
     if 'min_alpha' in reflections_params.keys():
         options['min_alpha'] = reflections_params['min_alpha']
@@ -806,7 +842,6 @@ def plot_reflection_table(data, reflections_params, ax=None, options={}):
         options['wavelength'] = reflections_params['wavelength']
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
-
     
     if not ax:
         _, ax = btp.prepare_plot(options)
@@ -826,8 +861,7 @@ def plot_reflection_table(data, reflections_params, ax=None, options={}):
         rel_intensity = (intensity / intensities.max())*(1-options['min_alpha']) + options['min_alpha']
         colour.append(rel_intensity)
         colours.append(colour)
-
-    
+        
 
     
     ax.vlines(x=reflections, ymin=-1, ymax=1, colors=colours, lw=0.5)
