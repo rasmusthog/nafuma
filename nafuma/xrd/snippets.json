@@ -9,13 +9,36 @@
     ],
     "gauss_fwhm": "gauss_fwhm = Sqrt({} Cos(2 * Th)^4 + {} Cos(2 * Th)^2 + {});",
     "lp_factor": "LP_Factor({}) 'change the LP correction  or lh value if required",
-    "wavelength": "lam ymin_on_ymax 0.0001 la 1.0 lo {} lh 0.1",
-    "zero_error": "Zero_Error(zero, 0)",
+    "synchrotron": "lam ymin_on_ymax 0.0001 la 1.0 lo {} lh 0.1",
+    "neutron": [
+        "lam ymin_on_ymax 0.0001 la 1.0 lo {} lh 0.5",
+        "neutron_data"
+    ],
+    "MoKa":[
+        "lam ymin_on_ymax 0.0001",
+        "la 0.6533 lo 0.7093 lh 0.2695",
+        "la 0.3467 lo 0.713574 lh 0.2795"
+    ],
+    "RECX2": [
+        "Rp 280",
+        "Rs 280"
+    ],
+    "zero_error": "Zero_Error(!zero, 0)",
     "th2_offset": [
-        "prm  zero \t\t\t0 \t\t\t\tmin = Max(Val - 20 Yobs_dx_at(X1), -100 Yobs_dx_at(X1)); max = Min(Val + 20 Yobs_dx_at(X2), 100 Yobs_dx_at(X2)); del = .01 Yobs_dx_at(X1); val_on_continue 0",
-        "prm  cos_shift \t\t0 \t\t\t\tmin = Val-.8; max = Val+.8; del 0.001",
-        "prm  sin_shift \t\t0 \t\t\t\tmin = Val-.8; max = Val+.8; del 0.001",  
+        "prm  !zero\t\t\t= 0 ;: 0 \t\t\t\tmin = Max(Val - 20 Yobs_dx_at(X1), -100 Yobs_dx_at(X1)); max = Min(Val + 20 Yobs_dx_at(X2), 100 Yobs_dx_at(X2)); del = .01 Yobs_dx_at(X1); val_on_continue 0",
+        "prm  !cos_shift\t\t= 0 ;: 0 \t\t\t\tmin = Val-.8; max = Val+.8; del 0.001",
+        "prm  !sin_shift\t\t= 0 ;: 0 \t\t\t\tmin = Val-.8; max = Val+.8; del 0.001",  
         "th2_offset = (zero) + (cos_shift) Cos(Th) + (sin_shift) Sin(Th) ;"
     ],
-    "fit_peak_width": "DC1( ad, 0, bd, 0, cd, 0)"
+    "fit_peak_width": "DC1( ad, 0, bd, 0, cd, 0)",
+    "TCHZ_Peak_Type": "TCHZ_Peak_Type(pku_1, 0, pkv_1, 0,pkw_1, 0, !pkx_1, 0.0000,pky_1, 0,!pkz_1, 0.0000)",
+    "Simple_Axial_Model": "Simple_Axial_Model( axial_1, 0)",
+    "magnetic_moment_str": "mlx = ml_x_{}_{}_XXXX ; \t mly = ml_y_{}_{}_XXXX ; \t mlz = ml_z_{}_{}_XXXX ; \t MM_CrystalAxis_Display( 0, 0, 0)",
+    "peak": [
+        "xo_Is", 
+	    "xo @  {}",
+	    "peak_type fp",
+	    "LVol_FWHM_CS_G_L( 1, 0, 0.89, 0,,,@, 2)",
+	    "I @  35.35632`"
+    ]
 }

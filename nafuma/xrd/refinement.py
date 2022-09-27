@@ -16,19 +16,25 @@ import nafuma.auxillary as aux
 
 def make_initial_inp(data: dict, options={}):
 
-    required_options = ['filename', 'overwrite', 'include', 'save_results', 'save_dir', 'topas_options', 'background', 'capillary', 'th2_offset', 'fit_peak_width', 'start', 'finish', 'exclude']
+    required_options = ['filename', 'overwrite', 'include', 'save_results', 'save_dir', 'instrument', 'topas_options', 'background', 'capillary', 'th2_offset', 'fit_peak_width', 'simple_axial_model', 'TCHZ_Peak_Type', 'start', 'finish', 'exclude', 'magnetic_atoms', 'radiation', 'magnetic_space_group', 'interval']
 
     default_options = {
         'filename': 'start.inp',
         'overwrite': False,
         'save_results': False,
         'save_dir': 'results/',
+        'instrument': None,
+        'radiation': 'synchrotron',
+        'magnetic_space_group': None,
+        'magnetic_atoms': [],
         'include': [], # Any files that should be included with #include
         'topas_options': {}, 
         'background': 7,
         'capillary': False,
         'th2_offset': False,
         'fit_peak_width': False,
+        'simple_axial_model': False,
+        'TCHZ_Peak_Type': False,
         'interval': [None, None], # Start and finish values that TOPAS should refine on. Overrides 'start' and 'finish'
         'start': None, # Start value only. Overridden by 'interval' if this is set.
         'finish': None, # Finish value only. Overridden by 'interval' if this is set.
@@ -70,6 +76,16 @@ def make_initial_inp(data: dict, options={}):
             for i, str in enumerate(data['str']):
                 fout.write('\n\n')
                 write_str(fout=fout, data=data, options=options, index=i)
+
+
+            if 'peak' in data.keys():
+                
+                fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
+                fout.write('\'PEAK PHASES')
+                fout.write('\n\'------------------------------------------------------------------------------------------------------------------------------------------\n')
+                
+                write_peaks(fout=fout, data=data, options=options, index=i)
+
 
 
     with open(options['filename'], 'r') as fin:
@@ -124,8 +140,21 @@ def write_xdd(fout, data, options):
 
     # Write wavelength and LP-factor
     fout.write('\n\n')
+
+    if options['instrument'] == 'RECX2':
+        options['radiation'] = 'MoKa'
+        for line in snippets['RECX2']:
+            fout.write('\t'+line+'\n')
     
-    fout.write('\t'+snippets['wavelength'].format(data['wavelength'])+'\n')
+    if options['radiation'] == 'synchrotron':
+        fout.write('\t'+snippets['synchrotron'].format(data['wavelength'])+'\n')
+    if options['radiation'] == 'neutron':
+        fout.write('\t'+snippets['neutron'][0].format(data['wavelength']) +'\n')
+        fout.write('\t'+snippets['neutron'][1] + '\n')
+    if options['radiation'] == 'MoKa':
+        for line in snippets['MoKa']:
+            fout.write('\t'+line+'\n')
+    
     fout.write('\t'+snippets['lp_factor'].format(topas_options['lp_factor'])+'\n')
     
     if options['th2_offset']:
@@ -190,21 +219,21 @@ def write_params(fout, data, options, index=0):
     # If start_values is defined:
     fout.write(f'#ifdef start_values_{label}\n')
     data['define_statements'].append(f'start_values_{label}')
-    lpa = f'local !lpa_{label} {a} ;: {a}'
-    lpb = f'local !lpb_{label} {b} ;: {b}'
-    lpc = f'local !lpc_{label} {c} ;: {c}'
+    lpa = f'local !lpa_{label} = {a} ;: {a}'
+    lpb = f'local !lpb_{label} = {b} ;: {b}'
+    lpc = f'local !lpc_{label} = {c} ;: {c}'
     fout.write('{: <55}  {: <55}  {: <55}\n'.format(lpa, lpb, lpc))
-    lpal = f'local !lpal_{label} {alpha} ;: {alpha}'
-    lpbe = f'local !lpbe_{label} {beta} ;: {beta}'
-    lpga = f'local !lpga_{label} {gamma} ;: {gamma}'
+    lpal = f'local !lpal_{label} = {alpha} ;: {alpha}'
+    lpbe = f'local !lpbe_{label} = {beta} ;: {beta}'
+    lpga = f'local !lpga_{label} = {gamma} ;: {gamma}'
     fout.write('{: <55}  {: <55}  {: <55}\n'.format(lpal, lpbe, lpga))
 
     # Otherwise
     fout.write('\n')
     fout.write('#else\n')
-    lpa = f'local !lpa_{label} {a}'
-    lpb = f'local !lpb_{label} {b}'
-    lpc = f'local !lpc_{label} {c}'
+    lpa = f'local !lpa_{label} = {a} ;: {a}'
+    lpb = f'local !lpb_{label} = {b} ;: {b}'
+    lpc = f'local !lpc_{label} = {c} ;: {c}'
     fout.write('{: <55}  {: <55}  {: <55}\n'.format(lpa, lpb, lpc))
     lpal = f'local !lpal_{label} {alpha}'
     lpbe = f'local !lpbe_{label} {beta}'
@@ -224,6 +253,7 @@ def write_params(fout, data, options, index=0):
 
 
     # WRITE SITE PARAMETERS
+    mag = []
     for site in sites:
 
         params = []
@@ -232,12 +262,29 @@ def write_params(fout, data, options, index=0):
                 value = atoms["atoms"][site][attr].split("(")[0]
                 value = value if value != '.' else 0.
 
+                
+
                 params.append('{: <20} {: <20}'.format(f'local !{attrs[attr]}_{site}_{label}', f' = {value} ;: {value}'))
-                #fout.write(f'local {attrs[attr]}_{site}_{label}\t\t =\t {value} \t ;= \t\t\t\t\t')
+
+                if options['magnetic_space_group']:
+                    for mag_atom in options['magnetic_atoms']:
+                        if mag_atom in site:
+                            mag.append(site)
 
         fout.write('{: <55}  {: <55}  {: <55} {: <55} {: <55}\n'.format(*params))
 
     fout.write('\n')
+
+    if options['magnetic_space_group']:
+        mag = list(dict.fromkeys(mag)) # remove duplicates
+        for m in mag:
+            fout.write('{: <55}  {: <55}  {: <55}\n'.format(
+                                                        f'local !ml_x_{m}_{label}_XXXX = 0 ;: 0',
+                                                        f'local !ml_y_{m}_{label}_XXXX = 0 ;: 0',
+                                                        f'local !ml_z_{m}_{label}_XXXX = 0 ;: 0'
+            ))
+
+        fout.write('\n')
 
     fout.write('{: <55}  {: <55}  {: <55} {: <55}\n'.format(
                                                         f'local !csgc_{label}_XXXX = 200 ;: 200',
@@ -277,7 +324,10 @@ def write_str(fout, data, options, index=0):
 
     fout.write('\tstr\n')
     fout.write(f'\t\tphase_name "{atoms["_chemical_name_common"]} ({atoms["_space_group_name_H-M_alt"]})"\n'.replace('\'', ''))
-    fout.write(f'\t\tspace_group {atoms["_space_group_IT_number"]}\n')
+    if options['magnetic_space_group']:
+        fout.write(f'\t\tmag_space_group {options["magnetic_space_group"]}\n')
+    else:
+        fout.write(f'\t\tspace_group {atoms["_space_group_IT_number"]}\n')
     fout.write(f'\t\ta = lpa_{label} ;\n')
     fout.write(f'\t\tb = lpb_{label} ;\n')
     fout.write(f'\t\tc = lpc_{label} ;\n')
@@ -287,8 +337,11 @@ def write_str(fout, data, options, index=0):
     fout.write('\n')
     fout.write(f'\t\tcell_volume\t vol_{label}_XXXX {atoms["_cell_volume"]}\n')
     fout.write(f'\t\tcell_mass\t mass_{label}_XXXX 1\n')
-    fout.write(f'\t\tweight_percent\t wp_{label}_XXXX 100\n\n')
-    fout.write('\n')
+    fout.write(f'\t\tweight_percent\t wp_{label}_XXXX 100\n\n\n')
+    if options['simple_axial_model']:
+        fout.write(f'\t\t{snippets["Simple_Axial_Model"]}\n')
+    if options['TCHZ_Peak_Type']:
+        fout.write(f'\t\t{snippets["TCHZ_Peak_Type"]}\n\n\n')
     fout.write('\t\tscale @ 1.0\n')
     fout.write('\t\tr_bragg 1.0\n\n')
     if options['fit_peak_width']:
@@ -342,6 +395,11 @@ def write_str(fout, data, options, index=0):
         fout.write('\t\t{: <9} {: <30}; {: <30}; {: <30}; {: <30}; {: <30};'.format(site, x, y, z, occ, beq))
         fout.write('\n')
 
+        if options['magnetic_space_group']:
+            for mag_atom in options['magnetic_atoms']:
+                if mag_atom in atom:
+                    fout.write('\t\t'+snippets['magnetic_moment_str'].format(atom, label, atom, label, atom, label)+'\n')
+
 
 
     if options['save_results']:
@@ -364,11 +422,13 @@ def write_output(fout, data, options, index=0):
 
 
     fout.write('#ifdef output\n')
-    fout.write(f'\t\tOut_Riet({options["save_dir"]}/{filename}_{label}_XXXX_riet.xy)\n')
-    fout.write(f'\t\tOut_CIF_STR({options["save_dir"]}/{filename}_{label}_XXXX.cif)\n')
-    fout.write(f'\t\tOut_CIF_ADPs({options["save_dir"]}/{filename}_{label}_XXXX.cif)\n')
-    fout.write(f'\t\tOut_CIF_Bonds_Angles({options["save_dir"]}/{filename}_{label}_XXXX.cif)\n')
-    fout.write(f'\t\tCreate_hklm_d_Th2_Ip_file({options["save_dir"]}/{filename}_{label}_XXXX_hkl.dat)\n')
+    fout.write(f'\t\tOut_Riet({options["save_dir"]}/{filename}_{label}_riet.xy)\n')
+    fout.write(f'\t\tOut_CIF_STR({options["save_dir"]}/{filename}_{label}.cif)\n')
+    fout.write(f'\t\tOut_CIF_ADPs({options["save_dir"]}/{filename}_{label}.cif)\n')
+    fout.write(f'\t\tOut_CIF_Bonds_Angles({options["save_dir"]}/{filename}_{label}.cif)\n')
+    fout.write(f'\t\tCreate_hklm_d_Th2_Ip_file({options["save_dir"]}/{filename}_{label}_hkl.dat)\n')
+    if options['magnetic_space_group']:
+        fout.write(f'\t\tOut_CIF_mag({options["save_dir"]}/{filename}_{label}_magnetic.cif)\n')
 
     fout.write('\n')
 
@@ -446,7 +506,26 @@ def write_output(fout, data, options, index=0):
     fout.write('\n\n')
 
 
+def write_peaks(fout, data, options, index=0):
 
+    import nafuma.xrd as xrd
+    basedir = os.path.dirname(xrd.__file__)
+
+    with open(os.path.join(basedir, 'snippets.json'), 'r') as snip:
+        snippets = json.load(snip)
+
+
+    if not isinstance(data['peak'], list):
+        data['peak'] = [data['peak']]
+
+    for peak in data['peak']:
+        fout.write('\t'+snippets['peak'][0]+'\n')
+        fout.write('\t\t'+snippets['peak'][1].format(peak)+'\n')
+        fout.write('\t\t'+snippets['peak'][2]+'\n')
+        fout.write('\t\t'+snippets['peak'][3]+'\n')
+        fout.write('\t\t'+snippets['peak'][4]+'\n')
+
+        fout.write('\n\n')
 
 def read_cif(path):
 
@@ -600,7 +679,7 @@ def make_big_inp(data: dict, options={}):
         aux.backup_file(filename=options['output'], backup_dir=options['backup_dir'])
 
 
-    runlist = os.path.join(os.path.dirname(options['output']), 'runlist.txt')
+    runlist = os.path.abspath(os.path.join(os.path.dirname(options['output']), f'runlist_{os.path.basename(options["output"]).split(".")[0]}.txt'))
     options['include'].append(runlist)
 
     with open(options['template'], 'r') as template:
@@ -614,6 +693,8 @@ def make_big_inp(data: dict, options={}):
         template = template.read()
         
         for i, path in enumerate(data['path']):
+
+            path = os.path.abspath(path)
 
             s = make_inp_entry(template=template, xdd=path, num=i, options=options)
             output.write(s)
@@ -745,6 +826,7 @@ def make_inp_entry(template: str, xdd: str, num: int, options: dict) -> str:
     
     # Replace diffractogram-path
     s = template.replace(temp_xdd, xdd).replace('XXXX', num_str)
+    s = s.replace(os.path.basename(temp_xdd).split('.')[0], os.path.basename(xdd).split('.')[0])
 
     return s
 
@@ -867,3 +949,73 @@ def read_results(path):
     return results
 
 
+
+
+def fix_magnetic_cif(path):
+    with open(path, 'r') as f:
+        lines = f.readlines()
+
+    for i, line in enumerate(lines):
+        if '_magnetic_space_group_symop_operation_timereversal' in line: # last line before symmetry operations
+            j = 1
+            line = lines[i + j]
+            while len(line) > 1:
+                lines[i+j] = f'{j} ' + line
+                j += 1
+                line = lines[i+j]
+
+
+
+    with open(path, 'w') as f:
+        for line in lines:
+            f.write(line)
+
+
+
+def get_magnetic_moment(path):
+    with open(path, 'r') as f:
+        lines = f.readlines()
+
+    for i, line in enumerate(lines):
+        if '_magnetic_atom_site_moment_crystalaxis_mz' in line: # last line before magnetic moments
+            j = 1
+            line = lines[i+j]
+
+            magnetic_moments = {}
+            while line:
+                magnetic_moments[line.split()[0]] = (float(line.split()[1]), float(line.split()[2]), float(line.split()[3]))
+
+                j += 1
+
+                if i+j < len(lines):
+                    line = lines[i+j]
+                else:
+                    break
+
+
+
+    return magnetic_moments
+
+
+def get_magnetic_moment_magnitude(magmom):
+    magnitudes = {}
+    for site in magmom.keys():
+        magnitudes[site] = np.sqrt(magmom[site][0]**2+magmom[site][1]**2+magmom[site][2]**2)
+    
+    return magnitudes 
+
+
+def strip_labels_from_inp(path, save_path=None):
+
+    if not save_path:
+        save_path = path
+
+    with open(path, 'r') as fin:
+        lines = fin.readlines()
+
+    for i, line in enumerate(lines):
+        lines[i] = line.replace('_XXXX', '')
+
+    with open(save_path, 'w') as fout:
+        for line in lines:
+            fout.write(line)
