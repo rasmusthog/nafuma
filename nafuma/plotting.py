@@ -6,6 +6,7 @@ import importlib
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
 import matplotlib.lines as mlines
+import matplotlib.markers as mmarkers
 import itertools
 
 
@@ -25,11 +26,13 @@ def prepare_plot(options={}):
     else:
         rc_params = {}
 
+
     if 'format_params' in options.keys():
         format_params = options['format_params']
     else:
         format_params = {}
     
+
     required_format_params = ['single_column_width', 'double_column_width', 'column_type', 'width_ratio', 'aspect_ratio', 
     'width', 'height', 'compress_width', 'compress_height', 'upscaling_factor', 'dpi',
     'nrows', 'ncols', 'grid_ratio_height', 'grid_ratio_width']
@@ -54,7 +57,7 @@ def prepare_plot(options={}):
     
     format_params = aux.update_options(format_params, required_format_params, default_format_params)
 
-
+    
 
 
     # Reset run commands
@@ -107,6 +110,7 @@ def adjust_plot(fig, ax, options):
     'title', 
     'legend', 'legend_position', 'legend_ncol',
     'subplots_adjust',
+    'marker_edges',
     'text']
 
     default_options = {
@@ -123,6 +127,7 @@ def adjust_plot(fig, ax, options):
         'title': None, # Title of the plot
         'legend': False, 'legend_position': ['lower center', (0.5, -0.1)], 'legend_ncol': 1, # Toggles on/off legend. Specifices legend position and the number of columns the legend should appear as.
         'subplots_adjust': [0.1, 0.1, 0.9, 0.9], # Adjustment of the Axes-object within the Figure-object. Fraction of the Figure-object the left, bottom, right and top edges of the Axes-object will start.
+        'marker_edges': None,
         'text': None # Text to show in the plot. Should be a list where the first element is the string, and the second is a tuple with x- and y-coordinates. Could also be a list of lists to show more strings of text.
     }
 
@@ -229,7 +234,12 @@ def adjust_plot(fig, ax, options):
                 _ = next(markers)
 
             else:
-                active_markers.append(mlines.Line2D([], [], markeredgecolor=next(colours), color=(1, 1, 1, 0), marker=next(markers)))
+                marker = next(markers)
+                if not marker:
+                    active_markers.append(mlines.Line2D([], [], color=next(colours)))
+                else:
+                    active_markers.append(mlines.Line2D([], [], markerfacecolor=next(colours), markeredgecolor=options['marker_edges'], markersize=10, color=(1,1,1,0), marker=marker))
+                
                 active_labels.append(label)
 
     
