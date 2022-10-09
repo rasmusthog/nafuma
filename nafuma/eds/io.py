@@ -2,12 +2,18 @@ from PIL import Image
 import numpy as np
 import cv2
 
-def read_image(path, weight=None, colour=None, resize=None):
+def read_image(path, weight=None, colour=None, crop=None, resize=None, brightness=None):
 
     img = np.array(Image.open(path))
 
     if colour is not None:
         img = change_colour(img, colour)
+
+    if brightness is not None:
+        img = increase_brightness(img, increase=brightness)
+
+    if crop is not None:
+        img = crop_image(img, crop)
 
     if resize is not None:
         img = resize_image(img, resize)
@@ -20,7 +26,6 @@ def read_image(path, weight=None, colour=None, resize=None):
 
 def scale_image(image, factor):
 
-
     for i in range(0,image.shape[0]):
         for j in range(0, image.shape[1]):
             image[i][j][0] = image[i][j][0]*factor
@@ -30,7 +35,7 @@ def scale_image(image, factor):
     return image
 
 
-def resize_image(image, factor):
+def crop_image(image, factor):
 
     y, x = image.shape[0:2]
 
@@ -41,6 +46,29 @@ def resize_image(image, factor):
     res = cv2.resize(image, dsize=(x, y), interpolation=cv2.INTER_CUBIC)
 
     return res
+
+
+def resize_image(image, factor):
+
+    y, x = image.shape[0:2]
+
+    new_y, new_x = int(y*factor), int(x*factor)
+
+    res = cv2.resize(image, dsize=(new_x, new_y), interpolation=cv2.INTER_CUBIC)
+
+    return res
+
+
+def increase_brightness(image, brightness):
+
+    for i in range(0,image.shape[0]):
+        for j in range(0, image.shape[1]):
+            image[i][j][0] = image[i][j][0]+brightness
+            image[i][j][1] = image[i][j][1]+brightness
+            image[i][j][2] = image[i][j][2]+brightness
+
+
+    return image
 
 
 def add_images(image1, image2):
