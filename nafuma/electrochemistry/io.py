@@ -144,6 +144,9 @@ def process_batsmall_data(df, options=None):
 	set_units(options)
 	options['old_units'] = get_old_units(df, options)
 
+
+	df = add_columns(df=df, options=options) # adds columns to the DataFrame if active material weight and/or molecular weight has been passed in options
+
 	df = unit_conversion(df=df, options=options)
 
 
@@ -176,6 +179,9 @@ def process_batsmall_data(df, options=None):
 		# Continue to next iteration if the charge and discharge DataFrames are empty (i.e. no current)
 		if chg_df.empty and dchg_df.empty:
 			continue
+
+		chg_df['reaction_coordinate'] = chg_df['time'] * np.abs(chg_df['current'].mean())
+		dchg_df['reaction_coordinate'] = dchg_df['time'] * np.abs(dchg_df['current'].mean())
 
 		if options['reverse_discharge']:
 			max_capacity = dchg_df['capacity'].max() 
@@ -480,6 +486,7 @@ def process_biologic_data(df, options=None):
 
 
 def add_columns(df, options):
+	from . import unit_tables
 
 	if options['kind'] == 'neware':
 
@@ -513,6 +520,28 @@ def add_columns(df, options):
 
 				df["IonsExtracted"] = (df["SpecificCapacity({}/mg)".format(options['old_units']['capacity'])]*options['molecular_weight'])*1000/f
 
+
+	if options['kind'] == 'batsmall':
+		if options['active_material_weight']:
+
+
+			active_material_weight = options['active_material_weight'] * unit_tables.mass()['mg'].loc[options['units']['mass']]
+			capacity = options['old_units']['capacity']
+
+			df[f'Capacity [{options["old_units"]["capacity"]}]'] = df[f'C [{options["old_units"]["capacity"]}/{options["old_units"]["mass"]}]'] * active_material_weight
+
+			if options['molecular_weight']:
+				faradays_constant = 96485.3365 # [F] = C mol^-1 = As mol^-1
+				seconds_per_hour = 3600 # s h^-1
+				f = faradays_constant / seconds_per_hour * 1000.0 # [f] = mAh mol^-1
+
+				molecular_weight = options['molecular_weight'] * unit_tables.mass()['g'].loc[options['units']['mass']]
+				df["IonsExtracted"] = (df[f'C [{options["old_units"]["capacity"]}/{options["old_units"]["mass"]}]'] * molecular_weight)/f
+
+
+		#df['reaction_coordinate'] = (df[f'TT [{options["old_units"]["time"]}]'] * unit_tables.time()[options['old_units']["time"]].loc["h"]) / np.abs(df[f'I [{options["old_units"]["current"]}]'] * unit_tables.current()[options['old_units']["current"]].loc['A'])
+
+
 	return df
 
 
@@ -545,7 +574,22 @@ def unit_conversion(df, options):
 		df["I [{}]".format(options['old_units']["current"])] = df["I [{}]".format(options['old_units']["current"])] * unit_tables.current()[options['old_units']["current"]].loc[options['units']['current']]
 		df["C [{}/{}]".format(options['old_units']["capacity"], options['old_units']["mass"])] = df["C [{}/{}]".format(options['old_units']["capacity"], options['old_units']["mass"])] * (unit_tables.capacity()[options['old_units']["capacity"]].loc[options['units']["capacity"]] / unit_tables.mass()[options['old_units']["mass"]].loc[options['units']["mass"]])
 
-		df.columns = ['time', 'voltage', 'current', 'count', 'specific_capacity', 'comment']
+		columns = ['time', 'voltage', 'current', 'count', 'specific_capacity', 'comment']
+
+		# Add column labels for specific capacity and ions if they exist
+		if f'Capacity [{options["old_units"]["capacity"]}]' in df.columns:
+			df[f'Capacity [{options["old_units"]["capacity"]}]'] = df[f'Capacity [{options["old_units"]["capacity"]}]'] * unit_tables.capacity()[options['old_units']['capacity']].loc[options['units']['capacity']]
+			columns.append('capacity')
+
+		if 'IonsExtracted' in df.columns:
+			columns.append('ions')
+
+		#columns.append('reaction_coordinate')
+		
+		df.columns = columns
+
+
+
 
 
 	if options['kind'] == 'neware':
