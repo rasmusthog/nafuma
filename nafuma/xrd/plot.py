@@ -22,16 +22,14 @@ def plot_diffractogram(data, options={}):
     Input:
     data (dict): Must include path = string to diffractogram data, and plot_kind = (recx, beamline, image)'''
 
-    # Update options
-    required_options = ['x_vals', 'y_vals', 'ylabel', 'xlabel', 'xunit', 'yunit', 'line', 'scatter', 'xlim', 'ylim', 'normalise', 'offset', 'offset_x', 'offset_y', 'offset_change',
-    'reflections_plot', 'reflections_indices', 'reflections_data', 'heatmap', 'cmap', 'plot_kind', 'palettes', 'highlight', 'highlight_colours', 'interactive', 'rc_params', 'format_params', 'interactive_session_active', 'plot_diff']
-
     default_options = {
         'x_vals': '2th', 'y_vals': 'I',
         'xlabel': '2$\\theta$', 'ylabel': None, 
         'xunit': '$^{\circ}$', 'yunit': None,
         'xlim': None, 'ylim': None, 
         'normalise': True,
+        'multiply': 1, # Factor to multiply the normalised data - only used if normalising.
+        'drawdown': False,
         'offset': True,
         'offset_x': 0,
         'offset_y': 1,
@@ -42,6 +40,7 @@ def plot_diffractogram(data, options={}):
         'reflections_indices': False, # whether to plot the reflection indices
         'reflections_data': None, # Should be passed as a list of dictionaries on the form {path: rel_path, reflection_indices: number of indices, colour: [r,g,b], min_alpha: 0-1]
         'heatmap': False,
+        'heatmap_reverse': False,
         'cmap': 'viridis',
         'plot_kind': None,
         'palettes': [('qualitative', 'Dark2_8')],
@@ -58,7 +57,7 @@ def plot_diffractogram(data, options={}):
         if len(data['path']) > 10:
             default_options['offset_y'] = 0.05
 
-    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+    options = aux.update_options(options=options, default_options=default_options)
     #options['current_offset_y'] = options['offset_y']
 
     # Convert data['path'] to list to allow iteration over this to accommodate both single and multiple diffractograms
@@ -322,7 +321,7 @@ def plot_diffractogram(data, options={}):
         if options['plot_diff'] and len(data['path']) == 2:
             diff = data['diffractogram'][0]
             diff['I'] = diff['I'] - data['diffractogram'][1]['I']
-            diff['I'] = diff['I'] - 0.5
+            diff['I'] = diff['I'] - 0.75
 
             diff.plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=next(colours))
 
