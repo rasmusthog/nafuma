@@ -6,10 +6,12 @@ import shutil
 import time
 from datetime import datetime
 
-def update_options(options, required_options, default_options):
+def update_options(options, default_options, required_options=None):
     ''' Takes a dictionary of options along with a list of required options and dictionary of default options, and sets all keyval-pairs of options that is not already defined to the default values'''
+    #FIXME This has been updated so that required_options is not needed. But lots of scripts still passes required_options, so for now it is still accepted, but has a default value and remains unused. Needs to go through all scripts to stop passing of this variable to remove it.
 
-    for option in required_options:
+
+    for option in default_options.keys():
         if option not in options.keys():
             options[option] = default_options[option]
 
@@ -146,3 +148,19 @@ def get_unique(full_list):
             unique_list.append(entry)
 
     return unique_list
+
+
+def swap_values(options: dict, key1, key2):
+
+    if not isinstance(key1,list):
+        key1 = [key1]
+    if not isinstance(key2,list):
+        key2 = [key2]
+
+    assert len(key1) == len(key2)
+
+    for k1, k2 in zip(key1, key2):
+        options[k1], options[k2] = options[k2], options[k1]
+
+
+    return options
