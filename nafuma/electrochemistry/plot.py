@@ -68,7 +68,12 @@ def plot_gc(data, options=None):
 		
 		if options['show_plot']:
 			# Prepare plot
-			fig, ax = btp.prepare_plot(options=options)
+			
+			if not options['fig'] and not options['ax']:
+				fig, ax = btp.prepare_plot(options=options)
+			else:
+				fig, ax = options['fig'], options['ax']
+			
 			for i, cycle in enumerate(data['cycles']):
 				if i in options['which_cycles']:
 					if options['charge']:
