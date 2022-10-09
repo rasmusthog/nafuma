@@ -451,9 +451,9 @@ def write_output(fout, data, options, index=0):
 
 
     fout.write('\t\t{: <40} {: <40} {: <40}'.format(
-                                                                    f'Out(vol_{label}_XXXX, "%11.5f")',
-                                                                    f'Out(mass_{label}_XXXX, "%11.5f")',
-                                                                    f'Out(wp_{label}_XXXX, "%11.5f")',
+                                                                    f'Out(vol_{label}_XXXX, "%11.5f", "%11.5f")',
+                                                                    f'Out(mass_{label}_XXXX, "%11.5f", "%11.5f")',
+                                                                    f'Out(wp_{label}_XXXX, "%11.5f", "%11.5f")',
     
         )
     )
@@ -463,12 +463,12 @@ def write_output(fout, data, options, index=0):
 
 
     fout.write('\t\t{: <40} {: <40} {: <40} {: <40} {: <40} {: <40}'.format(
-                                                                    f'Out(lpa_{label}, "%11.5f")',
-                                                                    f'Out(lpb_{label}, "%11.5f")',
-                                                                    f'Out(lpc_{label}, "%11.5f")',
-                                                                    f'Out(lpal_{label}, "%11.5f")',
-                                                                    f'Out(lpbe_{label}, "%11.5f")',
-                                                                    f'Out(lpga_{label}, "%11.5f")',
+                                                                    f'Out(lpa_{label}, "%11.5f", "%11.5f")',
+                                                                    f'Out(lpb_{label}, "%11.5f", "%11.5f")',
+                                                                    f'Out(lpc_{label}, "%11.5f", "%11.5f")',
+                                                                    f'Out(lpal_{label}, "%11.5f", "%11.5f")',
+                                                                    f'Out(lpbe_{label}, "%11.5f", "%11.5f")',
+                                                                    f'Out(lpga_{label}, "%11.5f", "%11.5f")',
     
         )
     )
@@ -477,11 +477,11 @@ def write_output(fout, data, options, index=0):
 
     for atom in atoms['atoms']:
         fout.write('\t\t{: <40} {: <40} {: <40} {: <40} {: <40}'.format(
-                                                                        f'Out(x_{atom}_{label}, "%11.5f")',
-                                                                        f'Out(y_{atom}_{label}, "%11.5f")',
-                                                                        f'Out(z_{atom}_{label}, "%11.5f")',
-                                                                        f'Out(occ_{atom}_{label}, "%11.5f")',
-                                                                        f'Out(beq_{atom}_{label}, "%11.5f")',
+                                                                        f'Out(x_{atom}_{label}, "%11.5f", "%11.5f")',
+                                                                        f'Out(y_{atom}_{label}, "%11.5f", "%11.5f")',
+                                                                        f'Out(z_{atom}_{label}, "%11.5f", "%11.5f")',
+                                                                        f'Out(occ_{atom}_{label}, "%11.5f", "%11.5f")',
+                                                                        f'Out(beq_{atom}_{label}, "%11.5f", "%11.5f")',
             )
         )
         
@@ -930,12 +930,12 @@ def read_results(path):
     
     results = pd.read_csv(path, delim_whitespace=True, index_col=0, header=None)
 
-    atoms = int((results.shape[1] - 15) / 5)
+    atoms = int((results.shape[1] - 24) / 10)
 
     headers = [
         'r_wp', 'r_exp', 'r_p', 'r_p_dash', 'r_exp_dash', 'gof',
-        'vol', 'mass', 'wp',
-        'a', 'b', 'c', 'alpha', 'beta', 'gamma',
+        'vol', 'vol_err', 'mass', 'mass_err', 'wp', 'wp_err',
+        'a', 'a_err', 'b', 'b_err', 'c', 'c_err', 'alpha', 'alpha_err', 'beta', 'beta_err', 'gamma', 'gamma_err',
     ]
 
 
@@ -943,6 +943,7 @@ def read_results(path):
     for i in range(atoms):
         for label in labels:
             headers.append(f'atom_{i+1}_{label}')
+            headers.append(f'atom_{i+1}_{label}_err')
 
     results.columns = headers
     
