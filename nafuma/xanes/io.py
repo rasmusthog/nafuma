@@ -443,3 +443,21 @@ def determine_active_roi(scan_data):
 
     return active_roi
     
+
+
+def write_data(data: dict, options={}):
+
+
+    default_options = {
+        'save_filenames': None,
+        'save_dir': '.',
+    }
+
+    options = aux.update_options(options=options, default_options=default_options, required_options=default_options.keys())
+
+
+    if not options['save_filenames']:
+        options['save_filenames'] = [os.path.basename(col).split('.')[0]+'_exported.dat' for col in data['xanes_data'].columns if 'ZapEnergy' not in col]
+
+
+    print(options['save_filenames'])
