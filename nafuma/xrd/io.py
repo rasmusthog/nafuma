@@ -720,7 +720,7 @@ def read_data(data, options={}, index=0):
         diffractogram['I_org'] = diffractogram['I']
         diffractogram['2th_org'] = diffractogram['2th']
         
-        diffractogram = apply_offset(diffractogram, wavelength, index, options)
+        diffractogram = adjust_intensities(diffractogram, wavelength, index, options)
 
 
     
@@ -729,7 +729,7 @@ def read_data(data, options={}, index=0):
     return diffractogram, wavelength
 
 
-def apply_offset(diffractogram, wavelength, index, options):
+def adjust_intensities(diffractogram, wavelength, index, options):
 
     if 'current_offset_y' not in options.keys():
         options['current_offset_y'] = options['offset_y']
@@ -748,6 +748,10 @@ def apply_offset(diffractogram, wavelength, index, options):
 
     if options['normalise']:
         diffractogram['I'] = diffractogram['I'] / diffractogram['I'].max()
+        diffractogram['I'] = diffractogram['I'] * options['multiply']
+
+    if options['drawdown']:
+        diffractogram['I'] = diffractogram['I'] - diffractogram['I'].mean()
 
     diffractogram['I'] = diffractogram['I'] + index*options['offset_y']
 
