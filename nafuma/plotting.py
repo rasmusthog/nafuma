@@ -2,6 +2,11 @@ import nafuma.auxillary as aux
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator)
+from mpl_toolkits.axes_grid.inset_locator import (inset_axes, InsetPosition, BboxPatch, BboxConnector)
+
+from matplotlib.transforms import TransformedBbox
+from matplotlib.patches import Rectangle
+
 import importlib
 import matplotlib.patches as mpatches
 from matplotlib.lines import Line2D
@@ -33,9 +38,6 @@ def prepare_plot(options={}):
         format_params = {}
     
 
-    required_format_params = ['single_column_width', 'double_column_width', 'column_type', 'width_ratio', 'aspect_ratio', 
-    'width', 'height', 'compress_width', 'compress_height', 'upscaling_factor', 'dpi',
-    'nrows', 'ncols', 'grid_ratio_height', 'grid_ratio_width']
 
     default_format_params = {
     'single_column_width': 8.3,
@@ -55,7 +57,7 @@ def prepare_plot(options={}):
     'grid_ratio_width': None
     }
     
-    format_params = aux.update_options(format_params, required_format_params, default_format_params)
+    format_params = aux.update_options(options=format_params, default_options=default_format_params)
 
     
 
@@ -96,27 +98,12 @@ def prepare_plot(options={}):
 def adjust_plot(fig, ax, options):
     ''' A general function to adjust plot according to contents of the options-dictionary '''
     
-    required_options = [
-    'plot_kind', 
-    'xlabel', 'ylabel',
-    'xunit', 'yunit',
-    'hide_x_labels', 'hide_y_labels',
-    'hide_x_ticklabels', 'hide_y_ticklabels',
-    'hide_x_ticks', 'hide_y_ticks',
-    'x_tick_locators', 'y_tick_locators',  
-    'rotation_x_ticks', 'rotation_y_ticks',
-    'xticks', 'yticks', 
-    'xlim', 'ylim', 
-    'title', 
-    'legend', 'legend_position', 'legend_ncol',
-    'subplots_adjust',
-    'marker_edges',
-    'text']
 
     default_options = {
         'plot_kind': None, # defaults to None, but should be utilised when requiring special formatting for a particular plot 
         'xlabel': None, 'ylabel': None,
         'xunit': None, 'yunit': None,
+        'xlabel_pad': 4.0, 'ylabel_pad': 4.0, 
         'hide_x_labels': False, 'hide_y_labels': False, # Whether the main labels on the x- and/or y-axes should be hidden
         'hide_x_ticklabels': False, 'hide_y_ticklabels': False, # Whether ticklabels on the x- and/or y-axes should be hidden
         'hide_x_ticks': False, 'hide_y_ticks': False, # Whether the ticks on the x- and/or y-axes should be hidden
@@ -125,30 +112,31 @@ def adjust_plot(fig, ax, options):
         'xticks': None, 'yticks': None, # Custom definition of the xticks and yticks. This is not properly implemented now.  
         'xlim': None, 'ylim': None, # Limits to the x- and y-axes
         'title': None, # Title of the plot
+        'backgrounds': [],
         'legend': False, 'legend_position': ['lower center', (0.5, -0.1)], 'legend_ncol': 1, # Toggles on/off legend. Specifices legend position and the number of columns the legend should appear as.
-        'subplots_adjust': [0.1, 0.1, 0.9, 0.9], # Adjustment of the Axes-object within the Figure-object. Fraction of the Figure-object the left, bottom, right and top edges of the Axes-object will start.
+        'subplots_adjust': {'left': None, 'right': None, 'top': None, 'bottom': None, 'wspace': None, 'hspace': None}, # Adjustment of the Axes-object within the Figure-object. Fraction of the Figure-object the left, bottom, right and top edges of the Axes-object will start.
         'marker_edges': None,
         'text': None # Text to show in the plot. Should be a list where the first element is the string, and the second is a tuple with x- and y-coordinates. Could also be a list of lists to show more strings of text.
     }
 
 
-    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+    options = aux.update_options(options=options, default_options=default_options)
 
     # Set labels on x- and y-axes
     if not options['hide_y_labels']:
         if not options['yunit']:
-            ax.set_ylabel(f'{options["ylabel"]}') 
+            ax.set_ylabel(f'{options["ylabel"]}', labelpad=options['ylabel_pad']) 
         else:
-            ax.set_ylabel(f'{options["ylabel"]} [{options["yunit"]}]')
+            ax.set_ylabel(f'{options["ylabel"]} [{options["yunit"]}]', labelpad=options['ylabel_pad'])
             
     else:
         ax.set_ylabel('')
         
     if not options['hide_x_labels']:
         if not options['xunit']:
-            ax.set_xlabel(f'{options["xlabel"]}')
+            ax.set_xlabel(f'{options["xlabel"]}', labelpad=options['xlabel_pad'])
         else:
-            ax.set_xlabel(f'{options["xlabel"]} [{options["xunit"]}]')
+            ax.set_xlabel(f'{options["xlabel"]} [{options["xunit"]}]', labelpad=options['xlabel_pad'])
     else:
         ax.set_xlabel('')
         
@@ -203,15 +191,17 @@ def adjust_plot(fig, ax, options):
 
      
 
-    # Create legend
+    #### DRAW/REMOVE LEGEND ####
+    # Options:
+    # 'legend_position': (default ['lower center', (0.5, -0.1)]) - Follows matplotlib's way of specifying legend position
+    # 'legend_ncol': (default 1) # Number of columns to write the legend in
+    # Also requires options to contain values in colours, markers and labels. (No defaults)
 
     if ax.get_legend():
         ax.get_legend().remove()
 
-    
-    if options['legend']:
-        
 
+    if options['legend']:
         # Make palette and linestyles from original parameters
         if not options['colours']:
             colours = generate_colours(palettes=options['palettes'])
@@ -250,7 +240,7 @@ def adjust_plot(fig, ax, options):
         
 
     # Adjust where the axes start within the figure. Default value is 10% in from the left and bottom edges. Used to make room for the plot within the figure size (to avoid using bbox_inches='tight' in the savefig-command, as this screws with plot dimensions)
-    plt.subplots_adjust(left=options['subplots_adjust'][0], bottom=options['subplots_adjust'][1], right=options['subplots_adjust'][2], top=options['subplots_adjust'][3])
+    plt.subplots_adjust(**options['subplots_adjust'])
 
 
     # If limits for x- and y-axes is passed, sets these.
@@ -259,6 +249,49 @@ def adjust_plot(fig, ax, options):
 
     if options['ylim'] is not None:
         ax.set_ylim(options['ylim'])
+
+
+    #### DRAW BACKGROUNDS ####
+    # options['backgrounds'] should contain a dictionary or a list of dictionaries. Options to be specified are listed below.
+
+    if options['backgrounds']:
+
+        if not isinstance(options['backgrounds'], list):
+            options['backgrounds'] = [options['backgrounds']]
+
+
+        for background in options['backgrounds']:
+            default_background_options = {
+                'colour': (0,0,0),
+                'alpha': 0.2,
+                'xlim': list(ax.get_xlim()),
+                'ylim': list(ax.get_ylim()),
+                'zorder': 0,
+                'edgecolour': None,
+                'linewidth': None
+            }
+
+
+            background = aux.update_options(options=background, default_options=default_background_options)
+
+            if not background['xlim'][0]:
+                background['xlim'][0] = ax.get_xlim()[0]
+            if not background['xlim'][1]:
+                background['xlim'][1] = ax.get_xlim()[1]
+            if not background['ylim'][0]:
+                background['ylim'][0] = ax.get_ylim()[0]
+            if not background['ylim'][1]:
+                background['ylim'][1] = ax.get_ylim()[1]
+            
+            ax.add_patch(Rectangle(
+                                    xy=(background['xlim'][0], background['ylim'][0]),                                                      # Anchor point
+                                    width=background['xlim'][1]-background['xlim'][0],                                                      # Width of background
+                                    height=background['ylim'][1]-background['ylim'][0],                                                     # Height of background
+                                    zorder=background['zorder'],                                                                            # Placement in stack 
+                                    facecolor=(background['colour'][0], background['colour'][1], background['colour'][2], background['alpha']), # Colour
+                                    edgecolor=background['edgecolour'],                                                                     # Edgecolour
+                                    linewidth=background['linewidth'])                                                                      # Linewidth 
+                        )
 
 
     # Add custom text
@@ -361,3 +394,74 @@ def generate_colours(palettes, kind=None):
 
 
     return colour_cycle
+
+
+
+def prepare_inset_axes(parent_ax, options):
+    
+    default_options = {
+        'hide_inset_x_labels': False, # Whether x labels should be hidden
+        'hide_inset_x_ticklabels': False,
+        'hide_inset_x_ticks': False,
+        'rotation_inset_x_ticks': 0,
+        'hide_inset_y_labels': False, # whether y labels should be hidden
+        'hide_inset_y_ticklabels': False,
+        'hide_inset_y_ticks': False,
+        'rotation_inset_y_ticks': 0,
+        'inset_x_tick_locators': [100, 50], # Major and minor tick locators
+        'inset_y_tick_locators': [10, 5],
+        'inset_position': [0.1,0.1,0.3,0.3],
+        'inset_bounding_box': [0,0,0.1, 0.1],
+        'inset_marks': [None, None],
+        'legend_position': ['upper center', (0.20, 0.90)], # the position of the legend passed as arguments to loc and bbox_to_anchor respectively,
+        'connecting_corners': [1,2] 
+    }
+        
+
+    options = aux.update_options(options=options, required_options=default_options.keys(), default_options=default_options)
+
+
+    # Create a set of inset Axes: these should fill the bounding box allocated to
+    # them.
+    inset_ax = plt.axes(options["inset_bounding_box"])
+    # Manually set the position and relative size of the inset axes within ax1
+    ip = InsetPosition(parent_ax, options['inset_position'])
+    inset_ax.set_axes_locator(ip)
+
+    if options['connecting_corners'] and len(options["connecting_corners"]) == 2:
+        connect_inset(parent_ax, inset_ax, loc1a=options['connecting_corners'][0], loc2a=options['connecting_corners'][1], loc1b=options['connecting_corners'][0], loc2b=options['connecting_corners'][1], fc='none', ec='black')
+    elif options['connecting_corners'] and len(options['connecting_corners']) == 4:
+        connect_inset(parent_ax, inset_ax, loc1a=options['connecting_corners'][0], loc2a=options['connecting_corners'][1], loc1b=options['connecting_corners'][2], loc2b=options['connecting_corners'][3], fc='none', ec='black', ls='--')
+    
+    inset_ax.xaxis.set_major_locator(MultipleLocator(options['inset_x_tick_locators'][0]))
+    inset_ax.xaxis.set_minor_locator(MultipleLocator(options['inset_x_tick_locators'][1]))
+
+    
+    inset_ax.yaxis.set_major_locator(MultipleLocator(options['inset_y_tick_locators'][0]))
+    inset_ax.yaxis.set_minor_locator(MultipleLocator(options['inset_y_tick_locators'][1]))
+   
+
+    
+    
+    return inset_ax
+
+
+
+
+def connect_inset(parent_axes, inset_axes, loc1a=1, loc1b=1, loc2a=2, loc2b=2, **kwargs):
+    rect = TransformedBbox(inset_axes.viewLim, parent_axes.transData)
+
+    pp = BboxPatch(rect, fill=False, **kwargs)
+    parent_axes.add_patch(pp)
+
+    p1 = BboxConnector(inset_axes.bbox, rect, loc1=loc1a, loc2=loc1b, **kwargs)
+    inset_axes.add_patch(p1)
+    p1.set_clip_on(False)
+    p2 = BboxConnector(inset_axes.bbox, rect, loc1=loc2a, loc2=loc2b, **kwargs)
+    inset_axes.add_patch(p2)
+    p2.set_clip_on(False)
+
+    return pp, p1, p2
+
+
+
