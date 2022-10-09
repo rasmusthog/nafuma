@@ -1571,9 +1571,6 @@ def prettify_thermal_plot_old(fig, ax, options, colour_cycle=('qualitative', 'Da
 
 def prepare_inset_axes(parent_ax, options):
     
-    required_options = ['hide_inset_x_labels','hide_inset_x_ticklabels', 'hide_inset_x_ticks', 'rotation_inset_x_ticks', 'hide_inset_y_labels',  'hide_inset_y_ticklabels', 'hide_inset_y_ticks', 'rotation_inset_y_ticks',
-        'inset_x_tick_locators', 'inset_y_tick_locators', 'inset_position', 'legend_position']
-
     default_options = {
         'hide_inset_x_labels': False, # Whether x labels should be hidden
         'hide_inset_x_ticklabels': False,
@@ -1586,11 +1583,12 @@ def prepare_inset_axes(parent_ax, options):
         'inset_x_tick_locators': [100, 50], # Major and minor tick locators
         'inset_y_tick_locators': [10, 5],
         'inset_position': [0.1,0.1,0.3,0.3],
-        'legend_position': ['upper center', (0.20, 0.90)] # the position of the legend passed as arguments to loc and bbox_to_anchor respectively 
+        'legend_position': ['upper center', (0.20, 0.90)], # the position of the legend passed as arguments to loc and bbox_to_anchor respectively 
+        'connecting_corners': [1,2]
     }
         
 
-    options = update_options(options=options, required_options=required_options, default_options=default_options)
+    options = update_options(options=options, required_options=default_options.keys(), default_options=default_options)
 
 
     # Create a set of inset Axes: these should fill the bounding box allocated to
@@ -1600,7 +1598,7 @@ def prepare_inset_axes(parent_ax, options):
     ip = InsetPosition(parent_ax, options['inset_position'])
     inset_ax.set_axes_locator(ip)
 
-    mark_inset(parent_ax, inset_ax, loc1=2, loc2=4, fc='none', ec='black')
+    mark_inset(parent_ax, inset_ax, loc1a=2, loc2a=4, loc1b=1, loc2b=2, fc='none', ec='black')
     
     inset_ax.xaxis.set_major_locator(MultipleLocator(options['inset_x_tick_locators'][0]))
     inset_ax.xaxis.set_minor_locator(MultipleLocator(options['inset_x_tick_locators'][1]))
