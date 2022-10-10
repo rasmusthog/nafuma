@@ -1125,6 +1125,19 @@ def fit_pre_edge_feautre(data: dict, options={}) -> pd.DataFrame:
                                                              ]
 
 
+        elif options['background_model'] == 'arctan':
+
+            popt, pcov = curve_fit(arctan, peak_background['ZapEnergy']-data['e0_diff'][filename], peak_background[filename])
+
+            background = arctan(background_df['ZapEnergy']-data['e0_diff'][filename], *popt)
+            background_df.insert(1, filename, background)
+
+
+            removed_background_df.insert(1, filename, partial_data[filename]-background_df[filename])
+            removed_background_df = removed_background_df.loc[(removed_background_df['ZapEnergy'] > options['background_limits'][0][1]) & 
+                                                            (removed_background_df['ZapEnergy'] < options['background_limits'][1][0])
+                                                             ]          
+
 
 
         # Fit Gaussian
@@ -1206,6 +1219,10 @@ def fit_pre_edge_feautre(data: dict, options={}) -> pd.DataFrame:
 
 def gauss(x, A, mu, sigma):
     return (A/(sigma*np.sqrt(np.pi)))*np.exp(-(x-mu)**2/(2*sigma**2))
+
+
+def arctan(x,a,b,c,d):
+    return a*np.arctan(x*b+c) + d
     
 
     
