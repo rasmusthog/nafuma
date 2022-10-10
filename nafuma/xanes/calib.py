@@ -1044,7 +1044,7 @@ def fit_pre_edge_feautre(data: dict, options={}) -> pd.DataFrame:
     default_options = {
         'remove_background': True,
         'background_model': 'exponential',
-        'fit_model': 'gaussian',
+        'peak_model': 'gaussian',
         'extract_range': None,
         'extract_range_increments': [0, 0],
         'background_limits': [None, None],
@@ -1136,30 +1136,81 @@ def fit_pre_edge_feautre(data: dict, options={}) -> pd.DataFrame:
             removed_background_df.insert(1, filename, partial_data[filename]-background_df[filename])
             removed_background_df = removed_background_df.loc[(removed_background_df['ZapEnergy'] > options['background_limits'][0][1]) & 
                                                             (removed_background_df['ZapEnergy'] < options['background_limits'][1][0])
-                                                             ]          
+                                                         ]          
 
 
 
         # Fit Gaussian
         # FIXME Should have options for Lorentzian and Pseudo-Voigt here as well.
-        if options['fit_model'] == 'gaussian':
-            # FIXME Understand what this deprecation warning means and what changes should be made to make it future proof
-            warnings.filterwarnings(action='ignore', category=np.VisibleDeprecationWarning)
+
+        # FIXME Understand what this deprecation warning means and what changes should be made to make it future proof
+        warnings.filterwarnings(action='ignore', category=np.VisibleDeprecationWarning)
 
 
-            sigma_init = removed_background_df['ZapEnergy'].loc[removed_background_df[filename] == removed_background_df[filename].max()]
-            popt, pcov = curve_fit( gauss, 
-                                    removed_background_df['ZapEnergy'], 
-                                    removed_background_df[filename], 
-                                    p0=[0.0005, sigma_init, 0.001], 
-                                    bounds=[
-                                            (0, sigma_init-0.002, -np.inf), 
-                                            (0.5, sigma_init+0.002, np.inf)
-                                            ]
-                                    )
+        mu_init = float(removed_background_df['ZapEnergy'].loc[removed_background_df[filename] == removed_background_df[filename].max()])
+        
+        if options['peak_model'] == 'gaussian':
+            popt, pcov = curve_fit(gauss, 
+                                removed_background_df['ZapEnergy'], 
+                                removed_background_df[filename], 
+                                p0=[0.0005, mu_init, 0.001], 
+                                bounds=[
+                                        (0, mu_init-0.002, -np.inf), 
+                                        (0.5, mu_init+0.002, np.inf)
+                                        ]
+                                )
 
-            centroids.append(popt)
-            errors.append(pcov)
+
+        elif options['peak_model'] == '2gaussian':
+            popt, pcov = curve_fit(_2gauss,
+                                removed_background_df['ZapEnergy'], 
+                                removed_background_df[filename], 
+                                p0=[0.0005, mu_init, 0.001, 0.0005, mu_init+0.003, 0.0005], 
+                                #bounds=[
+                                #        (0, mu_init-0.002, -np.inf), 
+                                #        (0.5, mu_init+0.002, np.inf)
+                                #        ]
+                                #)
+                                )
+
+        elif options['peak_model'] == 'lorentzian':
+
+            popt, pcov = curve_fit(lorentz, 
+                                removed_background_df['ZapEnergy'], 
+                                removed_background_df[filename], 
+                                p0=[1, mu_init, 0.001],
+                                # bounds=[
+                                #         (mu_init-0.001, 0.00001), 
+                                #         (mu_init+0.001, 0.01)
+                                #         ]
+                                )
+
+
+        elif options['peak_model'] == '2lorentzian':
+
+            popt, pcov = curve_fit(_2lorentz, 
+                                removed_background_df['ZapEnergy'], 
+                                removed_background_df[filename], 
+                                p0=[1, mu_init, 0.001, 1, mu_init+0.003, 0.001],
+                                # bounds=[
+                                #         (mu_init-0.001, 0.00001), 
+                                #         (mu_init+0.001, 0.01)
+                                #         ]
+                                )
+
+        
+
+        elif options['peak_model'] == 'pseudo-voigt':
+            
+            popt, pcov = curve_fit(pseudo_voigt,
+                                removed_background_df['ZapEnergy'],
+                                removed_background_df[filename],
+                                p0=[1, mu_init, 0.001, 0.5]
+            )
+
+
+        centroids.append(popt)
+        errors.append(pcov)
 
 
         if options['show_plots'] or options['save_plots']:
@@ -1175,24 +1226,63 @@ def fit_pre_edge_feautre(data: dict, options={}) -> pd.DataFrame:
             axes[0].axvline(x=options['background_limits'][0][1], color='black', ls='--')
             axes[0].axvline(x=options['background_limits'][1][0], color='black', ls='--')
             axes[0].axvline(x=options['background_limits'][1][1], color='black', ls='--')
-            axes[0].set_title(f'{os.path.basename(filename)} - Background removal', size=20)
-            axes[0].set_ylabel('Normalised x$\mu$(E)', size=20)
-            axes[0].set_xlabel('Energy (keV)', size=20)
+            axes[0].set_title(f'{os.path.basename(filename)} - Background removal', size=10)
+
             peak_background.plot(x='ZapEnergy', y=filename, ax=axes[0], color='green', kind='scatter')
             if options['xlim']:
                 axes[0].set_xlim(options['xlim'])
             if options['ylim']:
                 axes[0].set_ylim(options['ylim'])
+
+            axes[0].set_ylabel('Normalised x$\mu$(E)', size=20)
+            axes[0].set_xlabel('Energy (keV)', size=20)
+            axes[0].axhline(y=0, ls='--', color='black')
             
             # Fitted curve
 
-            y_fit = gauss(removed_background_df['ZapEnergy'], *popt)
+            if options['peak_model'] == 'gaussian':
+                y_fit = gauss(removed_background_df['ZapEnergy'], *popt)
+                components = [y_fit]
+            
+            elif options['peak_model'] == 'lorentzian':
+                y_fit = lorentz(removed_background_df['ZapEnergy'], *popt)
+                components = [y_fit]
+
+            elif options['peak_model'] == 'pseudo-voigt':
+                y_fit = pseudo_voigt(removed_background_df['ZapEnergy'], *popt)
+                components = [y_fit]
+
+            elif options['peak_model'] == '2gaussian':
+                y_fit = _2gauss(removed_background_df['ZapEnergy'], *popt)
+                y_fit1 = gauss(removed_background_df['ZapEnergy'], *popt[0:3])
+                y_fit2 = gauss(removed_background_df['ZapEnergy'], *popt[3:6])
+
+                components = [y_fit1, y_fit2]
+
+            elif options['peak_model'] == '2lorentzian':
+                y_fit = _2lorentz(removed_background_df['ZapEnergy'], *popt)
+                y_fit1 = lorentz(removed_background_df['ZapEnergy'], *popt[0:3])
+                y_fit2 = lorentz(removed_background_df['ZapEnergy'], *popt[3:6])
+
+                components = [y_fit1, y_fit2]
 
             removed_background_df.plot(x='ZapEnergy', y=filename, ax=axes[1], color='black', label='Background subtracted', kind='scatter')
-            axes[1].plot(removed_background_df['ZapEnergy'], y_fit, color='red', label=f'Fit data ({options["fit_model"]})')
-            axes[1].set_title(f'{os.path.basename(filename)} - Pre-edge feature fit', size=20)
+            
+            axes[1].plot(removed_background_df['ZapEnergy'], y_fit, color='red', label=f'Fit data ({options["peak_model"]})')
+            for comp in components:
+                axes[1].fill_between(x=removed_background_df['ZapEnergy'], y1=comp, y2=0, alpha=0.2)
+
+
+            residuals = (removed_background_df[filename] - y_fit) - 0.1*removed_background_df[filename].max()
+            axes[1].scatter(x=removed_background_df['ZapEnergy'], y=residuals)
+            axes[1].axhline(y=-0.1*removed_background_df[filename].max(), ls='--', color='black')
+            
+            axes[1].set_title(f'{os.path.basename(filename)} - Pre-edge feature fit', size=10)
             axes[1].set_ylabel('Normalised x$\mu$(E)', size=20)
             axes[1].set_xlabel('Energy (keV)', size=20)
+            axes[1].legend()
+            axes[1].axhline(y=0, ls='--', color='black')
+
 
             if options['xlim']:
                 axes[1].set_xlim(options['xlim'])
@@ -1220,9 +1310,28 @@ def fit_pre_edge_feautre(data: dict, options={}) -> pd.DataFrame:
 def gauss(x, A, mu, sigma):
     return (A/(sigma*np.sqrt(np.pi)))*np.exp(-(x-mu)**2/(2*sigma**2))
 
+def _2gauss(x, A1, mu1, sigma1, A2, mu2, sigma2):
+    return (A1/(sigma1*np.sqrt(np.pi)))*np.exp(-(x-mu1)**2/(2*sigma1**2))+(A2/(sigma2*np.sqrt(np.pi)))*np.exp(-(x-mu2)**2/(2*sigma2**2))
 
+
+def lorentz(x, A, mu, sigma):
+    return (A/np.pi * ((sigma)/(((x-mu)**2) + (sigma)**2)))
+
+def _2lorentz(x, A1, mu1, sigma1, A2, mu2, sigma2):
+    return (A1/np.pi * ((sigma1)/(((x-mu1)**2) + (sigma1)**2))) + (A2/np.pi * ((sigma2)/(((x-mu2)**2) + (sigma2)**2)))
+
+
+def pseudo_voigt(x, A, mu, sigma, eta):
+
+    G = gauss(x, A, mu, sigma)
+    L = lorentz(x, A, mu, sigma)
+
+    return eta*G + (1-eta)*L
+    
 def arctan(x,a,b,c,d):
     return a*np.arctan(x*b+c) + d
+
+
     
 
     
