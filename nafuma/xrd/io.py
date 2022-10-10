@@ -42,7 +42,7 @@ def integrate_scans(data: dict, options={}):
         'extension': '.dat',
         'save': True,
         'integration_save_folder': './integrated/',
-        'integration_save_filename': None,
+        'filename_base': 'integrated',
     }
 
     options = aux.update_options(options=options, required_options=default_options.keys(), default_options=default_options)
@@ -53,10 +53,10 @@ def integrate_scans(data: dict, options={}):
 
 
     diffractograms, wavelengths = [], []
-    for img in imgs:
+    for i, img in enumerate(imgs):
         data['image'] = get_image_array(img)
 
-        options['integration_save_filename'] = os.path.basename(img).split('.')[0] + '_int.xy'
+        options['integration_save_filename'] = options['filename_base'] + '_' + f'{i}'.zfill(4) + '.xy'
 
         diff, wl = integrate_1d(data=data, options=options)
 
