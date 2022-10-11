@@ -28,6 +28,7 @@ def plot_diffractogram(data, options={}):
         'xunit': '$^{\circ}$', 'yunit': None,
         'xlim': None, 'ylim': None, 
         'normalise': True,
+        'exclude': None,
         'multiply': 1, # Factor to multiply the normalised data - only used if normalising.
         'drawdown': False,
         'offset': True,

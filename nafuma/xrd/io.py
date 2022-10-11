@@ -714,6 +714,15 @@ def read_data(data, options={}, index=0):
     elif file_extension in['xy', 'xye']:
         diffractogram, wavelength = read_xy(data=data, options=options, index=index)
 
+    
+    if options['exclude']:
+
+        if not isinstance(options['exclude'], list):
+            options['exclude'] = [options['exclude']]
+
+        for excl in options['exclude']:
+            diffractogram['I'].loc[(diffractogram['2th'] > excl[0]) & (diffractogram['2th'] < excl[1])] = 0
+
    
     if options['offset'] or options['normalise']:
         # Make copy of the original intensities before any changes are made through normalisation or offset, to easily revert back if need to update.
