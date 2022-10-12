@@ -94,7 +94,8 @@ def read_coop(data={}, options={}):
     required_options = ['collapse']
 
     default_options = {
-        'collapse': False
+        'collapse': False,
+        'adjust': None,
     }
 
 
@@ -127,6 +128,9 @@ def read_coop(data={}, options={}):
 
 
     coopcar.columns = columns
+
+    if options['adjust']:
+        coopcar['Energy'] = coopcar['Energy'] - options['adjust']
 
 
     if options['collapse']:
