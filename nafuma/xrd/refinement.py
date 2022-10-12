@@ -926,24 +926,44 @@ def refine(data: dict, options={}):
 
 
 
-def read_results(path):
+def read_results(path, options={}):
     
+
+    default_options = {
+        'errors': True
+    }
+
+    options = aux.update_options(options=options, default_options=default_options)
+
     results = pd.read_csv(path, delim_whitespace=True, index_col=0, header=None)
 
-    atoms = int((results.shape[1] - 24) / 10)
+    if options['errors']:
+        atoms = int((results.shape[1] - 24) / 10)
 
-    headers = [
+        headers = [
         'r_wp', 'r_exp', 'r_p', 'r_p_dash', 'r_exp_dash', 'gof',
         'vol', 'vol_err', 'mass', 'mass_err', 'wp', 'wp_err',
         'a', 'a_err', 'b', 'b_err', 'c', 'c_err', 'alpha', 'alpha_err', 'beta', 'beta_err', 'gamma', 'gamma_err',
-    ]
+        ]
+    
+    else:
+        atoms = int((results.shape[1] - 15) / 5)
+
+        headers = [
+            'r_wp', 'r_exp', 'r_p', 'r_p_dash', 'r_exp_dash', 'gof',
+            'vol', 'mass', 'wp',
+            'a', 'b', 'c', 'alpha', 'beta', 'gamma',
+        ]
 
 
     labels = ['x', 'y', 'z', 'occ', 'beq']
     for i in range(atoms):
         for label in labels:
             headers.append(f'atom_{i+1}_{label}')
-            headers.append(f'atom_{i+1}_{label}_err')
+            
+            if options['errors']:
+                headers.append(f'atom_{i+1}_{label}_err')
+
 
     results.columns = headers
     

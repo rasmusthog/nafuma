@@ -786,11 +786,9 @@ def prettify_dos_plot(fig, ax, options):
 
 
 
-def plot_coop(plot_data, options):
+def plot_coop(data, options):
     ''' interactions = list with number of interaction (index + 1 of interactions list from read_coop)'''
 
-
-    required_options = ['plot_kind', 'mode', 'up', 'down', 'collapse', 'interactions', 'flip_xy', 'fill', 'colours', 'palettes']
 
     default_options = {
         'plot_kind': 'COOP',
@@ -806,17 +804,17 @@ def plot_coop(plot_data, options):
     
     }
 
-    options = update_options(options=options, required_options=required_options, default_options=default_options)
+    options = aux.update_options(options=options, default_options=default_options)
 
 
-    fig, ax = prepare_plot(options=options)
+    fig, ax = btp.prepare_plot(options=options)
 
-    coopcar, coop_interactions = dft.io.read_coop(plot_data=plot_data, options=options)
+    coopcar, coop_interactions = dft.io.read_coop(data=data, options=options)
 
 
 
     if not options['colours']:
-        colour_cycle = generate_colours(palettes=options['palettes'])
+        colour_cycle = btp.generate_colours(palettes=options['palettes'])
 
         colours = []
         for interaction in range(len(coop_interactions)):
@@ -894,6 +892,8 @@ def plot_coop(plot_data, options):
                     to_plot = ['mean_down']
                         
 
+
+            
             # Plot all columns as decided above
             for j, column in enumerate(to_plot):
                 if options['fill']:
@@ -912,9 +912,9 @@ def plot_coop(plot_data, options):
                     else:
                         coopcar.plot(x='Energy', y=column, ax=ax, color=colour)
 
-    prettify_dos_plot(fig=fig, ax=ax, options=options)
+    fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
 
-    return coopcar
+    return coopcar, fig, ax
 
 
 
