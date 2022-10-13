@@ -305,7 +305,7 @@ def adjust_plot(fig, ax, options):
 
         # Plot all passed texts
         for text in options['text']:
-            plt.text(x=text[1][0], y=text[1][1], s=text[0])
+            ax.text(x=text[1][0], y=text[1][1], s=text[0])
     
     return fig, ax
 
