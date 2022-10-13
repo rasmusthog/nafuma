@@ -422,17 +422,17 @@ def write_output(fout, data, options, index=0):
 
 
     fout.write('#ifdef output\n')
-    fout.write(f'\t\tOut_Riet({options["save_dir"]}/{filename}_{label}_riet.xy)\n')
-    fout.write(f'\t\tOut_CIF_STR({options["save_dir"]}/{filename}_{label}.cif)\n')
-    fout.write(f'\t\tOut_CIF_ADPs({options["save_dir"]}/{filename}_{label}.cif)\n')
-    fout.write(f'\t\tOut_CIF_Bonds_Angles({options["save_dir"]}/{filename}_{label}.cif)\n')
-    fout.write(f'\t\tCreate_hklm_d_Th2_Ip_file({options["save_dir"]}/{filename}_{label}_hkl.dat)\n')
+    fout.write(f'\t\tOut_Riet("{options["save_dir"]}/{filename}_{label}_riet.xy")\n')
+    fout.write(f'\t\tOut_CIF_STR("{options["save_dir"]}/{filename}_{label}.cif")\n')
+    fout.write(f'\t\tOut_CIF_ADPs("{options["save_dir"]}/{filename}_{label}.cif")\n')
+    fout.write(f'\t\tOut_CIF_Bonds_Angles("{options["save_dir"]}/{filename}_{label}.cif")\n')
+    fout.write(f'\t\tCreate_hklm_d_Th2_Ip_file("{options["save_dir"]}/{filename}_{label}_hkl.dat")\n')
     if options['magnetic_space_group']:
-        fout.write(f'\t\tOut_CIF_mag({options["save_dir"]}/{filename}_{label}_magnetic.cif)\n')
+        fout.write(f'\t\tOut_CIF_mag("{options["save_dir"]}/{filename}_{label}_magnetic.cif")\n')
 
     fout.write('\n')
 
-    fout.write(f'out {options["save_dir"]}/{filename}_{label}.dat append\n')
+    fout.write(f'out "{options["save_dir"]}/{filename}_{label}.dat" append\n')
     fout.write(f'\t\tOut_String("XXXX")\n')
 
 
