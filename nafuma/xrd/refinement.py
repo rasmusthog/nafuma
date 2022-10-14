@@ -13,10 +13,9 @@ import pandas as pd
 import nafuma.auxillary as aux
 
 
-
 def make_initial_inp(data: dict, options={}):
 
-    required_options = ['filename', 'overwrite', 'include', 'save_results', 'save_dir', 'instrument', 'topas_options', 'background', 'capillary', 'th2_offset', 'fit_peak_width', 'simple_axial_model', 'TCHZ_Peak_Type', 'start', 'finish', 'exclude', 'magnetic_atoms', 'radiation', 'magnetic_space_group', 'interval']
+   # required_options = ['filename', 'overwrite', 'include', 'save_results', 'save_dir', 'instrument', 'topas_options', 'background', 'capillary', 'th2_offset', 'fit_peak_width', 'simple_axial_model', 'TCHZ_Peak_Type', 'start', 'finish', 'exclude', 'magnetic_atoms', 'radiation', 'magnetic_space_group', 'interval']
 
     default_options = {
         'filename': 'start.inp',
@@ -38,10 +37,11 @@ def make_initial_inp(data: dict, options={}):
         'interval': [None, None], # Start and finish values that TOPAS should refine on. Overrides 'start' and 'finish'
         'start': None, # Start value only. Overridden by 'interval' if this is set.
         'finish': None, # Finish value only. Overridden by 'interval' if this is set.
-        'exclude': [] # Excluded regions. List of lists.
+        'exclude': [], # Excluded regions. List of lists.
+        'manual_background': False #Upload a background-file
     }
 
-    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+    options = aux.update_options(options=options, default_options=default_options)
     options['topas_options'] = update_topas_options(options=options)
 
 
@@ -134,9 +134,18 @@ def write_xdd(fout, data, options):
             fout.write('\t'+snippets['gauss_fwhm'].format(peak_width_params[0], peak_width_params[1], peak_width_params[2])+'\n')
     
     # Write background
-    fout.write('\tbkg @    ')
+    fout.write('\tbkg @  ')
     for i in range(options['background']):
         fout.write('0    ')
+        #EXTRA for manual background:
+    if options['manual_background'] != False:
+        print('YEAH1')
+        fout.write('\n\t\'manual background file:')
+        print('YEAH2')
+        fout.write('\n\tuser_y my_shape {_xy #include "'+options['manual_background']+'"} \n')
+        print('YEAH3')
+        fout.write('\tprm  !my_scale = 1;:  1.00000')
+
 
     # Write wavelength and LP-factor
     fout.write('\n\n')
