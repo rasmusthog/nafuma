@@ -441,7 +441,8 @@ def generate_heatmap(data, options={}):
         xticks[xval] = xticks_xval
 
 
-    options['x_tick_locators'] = None
+    # FIXME COMMENTED OUT THIS LINE TO FIX SOMETHING - NOT SURE WHAT UNINTENDED CONSEQUENCES THAT MAY HAVE....
+    #options['x_tick_locators'] = None
 
     heatmap = heatmap.reset_index().pivot_table(index='scan', columns='2th', values='I')
 
@@ -826,7 +827,8 @@ def plot_reflection_table(data, reflections_params, ax=None, options={}):
         'wavelength': 1.54059, # CuKalpha, [Å] 
         'format_params': {},
         'rc_params': {},
-        'label': None
+        'label': None,
+        'heatmap': False
     }
 
 
@@ -975,6 +977,16 @@ def plot_refinement(data, options={}):
         'r_wp': True,
         'r_exp': False,
         'wp': False,
+        'wavelength': None,
+        'xlabel': '2$\\theta$', 'xunit': '$^{\circ}$',
+        'ylabel': 'Intensity', 'yunit': 'arb. u.',
+        'text': [],
+        'text_pos': [0.7, 0.9],
+        'text_pos_increments': [0, -0.1],
+        'reflections_plot': False, # whether to plot reflections as a plot
+        'reflections_indices': False, # whether to plot the reflection indices
+        'reflections_data': None, # Should be passed as a list of dictionaries on the form {path: rel_path, reflection_indices: number of indices, colour: [r,g,b], min_alpha: 0-1]
+        
     }
 
     options = aux.update_options(options=options, default_options=default_options, required_options=required_options)
@@ -1008,31 +1020,89 @@ def plot_refinement(data, options={}):
         for attr in results.keys():
             results[attr].append(result[attr].iloc[options['index']])
 
-    fig, ax = plt.subplots(figsize=(20,10))
+    # CREATE AND ASSIGN AXES
 
-    df.plot(x='2th', y='Yobs', kind='scatter', ax=ax, c='black', marker='$\u25EF$')
+    # Makes a list out of reflections_data if it only passed as a dict, as it will be looped through later
+    if options['reflections_data']:
+        if not isinstance(options['reflections_data'], list):
+            options['reflections_data'] = [options['reflections_data']]
+    
+    
+    # Determine the grid layout based on how many sets of reflections data has been passed
+    if options['reflections_data'] and len(options['reflections_data']) >= 1:
+        options = determine_grid_layout(options=options)
+
+    # Create the Figure and Axes objects
+    fig, ax = btp.prepare_plot(options=options)
+
+    # Assign the correct axes to the indicies, reflections and figure itself
+    if options['reflections_plot'] or options['reflections_indices']:
+        
+        if options['reflections_indices']:
+            indices_ax = ax[0]
+
+            if options['reflections_plot']:
+                ref_axes = [axx for axx in ax[range(1,len(options['reflections_data'])+1)]]
+
+        else:
+            ref_axes = [axx for axx in ax[range(0,len(options['reflections_data']))]]
+
+        ax = ax[-1]
+
+    df.plot.scatter(x='2th', y='Yobs', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*10)
     df.plot(x='2th', y='Ycalc', ax=ax, c='red')
     df.plot(x='2th', y='diff', ax=ax)
     
-    if options['r_wp']:
-        ax.text(x=0.7*df['2th'].max(), y=0.7*df['Yobs'].max(), s='R$_{wp}$ = '+f'{r_wp}', fontsize=20)
-    
-    if options['r_exp']:
-        ax.text(x=0.70*df['2th'].max(), y=0.60*df['Yobs'].max(), s='R$_{exp}$ = '+f'{r_exp}', fontsize=20)
 
+
+
+    if options['sample']:
+        options['text'].append([options['sample'], [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+
+    if options['wavelength']:
+        options['text'].append([f'$\lambda$ = {options["wavelength"]} Å', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
 
     if options['wp']:
         for i, (result, label) in enumerate(zip(data['results'], options['labels'])):
-            ax.text(x=0.7*df['2th'].max(), y=(0.9-0.1*i)*df['Yobs'].max(), s=f'{label}: {np.round(float(results["wp"][i]), 2)}%', fontsize=20)
+            options['text'].append([f'{label}: {np.round(float(results["wp"][i]), 1)}%', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+            
+            
+            #ax.text(x=0.7*df['2th'].max(), y=ypos*df['Yobs'].max(), s=f'{label}: {np.round(float(results["wp"][i]), 2)}%', fontsize=20)
+            options['text_pos'][0] += options['text_pos_increments'][0]
+            options['text_pos'][1] += options['text_pos_increments'][1]
 
-    if options['title']:
-        ax.set_title(options['title'], size=30)
+    if options['r_wp']:
+        options['text'].append(['R$_{wp}$ = '+f'{np.round(r_wp, 2)}', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+        #ax.text(x=0.7*df['2th'].max(), y=0.7*df['Yobs'].max(), s='R$_{wp}$ = '+f'{r_wp}')
+    
+    if options['r_exp']:
+        options['text'].append(['R$_{exp}$ = '+f'{np.round(r_exp, 2)}', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+        #ax.text(x=0.70*df['2th'].max(), y=0.60*df['Yobs'].max(), s='R$_{exp}$ = '+f'{r_exp}')
 
-    if options['xlim']:
-        ax.set_xlim(options['xlim'])
-    else:
-        ax.set_xlim([df['2th'].min(), df['2th'].max()])
 
-    ax.tick_params(which='both', labelleft=False, left=False, labelsize=20, direction='in')
-    ax.set_ylabel('Intensity [arb. u.]', size=20)
-    ax.set_xlabel('2$\\theta$ [$^{\circ}$]', size=20)
+    if 'xlim' not in options.keys() or options['xlim'] == None:
+        options['xlim'] = [df['2th'].min(), df['2th'].max()]
+
+
+    fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
+
+    # PLOT REFLECTION TABLES
+    if options['reflections_plot'] and options['reflections_data']:
+        options['xlim'] = ax.get_xlim()
+        options['to_wavelength'] = options['wavelength'] # By default, the wavelength of the first diffractogram will be used for these.
+        
+        # Plot each reflection table in the relevant axis
+        for reflections_params, axis in zip(options['reflections_data'], ref_axes):
+            plot_reflection_table(data=data, reflections_params=reflections_params, ax=axis, options=options)
+
+
+    
+

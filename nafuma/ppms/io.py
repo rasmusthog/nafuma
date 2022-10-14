@@ -5,10 +5,15 @@ import nafuma.auxillary as aux
 
 def read_data(path, options={}):
 
+    default_options = {
+        'split': False,
+    }
+
+    options = aux.update_options(options=options, default_options=default_options)
+
     index = find_start(path)
 
     df = pd.read_csv(path, skiprows=index+1)
-    mask = df.loc[df['Comment'].notna()]
 
     df = df[['Comment', 'Time Stamp (sec)', 'Temperature (K)', 'Magnetic Field (Oe)', 
     'DC Moment (emu)', 'DC Std. Err. (emu)', 'DC Quad. Moment (emu)', 
@@ -19,7 +24,8 @@ def read_data(path, options={}):
     'DC_Moment', 'DC_Std_Err', 'DC_Quad_Moment', 
     'Status', 'Max_Field', 'Pressure', 'Temperature_Status']
 
-    df.columns = new_columns
+    df.columns = new_columns  
+
 
     df[['Temperature', 'Magnetic_Field', 'DC_Moment', 'DC_Std_Err', 'DC_Quad_Moment', 'Max_Field', 'Pressure']] = df[['Temperature', 'Magnetic_Field', 'DC_Moment', 'DC_Std_Err', 'DC_Quad_Moment', 'Max_Field', 'Pressure']].astype(float)
 
@@ -30,12 +36,15 @@ def read_data(path, options={}):
         df = calculate_bohr_magnetons(df, options)
         df = calculate_chi_inverse(df, options)
 
+    if options['split']:
+        mask = df.loc[df['Comment'].notna()]
+        dfs = []
+        for i in range(1,len(mask.index)):
+            dfs.append(df.iloc[mask.index[i-1]:mask.index[i]])
 
-    dfs = []
-    for i in range(1,len(mask.index)):
-        dfs.append(df.iloc[mask.index[i-1]:mask.index[i]])
+        return dfs
 
-    return dfs
+    return df
 
 
 def read_hysteresis(path):

@@ -894,9 +894,10 @@ def get_equilibrium_data(path, atoms_per_formula_unit, eos=None):
         atoms, atom_num, atoms_dict = get_atoms(os.path.join(dir, 'POSCAR'))
         scaling_factor = sum(atom_num) / atoms_per_formula_unit
 
-        label = dir.split('/')[-1]
+        label = os.path.basename(dir)
 
-        dft_df = pd.read_csv(os.path.join(dir, 'energ.dat'), header=None, delim_whitespace=True)
+        dft_df = pd.read_csv(os.path.join(dir, 'energ.dat'), header=None, delim_whitespace=True, index_col=0)
+        dft_df.reset_index(drop=True, inplace=True)
         dft_df.columns = ['Volume', 'Energy']
 
         volume = dft_df["Volume"].to_numpy() / scaling_factor
@@ -904,10 +905,15 @@ def get_equilibrium_data(path, atoms_per_formula_unit, eos=None):
 
         p0 = get_initial_guesses(volume, energy)
 
-        equilibrium_constants = fit_eos_curve(volume, energy, p0, eos)
-        e0, v0, b0, bp = equilibrium_constants[0], equilibrium_constants[1], equilibrium_constants[2], equilibrium_constants[3]
+        try:
+            equilibrium_constants = fit_eos_curve(volume, energy, p0, eos)
 
-        data.append([label, e0, v0, b0/kJ*1e24, bp])
+            e0, v0, b0, bp = equilibrium_constants[0], equilibrium_constants[1], equilibrium_constants[2], equilibrium_constants[3]
+
+            data.append([label, e0, v0, b0/kJ*1e24, bp])
+    
+        except:
+            data.append([label, None, None, None, None])
 
 
     df = pd.DataFrame(data)
