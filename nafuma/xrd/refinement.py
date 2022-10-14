@@ -104,8 +104,53 @@ def make_initial_inp(data: dict, options={}):
             fout.write(line)
 
 
+def make_manual_background(data, options):
+    #FIXME generalize this so it works properly
+    #FIXME fix so that plotting is optional
+    import numpy as np
+    import nafuma.xrd as xrd
+    import matplotlib.pyplot as plt
 
-           
+    default_options = {
+        'plot_background':  True,
+        'interval_length':  0.05,
+        'save_dir': 'background'
+    }
+    if "noheaders" in data['path'][0]:
+        filename = os.path.basename(data['path'][0]).split('_noheaders.')[0]
+    else:
+        filename = os.path.basename(data['path'][0]).split('.')[0]
+
+
+    options = aux.update_options(options=options, default_options=default_options)
+    
+    #data['background_in_q'] is a .txt-file with one column of x-values that are good starting points for background determination, as they should not include any peaks for that specific material
+    
+    #importing the pre-made background points in Q into a dataframe
+    df_backgroundpoints_q=pd.read_csv(data['background_in_q'],names=["background_q"])
+
+    diffractogram, wavelength = xrd.io.read_xy(data=data)
+
+    #transferring q-range background to the respective wavelength
+    x_background_points=[]
+    for q in df_backgroundpoints_q["background_q"]:
+        twotheta=2*180/np.pi*np.arcsin(q*wavelength/(4*np.pi))
+        x_background_points.append(twotheta)
+
+    fig,ax=plt.subplots(figsize=(20,20))
+    diffractogram.plot(x="2th",y="I", kind="scatter",ax=ax)
+    intervallength=options['interval_length']
+    background=pd.DataFrame()
+
+    for i, x in enumerate(x_background_points):
+        test=diffractogram.loc[(diffractogram["2th"]>x-intervallength) & (diffractogram["2th"]<x+intervallength)]
+        background = pd.concat([background,test], ignore_index=True, sort=False)
+    
+    background.plot(x="2th",y="I", ax=ax,color='red',kind="scatter")
+
+    fig2,ax2=plt.subplots(figsize=(20,10))
+
+    background.to_csv(os.path.join(options['save_dir'],filename+"_background.txt"),index=None, header=None,sep=' ')
 
 def write_xdd(fout, data, options):
     import nafuma.xrd as xrd
@@ -138,10 +183,11 @@ def write_xdd(fout, data, options):
     for i in range(options['background']):
         fout.write('0    ')
         #EXTRA for implementation of manual background:
-    if options['manual_background'] != False:
+    if options['manual_background']:
         fout.write('\n\t\'manual background file:')
         fout.write('\n\tuser_y my_shape {_xy #include "'+options['manual_background']+'"} \n')
         fout.write('\tprm  !my_scale = 1;:  1.00000')
+        fout.write('\tfit_obj !f_SR_pos1 = my_scale * (my_shape);')
 
 
     # Write wavelength and LP-factor
