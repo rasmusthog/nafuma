@@ -137,13 +137,10 @@ def write_xdd(fout, data, options):
     fout.write('\tbkg @  ')
     for i in range(options['background']):
         fout.write('0    ')
-        #EXTRA for manual background:
+        #EXTRA for implementation of manual background:
     if options['manual_background'] != False:
-        print('YEAH1')
         fout.write('\n\t\'manual background file:')
-        print('YEAH2')
         fout.write('\n\tuser_y my_shape {_xy #include "'+options['manual_background']+'"} \n')
-        print('YEAH3')
         fout.write('\tprm  !my_scale = 1;:  1.00000')
 
 
