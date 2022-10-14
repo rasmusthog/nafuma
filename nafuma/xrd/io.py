@@ -576,10 +576,12 @@ def read_xy(data, options={}, index=0):
     #if 'wavelength' not in data.keys():
     # Get wavelength from scan
 
-    
+    if 'wavelength' in data.keys() and not type(data['wavelength']) == list:
+        data['wavelength'] = [data['wavelength']]
 
     if not 'wavelength' in data.keys() or not data['wavelength'][index]:
         wavelength = read_metadata_from_xy(path=data['path'][index])['wavelength']
+    
     else:
         wavelength = data['wavelength'][index]
 
