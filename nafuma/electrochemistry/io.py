@@ -357,6 +357,12 @@ def process_neware_data(df, options={}):
 						max_capacity = dchg_df['ions'].max() 
 						dchg_df['ions'] = np.abs(dchg_df['ions'] - max_capacity)
 
+
+			if not chg_df.empty:
+				chg_df.reset_index(inplace=True)
+			if not dchg_df.empty:
+				dchg_df.reset_index(inplace=True)
+			
 			cycles.append((chg_df, dchg_df))
 
 
