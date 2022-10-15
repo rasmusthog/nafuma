@@ -71,3 +71,65 @@ def show_image(data, options={}):
     else:
         return data['image'], None, None
 
+
+
+def plot_spectrum(data: dict, options={}):
+
+    default_options = {
+        'deconvolutions': None,
+        'lines': None,
+        'colours': None,
+        'xlabel': 'Energy', 'xunit': 'keV', 'xlim': None,
+        'ylabel': 'Counts', 'yunit': 'arb. u.', 'ylim': None, 'hide_y_ticklabels': True, 'hide_y_ticks': True,
+    }
+
+    options = aux.update_options(options=options, default_options=default_options)
+
+    fig, ax = btp.prepare_plot(options=options)
+
+
+    spectrum = io.read_spectrum(data['path'])
+
+    if options['deconvolutions']:
+        
+        deconvolutions = []
+        if not isinstance(options['deconvolutions'], list):
+            options['deconvolutions'] = [options['deconvolutions']]
+
+        if options['colours'] and (len(options['colours']) != len(options['deconvolutions'])):
+            options['colours'] = None
+
+        for deconv in options['deconvolutions']:
+            df = io.read_spectrum(deconv)
+            deconvolutions.append(df)
+
+
+    
+    spectrum.plot(x='Energy', y='Counts', ax=ax, color='black')
+
+    if options['deconvolutions']:
+        if options['colours']:
+            for deconv, colour in zip(deconvolutions, options['colours']):
+                ax.fill_between(x=deconv['Energy'], y1=deconv['Counts'], y2=0, color=colour, alpha=0.4)
+        else:
+            for deconv in deconvolutions:
+                ax.fill_between(x=deconv['Energy'], y1=deconv['Counts'], y2=0, alpha=0.4)
+
+
+    if not options['xlim']:
+        options['xlim'] = [spectrum['Energy'].min(), spectrum['Energy'].max()]
+
+    if not options['ylim']:
+        options['ylim'] = [0, 1.1*spectrum['Counts'].max()]
+
+    if options['lines']:
+        for i, (line, energy) in enumerate(options['lines'].items()):
+            ax.axvline(x=energy, ls='--', lw=0.5, c='black')
+            ax.text(s=line, x=energy, y=(0.9-0.1*i)*options['ylim'][1], fontsize=8)
+
+
+    
+    fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
+
+
+    return spectrum, fig, ax

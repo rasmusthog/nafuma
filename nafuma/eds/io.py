@@ -1,6 +1,7 @@
 from PIL import Image
 import numpy as np
 import cv2
+import pandas as pd
 
 def read_image(path, weight=None, colour=None, crop=None, resize=None, brightness=None):
 
@@ -125,3 +126,27 @@ def change_colour(image, new_colour):
 
 
     return image
+
+
+def read_spectrum(path):
+
+    headers = find_start(path)
+
+    spectrum = pd.read_csv(path, skiprows=headers, delim_whitespace=True)
+
+
+    return spectrum
+
+
+
+def find_start(path):
+
+    with open(path, 'r') as f:
+        line = f.readline()
+        i = 0
+        while not line.startswith('Energy'):
+            line = f.readline()
+            i += 1
+
+    return i
+
