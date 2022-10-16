@@ -74,13 +74,12 @@ def plot_gc(data, options=None):
 			else:
 				fig, ax = options['fig'], options['ax']
 			
-			for i, cycle in enumerate(data['cycles']):
-				if i in options['which_cycles']:
+			for i, cycle in enumerate(options['which_cycles']):
 					if options['charge']:
-						cycle[0].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][0])
+						data['cycles'][cycle][0].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][0])
 
 					if options['discharge']:
-						cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
+						data['cycles'][cycle][1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
 
 
 			if options['interactive_session_active']:
@@ -159,11 +158,11 @@ def plot_gc(data, options=None):
 		else:
 			if options['charge']:
 				yval = 'charge_' + options['x_vals']
-				data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][0], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
+				data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][0], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize']*10)
 			
 			if options['discharge']:
 				yval = 'discharge_' + options['x_vals']
-				data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][1], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
+				data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][1], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize']*10)
 
 
 			if options['limit']:
@@ -611,17 +610,25 @@ def generate_colours(cycles, options):
 
 
 
+
 	# Generate lists of colours
 	colours = []
+
+	if len(charge_colour) != len(options['which_cycles']):
+
+		for cycle_number in range(0, len(options['which_cycles'])):
+			if options['gradient']:
+				weight_start = ((len(options['which_cycles'])) - cycle_number)/(len(options['which_cycles']))
+				weight_end = cycle_number/len(options['which_cycles'])
 	
-	for cycle_number in range(0, len(cycles)):
-		if options['gradient']:
-			weight_start = (len(cycles) - cycle_number)/len(cycles)
-			weight_end = cycle_number/len(cycles)
+				charge_colour = [weight_start*start_colour + weight_end*end_colour for start_colour, end_colour in zip(charge_colour_start, charge_colour_end)]
+				discharge_colour = [weight_start*start_colour + weight_end*end_colour for start_colour, end_colour in zip(discharge_colour_start, discharge_colour_end)]
+	
+			colours.append([charge_colour, discharge_colour])
 
-			charge_colour = [weight_start*start_colour + weight_end*end_colour for start_colour, end_colour in zip(charge_colour_start, charge_colour_end)]
-			discharge_colour = [weight_start*start_colour + weight_end*end_colour for start_colour, end_colour in zip(discharge_colour_start, discharge_colour_end)]
 
-		colours.append([charge_colour, discharge_colour])
+	else:
+		for charge, discharge in zip(charge_colour, discharge_colour):
+			colours.append([charge, discharge])
 
 	return colours
