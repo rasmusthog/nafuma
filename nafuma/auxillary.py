@@ -182,6 +182,4 @@ def find_neighbours(value, df, colname, start=0, end=-1):
         lowerneighbour_ind = lower_df.idxmax()
         upperneighbour_ind = upper_df.idxmin()
 
-        print(lowerneighbour_ind, upperneighbour_ind)
-
         return [lowerneighbour_ind, upperneighbour_ind] 
