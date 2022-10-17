@@ -33,6 +33,7 @@ def plot_gc(data, options=None):
 		'summary': False,
 		'charge': True, 'discharge': True, 
 		'colours': None, 
+		'markers': None,
 		'differentiate_charge_discharge': True, 
 		'gradient': False,
 		'interactive': False,
@@ -42,7 +43,9 @@ def plot_gc(data, options=None):
 		'save_gif': False,
 		'save_path': 'animation.gif',
 		'fps': 1,
-		'fig': None, 'ax': None
+		'fig': None, 'ax': None,
+		'edgecolor': plt.rcParams['lines.markeredgecolor'],
+		'plot_every': 1,
 		}
 
 	options = aux.update_options(options=options, default_options=default_options)
@@ -52,7 +55,6 @@ def plot_gc(data, options=None):
 	if not 'cycles' in data.keys() or options['force_reload']:
 		data['cycles'] = ec.io.read_data(data=data, options=options)
 
-	
 	# Update list of cycles to correct indices
 	update_cycles_list(data=data, options=options)
 
@@ -63,7 +65,9 @@ def plot_gc(data, options=None):
 
 
 
-	colours = generate_colours(cycles=data['cycles'], options=options)
+	colours = generate_colours(options=options)
+	markers = generate_markers(options=options)
+
 	if not options['summary']:
 		
 		if options['show_plot']:
@@ -73,6 +77,7 @@ def plot_gc(data, options=None):
 				fig, ax = btp.prepare_plot(options=options)
 			else:
 				fig, ax = options['fig'], options['ax']
+			
 			
 			for i, cycle in enumerate(options['which_cycles']):
 					if options['charge']:
@@ -133,7 +138,10 @@ def plot_gc(data, options=None):
 
 	elif options['summary'] and options['show_plot']:
 		# Prepare plot
-		fig, ax = btp.prepare_plot(options=options)
+		if not options['fig'] and not options['ax']:
+			fig, ax = btp.prepare_plot(options=options)
+		else:
+			fig, ax = options['fig'], options['ax']
 		
 		mask = []
 		for i in range(data['cycles'].shape[0]):
@@ -151,18 +159,18 @@ def plot_gc(data, options=None):
 
 		# FIXME To begin, the default is that y-values correspond to x-values. This should probably be implemented in more logical and consistent manner in the future.
 		if options['x_vals'] in ['coulombic_efficiency', 'energy_efficiency']:
-			data['cycles'].loc[mask].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][0], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize'])
+			data['cycles'].loc[mask].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][1], kind='scatter', s=plt.rcParams['lines.markersize']*10,  marker=markers[0], edgecolor=plt.rcParams['lines.markeredgecolor'])
 			if options['limit']:
 				ax.axhline(y=options['limit'], ls='--', c='black')
 
 		else:
 			if options['charge']:
 				yval = 'charge_' + options['x_vals']
-				data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][0], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize']*10)
+				data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][0], kind='scatter', s=plt.rcParams['lines.markersize']*10, marker=markers[0], edgecolor=plt.rcParams['lines.markeredgecolor'])
 			
 			if options['discharge']:
 				yval = 'discharge_' + options['x_vals']
-				data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][1], kind='scatter', marker="$\u25EF$", s=plt.rcParams['lines.markersize']*10)
+				data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][1], kind='scatter', s=plt.rcParams['lines.markersize']*10, marker=markers[1], edgecolor=plt.rcParams['lines.markeredgecolor'])
 
 
 			if options['limit']:
@@ -233,18 +241,26 @@ def plot_cv(data, options):
 	# Update list of cycles to correct indices
 	update_cycles_list(data=data, options=options)
 
-	colours = generate_colours(cycles=data['cycles'], options=options)
+	colours = generate_colours(options=options)
 
 	if options['show_plot']:
 		# Prepare plot
 		fig, ax = btp.prepare_plot(options=options)
-		for i, cycle in enumerate(data['cycles']):
-			if i in options['which_cycles']:
-				if options['charge']:
-					cycle[0].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][0])
 
-				if options['discharge']:
-					cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
+		for i, cycle in enumerate(options['which_cycles']):
+			if options['charge']:
+				data['cycles'][cycle][0].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][0])
+
+			if options['discharge']:
+				data['cycles'][cycle][1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
+
+		# for i, cycle in enumerate(data['cycles']):
+		# 	if i in options['which_cycles']:
+		# 		if options['charge']:
+		# 			cycle[0].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][0])
+
+		# 		if options['discharge']:
+		# 			cycle[1].plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=colours[i][1])
 
 		update_labels(options)
 
@@ -259,6 +275,7 @@ def plot_cv(data, options):
 		options['format_params']['height'] = 3
 
 		options['format_params']['dpi'] = 200
+
 
 		for i, cycle in enumerate(data['cycles']):
 			if i in options['which_cycles']:
@@ -359,11 +376,13 @@ def update_cycles_list(data, options: dict) -> None:
 
 
 		options['which_cycles'] = [i-1 for i in range(which_cycles[0], which_cycles[1]+1)]
-
 	
 	for i, cycle in enumerate(options['which_cycles']):
 		if cycle in options['exclude_cycles']:
 			del options['which_cycles'][i]
+
+
+	options['which_cycles'] = options['which_cycles'][::options['plot_every']]
 
 
 
@@ -580,16 +599,27 @@ def prettify_labels(label):
 
 
 
-def generate_colours(cycles, options):
+def generate_colours(options):
+
+	default_options = {
+		'gradient_colours': None,
+	}
+
+	aux.update_options(options=options, default_options=default_options)
 
 	# Assign colours from the options dictionary if it is defined, otherwise use standard colours.
 	if options['colours']:
 		charge_colour = options['colours'][0]
 		discharge_colour = options['colours'][1]
+
+		if isinstance(charge_colour, tuple):
+			charge_colour = [charge_colour]
+		if isinstance(discharge_colour, tuple):
+			discharge_colour = [discharge_colour]
 	
 	else:
-		charge_colour = (40/255, 70/255, 75/255) # Dark Slate Gray #28464B, coolors.co
-		discharge_colour = (239/255, 160/255, 11/255) # Marigold #EFA00B, coolors.co
+		charge_colour = [(40/255, 70/255, 75/255)] # Dark Slate Gray #28464B, coolors.co
+		discharge_colour = [(239/255, 160/255, 11/255)] # Marigold #EFA00B, coolors.co
 
 		if not options['differentiate_charge_discharge']:
 			discharge_colour = charge_colour
@@ -599,14 +629,19 @@ def generate_colours(cycles, options):
 	# If gradient is enabled, find start and end points for each colour
 	if options['gradient']:
 
-		add_charge = min([(1-x)*0.75 for x in charge_colour])
-		add_discharge = min([(1-x)*0.75 for x in discharge_colour])
+		if not options['gradient_colours']:
 
-		charge_colour_start = charge_colour
-		charge_colour_end = [x+add_charge for x in charge_colour]
+			options['gradient_colours'] = [[None, None], [None, None]]
 
-		discharge_colour_start = discharge_colour
-		discharge_colour_end = [x+add_discharge for x in discharge_colour]
+			add_charge = min([(1-x)*0.75 for x in charge_colour])
+			add_discharge = min([(1-x)*0.75 for x in discharge_colour])
+
+			options['gradient_colours'][0][0] = charge_colour
+			options['gradient_colours'][0][1] = [x+add_charge for x in charge_colour]
+
+			options['gradient_colours'][1][0] = discharge_colour
+			options['gradient_colours'][1][1] = [x+add_discharge for x in discharge_colour]
+
 
 
 
@@ -615,20 +650,35 @@ def generate_colours(cycles, options):
 	colours = []
 
 	if len(charge_colour) != len(options['which_cycles']):
+		if options['gradient']:
+			options['number_of_colours'] = len(options['which_cycles'])
 
-		for cycle_number in range(0, len(options['which_cycles'])):
-			if options['gradient']:
-				weight_start = ((len(options['which_cycles'])) - cycle_number)/(len(options['which_cycles']))
-				weight_end = cycle_number/len(options['which_cycles'])
+			charge_colours = btp.mix_colours(colour1=options['gradient_colours'][0][0], colour2=options['gradient_colours'][0][1], options=options)
+			discharge_colours = btp.mix_colours(colour1=options['gradient_colours'][1][0], colour2=options['gradient_colours'][1][1], options=options)
 	
-				charge_colour = [weight_start*start_colour + weight_end*end_colour for start_colour, end_colour in zip(charge_colour_start, charge_colour_end)]
-				discharge_colour = [weight_start*start_colour + weight_end*end_colour for start_colour, end_colour in zip(discharge_colour_start, discharge_colour_end)]
-	
-			colours.append([charge_colour, discharge_colour])
+			for chg, dchg in zip(charge_colours, discharge_colours):
+				colours.append([chg, dchg])
+
+		else:
+			for i in options['which_cycles']:
+				colours.append([charge_colour, discharge_colour])
 
 
 	else:
-		for charge, discharge in zip(charge_colour, discharge_colour):
-			colours.append([charge, discharge])
+		for chg, dchg in zip(charge_colour, discharge_colour):
+			colours.append([chg, dchg])
+
 
 	return colours
+
+
+
+def generate_markers(options):
+
+	if not options['markers']:
+		markers = ['o', 'v']
+
+	else:
+		markers = [options['markers'][0], options['markers'][1]]
+
+	return markers
