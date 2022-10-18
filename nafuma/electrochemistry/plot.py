@@ -209,7 +209,6 @@ def plot_gc_interactive(data, options):
 def plot_cv(data, options):
 
 	# Update options
-	required_options = ['force_reload', 'x_vals', 'y_vals', 'which_cycles', 'limit', 'exclude_cycles', 'show_plot', 'charge', 'discharge', 'colours', 'differentiate_charge_discharge', 'gradient', 'interactive', 'interactive_session_active', 'rc_params', 'format_params', 'save_gif', 'save_path', 'fps']	
 	default_options = {
 		'force_reload': False,
 		'x_vals': 'voltage', 'y_vals': 'current', 
@@ -227,10 +226,13 @@ def plot_cv(data, options):
 		'format_params': {},
 		'save_gif': False,
 		'save_path': 'animation.gif',
-		'fps': 1
+		'fps': 1,
+		'plot_every': 1,
+		'fig': None,
+		'ax': None
 		}
 
-	options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+	options = aux.update_options(options=options, default_options=default_options)
 
 	
 	# Read data if not already loaded
@@ -245,7 +247,10 @@ def plot_cv(data, options):
 
 	if options['show_plot']:
 		# Prepare plot
-		fig, ax = btp.prepare_plot(options=options)
+		if not options['fig'] and not options['ax']:
+			fig, ax = btp.prepare_plot(options=options)
+		else:
+			fig, ax = options['fig'], options['ax']
 
 		for i, cycle in enumerate(options['which_cycles']):
 			if options['charge']:
