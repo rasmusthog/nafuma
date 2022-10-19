@@ -103,6 +103,31 @@ def make_initial_inp(data: dict, options={}):
         for line in lines:
             fout.write(line)
 
+def make_general_background_in_q(data, options):
+    #Function where you get a txt.-file of q-values, based on the 2th values you have picked out manually from a data set. Idea is that the same background points can be used for several samples, measured at several wavelengths.
+    #The input is a list of 2th-values that the user has found by manually inspecting a data set
+    import numpy as np
+    import nafuma.xrd as xrd
+    import matplotlib.pyplot as plt
+
+    default_options = {
+        'save_dir': 'background',
+        'filename': 'test'
+    }
+
+    options = aux.update_options(options=options, default_options=default_options)
+
+    list_of_2th_values = data['2th_values']
+    
+    #x_background_points=list_of_2th_values
+    x_background_points_q=[]
+    for x in list_of_2th_values:
+        q=np.abs((4*np.pi/data['wavelength'])*np.sin(x/2 * np.pi/180))
+        x_background_points_q.append(q)
+
+    background_points=pd.DataFrame(x_background_points_q)
+    background_filename="C:/Users/halvorhv/OneDriveUiO/1_OrderPaper/analysis/exsitu/probing_ordering/refinements/"+options['filename']+"_background_points_in_q.txt"
+    background_points.to_csv(background_filename,index=None, header=None)#,index=None, header=None,sep=' ')
 
 def make_manual_background(data, options):
     #FIXME generalize this so it works properly
@@ -113,7 +138,7 @@ def make_manual_background(data, options):
 
     default_options = {
         'plot_background':  True,
-        'interval_length':  0.05,
+        'interval_length':  0.05, #picking out the region to be fitted for each background point, bigger interval-length means a bigger region for each point.
         'save_dir': 'background'
     }
     if "noheaders" in data['path'][0]:
@@ -136,21 +161,34 @@ def make_manual_background(data, options):
     for q in df_backgroundpoints_q["background_q"]:
         twotheta=2*180/np.pi*np.arcsin(q*wavelength/(4*np.pi))
         x_background_points.append(twotheta)
-
-    fig,ax=plt.subplots(figsize=(20,20))
-    diffractogram.plot(x="2th",y="I", kind="scatter",ax=ax)
+    
     intervallength=options['interval_length']
+    
     background=pd.DataFrame()
 
     for i, x in enumerate(x_background_points):
         test=diffractogram.loc[(diffractogram["2th"]>x-intervallength) & (diffractogram["2th"]<x+intervallength)]
         background = pd.concat([background,test], ignore_index=True, sort=False)
-    
-    background.plot(x="2th",y="I", ax=ax,color='red',kind="scatter")
+        
+    if options['plot_background']:
+        #Overview figure
+        fig,ax=plt.subplots(figsize=(20,10))
+        diffractogram.plot(x="2th",y="I", kind="scatter",ax=ax,title="Background points (red) plotted with "+filename)
+        background.plot(x="2th",y="I", ax=ax,color='red',kind="scatter")
 
-    fig2,ax2=plt.subplots(figsize=(20,10))
+        #Log-figure for closer inspection
+        diffractogram["I_log"]=np.log10(diffractogram["I"])
+        background["I_log"]=np.log10(background["I"])
+        background_logmax=max(background["I_log"])
+        background_logmin=min(background["I_log"])
 
-    background.to_csv(os.path.join(options['save_dir'],filename+"_background.txt"),index=None, header=None,sep=' ')
+        fig2,ax2=plt.subplots(figsize=(20,10))
+        diffractogram.plot(x="2th",y="I_log", kind="scatter",ax=ax2, title="Background ploints (red) plotted with "+filename+" (log)")
+        background.plot(x="2th",y="I_log", ax=ax2,color='red',kind="scatter")
+        
+        ax2.set_ylim(background_logmin,background_logmax)
+        
+    background[["2th","I"]].to_csv(os.path.join(options['save_dir'],filename+"_background.txt"),index=None, header=None,sep=' ')
 
 def write_xdd(fout, data, options):
     import nafuma.xrd as xrd
