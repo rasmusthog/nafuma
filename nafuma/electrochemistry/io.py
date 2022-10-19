@@ -41,11 +41,10 @@ def read_neware(path, options={}):
 	# Convert from .xlsx to .csv to make readtime faster
 	if path.endswith('xlsx'):
 		csv_details = ''.join(path[:-5]) + '_details.csv'
-		csv_summary = ''.join(path[:-5]) + '_summary.csv'
+		csv_summary = os.path.abspath(''.join(path[:-5]) + '_summary.csv')
 
-	
 		if not os.path.isfile(csv_summary):
-			Xlsx2csv(path, outputencoding="utf-8").convert(csv_summary, sheetid=3)
+			Xlsx2csv(path, outputencoding="utf-8").convert(os.path.abspath(csv_summary), sheetid=3)
 
 		if not os.path.isfile(csv_details):
 			Xlsx2csv(path, outputencoding="utf-8").convert(csv_details, sheetid=4)
@@ -357,6 +356,12 @@ def process_neware_data(df, options={}):
 						max_capacity = dchg_df['ions'].max() 
 						dchg_df['ions'] = np.abs(dchg_df['ions'] - max_capacity)
 
+
+			if not chg_df.empty:
+				chg_df.reset_index(inplace=True)
+			if not dchg_df.empty:
+				dchg_df.reset_index(inplace=True)
+			
 			cycles.append((chg_df, dchg_df))
 
 
@@ -426,14 +431,16 @@ def process_biologic_data(df, options=None):
 
 	df = df[headers].copy()
 
+
 	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
 	set_units(options)
 	options['old_units'] = get_old_units(df=df, options=options)
 	
 	df = add_columns(df=df, options=options)
 
-	df = unit_conversion(df=df, options=options)
 
+
+	df = unit_conversion(df=df, options=options)
 
 	# Creates masks for charge and discharge curves
 	if options['mode'] == 'GC':
@@ -447,8 +454,13 @@ def process_biologic_data(df, options=None):
 	# Initiate cycles list
 	cycles = []
 
+	if df['cycle'].max() == 0:
+		no_cycles = 1
+	else:
+		no_cycles = int(df['cycle'].max())
+
 	# Loop through all the cycling steps, change the current and capacities in the 
-	for i in range(int(df["cycle"].max())):
+	for i in range(no_cycles):
 
 		sub_df = df.loc[df['cycle'] == i].copy()
 

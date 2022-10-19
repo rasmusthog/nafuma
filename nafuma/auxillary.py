@@ -164,3 +164,22 @@ def swap_values(options: dict, key1, key2):
 
 
     return options
+
+
+
+def find_neighbours(value, df, colname, start=0, end=-1):
+    ''' Finds closest match to a given value in colname of df. If there is an exact match, returns index of this value. Else, it returns the nearest neighbors (upper and lower)'''
+    
+    df = df.iloc[start:end]
+    
+    exactmatch = df[df[colname] == value]
+    if not exactmatch.empty:
+        return exactmatch.index
+    else:
+        lower_df = df[df[colname] < value][colname]
+        upper_df = df[df[colname] > value][colname]
+
+        lowerneighbour_ind = lower_df.idxmax()
+        upperneighbour_ind = upper_df.idxmin()
+
+        return [lowerneighbour_ind, upperneighbour_ind] 
