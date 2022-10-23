@@ -400,10 +400,12 @@ def read_metadata(data: dict, options={}) -> dict:
         timestamps = new_times
 
 
+    metadata = {'time': timestamps, 'temperature': temperatures}
+
     # Match timestamps against electrochemistry-data
     # TODO This could be generalised to match up against any other dataset with timestamps.
     if 'cycles' in data.keys():
-        ions = []
+        ions, specific_capacity = [], []
         i = 0
         for timestamp in timestamps:
             if timestamp < 0:
@@ -420,26 +422,46 @@ def read_metadata(data: dict, options={}) -> dict:
                 
 
                 if all([x==x for x in closest_chg]):
-                    print(f'Charge, cycle {i}')
+                    ions.append(np.mean([data['cycles'][i][0]['ions'].loc[data['cycles'][i][0].index == closest_chg[0]], data['cycles'][i][0]['ions'].loc[data['cycles'][i][0].index == closest_chg[1]]]))
+                    specific_capacity.append(np.mean([data['cycles'][i][0]['specific_capacity'].loc[data['cycles'][i][0].index == closest_chg[0]], data['cycles'][i][0]['specific_capacity'].loc[data['cycles'][i][0].index == closest_chg[1]]]))
                     continue
 
                 elif all([x==x for x in closest_dchg]):
-                    print(f'Discharge, cycle {i}')
+                    ions.append(np.mean([data['cycles'][i][1]['ions'].loc[data['cycles'][i][1].index == closest_dchg[0]], data['cycles'][i][1]['ions'].loc[data['cycles'][i][1].index == closest_dchg[1]]]))
+                    specific_capacity.append(np.mean([data['cycles'][i][1]['specific_capacity'].loc[data['cycles'][i][1].index == closest_dchg[0]], data['cycles'][i][1]['specific_capacity'].loc[data['cycles'][i][1].index == closest_dchg[1]]]))
                     continue
 
-                elif (closest_chg[1]!=closest_chg[1]) and (closest_dchg[0]!=closest_dchg[0]):
-                    print('Rest step!')
+                elif aux.isnan(closest_chg[1]) and aux.isnan(closest_dchg[0]):
+                    ions.append(np.nan)
+                    specific_capacity.append(np.nan)
                     continue
                 else:
-                    print('Rest step, new cycle!')
+                    ions.append(np.nan)
+                    specific_capacity.append(np.nan)
                     i += 1
 
                     if i > len(data['cycles'])-1:
                         break
 
+        for i, (ion, cap) in enumerate(zip(ions, specific_capacity)):
+            if aux.isnan(ion): # if a resting step, assign a meaningful value
+                if i < len(ions)-1: # if resting step in the middle of the run, take the mean between the last of previous and first of next run
+                    ions[i] = np.mean([ions[i-1], ions[i+1]])
+
+                else: # If last element, set to last values plus the delta between the last two previous measurements
+                    ions[i] = ions[i-1] + (ions[i-1]-ions[i-2]) 
+
+            if aux.isnan(cap) and i < len(specific_capacity)-1: # do same thing for specific capacity
+                if i < len(specific_capacity)-1: 
+                    specific_capacity[i] = np.mean([specific_capacity[i-1], specific_capacity[i+1]])
+
+                else: 
+                    specific_capacity[i] = specific_capacity[i-1] + (specific_capacity[i-1]-specific_capacity[i-2]) 
 
 
-    metadata = {'time': timestamps, 'temperature': temperatures}
+        metadata['ions'] = ions
+        metadata['specific_capacity'] = specific_capacity
+    
 
     return metadata
 
