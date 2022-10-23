@@ -50,16 +50,6 @@ def load_options(path):
 
 
 
-def swap_values(dict, key1, key2):
-
-    key1_val = dict[key1]
-    dict[key1] = dict[key2]
-    dict[key2] = key1_val
-
-    return dict
-
-
-
 def ceil(a, roundto=1):
 
     fac = 1/roundto
