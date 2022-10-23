@@ -400,6 +400,43 @@ def read_metadata(data: dict, options={}) -> dict:
         timestamps = new_times
 
 
+    # Match timestamps against electrochemistry-data
+    # TODO This could be generalised to match up against any other dataset with timestamps.
+    if 'cycles' in data.keys():
+        ions = []
+        i = 0
+        for timestamp in timestamps:
+            if timestamp < 0:
+                ions.append(0)
+            
+            else:
+                closest_chg = aux.find_neighbours(value=timestamp, df=data['cycles'][i][0], colname='time')
+                closest_dchg = aux.find_neighbours(value=timestamp, df=data['cycles'][i][1], colname='time')
+
+                if not isinstance(closest_chg, list):
+                    closest_chg = [closest_chg, closest_chg]
+                if not isinstance(closest_dchg, list):
+                    closest_dchg = [closest_dchg, closest_dchg]
+                
+
+                if all([x==x for x in closest_chg]):
+                    print(f'Charge, cycle {i}')
+                    continue
+
+                elif all([x==x for x in closest_dchg]):
+                    print(f'Discharge, cycle {i}')
+                    continue
+
+                elif (closest_chg[1]!=closest_chg[1]) and (closest_dchg[0]!=closest_dchg[0]):
+                    print('Rest step!')
+                    continue
+                else:
+                    print('Rest step, new cycle!')
+                    i += 1
+
+                    if i > len(data['cycles'])-1:
+                        break
+
 
 
     metadata = {'time': timestamps, 'temperature': temperatures}
