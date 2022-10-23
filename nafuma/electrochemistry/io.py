@@ -126,17 +126,18 @@ def process_batsmall_data(df, options=None):
 	Output:
 	cycles: A list with 
 	'''
-
-	required_options = ['splice_cycles', 'molecular_weight', 'reverse_discharge', 'units']
 	
 	default_options = {
-		'splice_cycles': False, 
+		'splice_cycles': False,  
+		'append': False, # Add max of ions and specific_capacity of previous run #TODO Generalise
+		'append_gap': 0, # Add a gap between cyclces - only used if append == True.
 		'molecular_weight': None, 
 		'reverse_discharge': False, 
-		'units': None}
+		'units': None,
+		}
 
 
-	aux.update_options(options=options, required_options=required_options, default_options=default_options)
+	aux.update_options(options=options, default_options=default_options)
 	options['kind'] = 'batsmall'
 
 	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
@@ -171,6 +172,9 @@ def process_batsmall_data(df, options=None):
 
 		sub_df.loc[dchg_mask, 'current']  *= -1
 		sub_df.loc[dchg_mask, 'specific_capacity'] *= -1
+		sub_df.loc[dchg_mask, 'ions'] *= -1
+
+
 
 		chg_df = sub_df.loc[chg_mask]
 		dchg_df = sub_df.loc[dchg_mask]
@@ -179,8 +183,11 @@ def process_batsmall_data(df, options=None):
 		if chg_df.empty and dchg_df.empty:
 			continue
 
-		chg_df['reaction_coordinate'] = chg_df['time'] * np.abs(chg_df['current'].mean())
-		dchg_df['reaction_coordinate'] = dchg_df['time'] * np.abs(dchg_df['current'].mean())
+		if options['append']: 
+			if cycles: 
+				chg_df.loc[chg_mask, 'ions'] += cycles[-1][1]['ions'].max() + options['append_gap']
+			
+			dchg_df.loc[dchg_mask, 'ions'] += chg_df['ions'].max() + options['append_gap']
 
 		if options['reverse_discharge']:
 			max_capacity = dchg_df['capacity'].max() 
@@ -548,8 +555,6 @@ def add_columns(df, options):
 				f = faradays_constant / seconds_per_hour * 1000.0 # [f] = mAh mol^-1
 
 				molecular_weight = options['molecular_weight'] * unit_tables.mass()['g'].loc[options['old_units']['mass']]
-
-				print(options['old_units']['capacity'], options['old_units']['mass'])
 
 				df["IonsExtracted"] = (df[f'C [{options["old_units"]["capacity"]}/{options["old_units"]["mass"]}]'] * molecular_weight)/f
 
