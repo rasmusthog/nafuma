@@ -174,7 +174,7 @@ def find_neighbours(value, df, colname, start=0, end=-1):
     
     exactmatch = df[df[colname] == value]
     if not exactmatch.empty:
-        return exactmatch.index
+        return exactmatch.index.values[0]
     else:
         lower_df = df[df[colname] < value][colname]
         upper_df = df[df[colname] > value][colname]
@@ -191,3 +191,8 @@ def find_neighbours(value, df, colname, start=0, end=-1):
             upperneighbour_ind = np.nan
 
         return [lowerneighbour_ind, upperneighbour_ind] 
+
+
+def isnan(value):
+
+    return value!=value
