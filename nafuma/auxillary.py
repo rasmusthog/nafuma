@@ -179,7 +179,15 @@ def find_neighbours(value, df, colname, start=0, end=-1):
         lower_df = df[df[colname] < value][colname]
         upper_df = df[df[colname] > value][colname]
 
-        lowerneighbour_ind = lower_df.idxmax()
-        upperneighbour_ind = upper_df.idxmin()
+
+        if not lower_df.empty:
+            lowerneighbour_ind = lower_df.idxmax()
+        else:
+            lowerneighbour_ind = np.nan
+        
+        if not upper_df.empty:
+            upperneighbour_ind = upper_df.idxmin()
+        else:
+            upperneighbour_ind = np.nan
 
         return [lowerneighbour_ind, upperneighbour_ind] 
