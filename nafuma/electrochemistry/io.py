@@ -547,7 +547,10 @@ def add_columns(df, options):
 				seconds_per_hour = 3600 # s h^-1
 				f = faradays_constant / seconds_per_hour * 1000.0 # [f] = mAh mol^-1
 
-				molecular_weight = options['molecular_weight'] * unit_tables.mass()['g'].loc[options['units']['mass']]
+				molecular_weight = options['molecular_weight'] * unit_tables.mass()['g'].loc[options['old_units']['mass']]
+
+				print(options['old_units']['capacity'], options['old_units']['mass'])
+
 				df["IonsExtracted"] = (df[f'C [{options["old_units"]["capacity"]}/{options["old_units"]["mass"]}]'] * molecular_weight)/f
 
 
