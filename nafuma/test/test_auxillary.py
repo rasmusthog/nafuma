@@ -4,16 +4,16 @@ import os
 def test_swap_values():
 
 
-    dict = {'test1': 1, 'test2': 2}
+    test_dict = {'test1': 1, 'test2': 2}
     key1 = 'test1'
     key2 = 'test2'
 
-    oldval1 = dict[key1]
-    oldval2 = dict[key2]
+    oldval1 = test_dict[key1]
+    oldval2 = test_dict[key2]
 
-    new_dict = aux.swap_values(dict=dict, key1=key1, key2=key2) 
+    new_dict = aux.swap_values(options=test_dict, key1=key1, key2=key2) 
 
-    assert (dict[key1] == oldval2) and (dict[key2] == oldval1)
+    assert (test_dict[key1] == oldval2) and (test_dict[key2] == oldval1)
 
 
 def test_ceil() -> None:
@@ -35,7 +35,7 @@ def test_options() -> None:
 
 
     options = {}
-    required_options = ['test1', 'test2', 'test3', 'test4']
+
     default_options = {
         'test1': 1,
         'test2': 2, 
@@ -45,11 +45,9 @@ def test_options() -> None:
     }
 
 
-    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+    options = aux.update_options(options=options, default_options=default_options)
 
     assert options['test1'] == default_options['test1']
-    assert len(options.items()) == len(required_options)
-    assert 'test5' not in options.keys()
 
 
 def test_save_options() -> None:
