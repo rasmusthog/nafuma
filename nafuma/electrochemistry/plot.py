@@ -618,9 +618,9 @@ def generate_colours(options):
 		discharge_colour = options['colours'][1]
 
 		if isinstance(charge_colour, tuple):
-			charge_colour = [charge_colour]
+			charge_colour = list(charge_colour)
 		if isinstance(discharge_colour, tuple):
-			discharge_colour = [discharge_colour]
+			discharge_colour = list(discharge_colour)
 	
 	else:
 		charge_colour = [(40/255, 70/255, 75/255)] # Dark Slate Gray #28464B, coolors.co
