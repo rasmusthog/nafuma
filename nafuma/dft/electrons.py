@@ -317,7 +317,7 @@ def plot_pdos(data: dict, options={}):
                 for j, orbital in enumerate(options['plot_orbitals'][i]):
 
                     if options['fill']:
-                        ax.fill_betweenx(y=data['pdos'][atom]['Energy'], x1=data['pdos'][atom][orbital], x2=0, color=options['orbital_colours'][i][j], alpha=0.5, ec=(0,0,0,0))
+                        ax.fill_betweenx(y=data['pdos'][atom]['Energy'], x1=data['pdos'][atom][orbital], x2=0, color=options['orbital_colours'][i][j], ec=(0,0,0,1))
                     else:
                         ax.plot(data['pdos'][atom][orbital], data['pdos'][atom]['Energy'], color=options['orbital_colours'][i][j])
 
@@ -654,11 +654,11 @@ def prettify_dos_plot(fig, ax, options):
     if options['flip_xy']:
 
         # Switch all the x- and y-specific values
-        options = swap_values(dict=options, key1='xlim', key2='ylim')
-        options = swap_values(dict=options, key1='xunit', key2='yunit')
-        options = swap_values(dict=options, key1='xlabel', key2='ylabel')
-        options = swap_values(dict=options, key1='x_tick_locators', key2='y_tick_locators')
-        options = swap_values(dict=options, key1='hide_x_labels', key2='hide_y_labels')
+        options = aux.swap_values(dict=options, key1='xlim', key2='ylim')
+        options = aux.swap_values(dict=options, key1='xunit', key2='yunit')
+        options = aux.swap_values(dict=options, key1='xlabel', key2='ylabel')
+        options = aux.swap_values(dict=options, key1='x_tick_locators', key2='y_tick_locators')
+        options = aux.swap_values(dict=options, key1='hide_x_labels', key2='hide_y_labels')
 
     # Set labels on x- and y-axes
     if not options['hide_y_labels']:
