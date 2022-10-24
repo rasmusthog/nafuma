@@ -301,7 +301,8 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
     required_options = ['adjust', 'mode']
     default_options = {
         'adjust': 0,
-        'mode': 'fluoresence'
+        'mode': 'fluoresence',
+        'active_roi': None
     }
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -328,7 +329,7 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
                 scan_data = scan_data[options['active_roi']]
 
         elif options['mode'] == 'transmission':
-            scan_data = scan_data['MonEx'] / scan_data['Ion2']
+            scan_data = scan_data['MonEx'] / scan_data['Ion1']
 
         xanes_data = pd.concat([xanes_data, scan_data], axis=1)
 
