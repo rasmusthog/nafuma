@@ -26,7 +26,7 @@ def find_element(data: dict, index=0) -> str:
 
     element_energy_intervals = {
         'Mn': [5.9, 6.5],
-        'Fe': [7.0, 7.2],
+        'Fe': [6.9, 7.2],
         'Co': [7.6, 7.8],
         'Ni': [8.0, 8.6]
     }
@@ -85,8 +85,6 @@ def pre_edge_fit(data: dict, options={}) -> pd.DataFrame:
 
         edge_position = estimate_edge_position(data, options, index=0)
         options['pre_edge_limits'][1] = edge_position - pre_edge_limit_offset
-
-        print(edge_position)
 
     if options['pre_edge_limits'][0] >= options['pre_edge_limits'][1]:
         options['pre_edge_limits'][1] = options['pre_edge_limits'][0] + 0.03
