@@ -111,10 +111,11 @@ def plot_diffractogram(data, options={}):
         # Sets the xlim if this has not been specified
         if not options['xlim']:
             options['xlim'] = [data['diffractogram'][0][options['x_vals']].min(), data['diffractogram'][0][options['x_vals']].max()]
-            
+
         # GENERATE HEATMAP DATA
         data['heatmap'], data['heatmap_xticks'], data['heatmap_xticklabels'], data['heatmap_yticks'], data['heatmap_yticklabels'] = generate_heatmap(data=data, options=options)
         options['heatmap_loaded'] = True
+
 
         if options['heatmap']:
             xlim_start_frac, xlim_end_frac = options['xlim'][0] / data['diffractogram'][0][options['x_vals']].max(), options['xlim'][1] / data['diffractogram'][0][options['x_vals']].max()
@@ -150,7 +151,7 @@ def plot_diffractogram(data, options={}):
         if options['offset']:
             if (options['offset_x'] != options['current_offset_x']) or (options['offset_y'] != options['current_offset_y']):
                 for i, (diff, wl) in enumerate(zip(data['diffractogram'], data['wavelength'])):
-                    xrd.io.apply_offset(diff, wl, i, options)
+                    xrd.io.adjust_intensities(diff, wl, i, options)
 
     
 
@@ -292,7 +293,7 @@ def plot_diffractogram(data, options={}):
         if options['highlight']:
             for i, highlight in enumerate(options['highlight']):
                 if i < len(options['highlight']) or len(options['highlight']) == 1: 
-                    ax.axhline(y=highlight[1], c=options['highlight_colours'][i], ls='--', lw=0.5)
+                    ax.axhline(y=highlight, c=options['highlight_colours'][i], ls='--', lw=0.5)
 
 
     # PLOT DIFFRACTOGRAM
