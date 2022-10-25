@@ -113,6 +113,7 @@ def adjust_plot(fig, ax, options):
         'rotation_x_ticks': 0, 'rotation_y_ticks': 0, # Degrees the x- and/or y-ticklabels should be rotated
         'xticks': None, 'yticks': None, # Custom definition of the xticks and yticks. This is not properly implemented now.  
         'xlim': None, 'ylim': None, # Limits to the x- and y-axes
+        'xlim_reset': False, 'ylim_reset': False, # For use in setting limits of backgrounds - forcing reset of xlim and ylim, useful when more axes
         'title': None, # Title of the plot
         'backgrounds': [],
         'legend': False, 'legend_position': ['lower center', (0.5, -0.1)], 'legend_ncol': 1, # Toggles on/off legend. Specifices legend position and the number of columns the legend should appear as.
@@ -275,6 +276,11 @@ def adjust_plot(fig, ax, options):
 
 
             background = aux.update_options(options=background, default_options=default_background_options)
+
+            if options['xlim_reset']:
+                background['xlim'] = list(ax.get_xlim())
+            if options['ylim_reset']:
+                background['ylim'] = list(ax.get_ylim())
 
             if not background['xlim'][0]:
                 background['xlim'][0] = ax.get_xlim()[0]
