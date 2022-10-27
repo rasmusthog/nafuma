@@ -119,7 +119,7 @@ def plot_diffractogram(data, options={}):
 
         if options['heatmap']:
             xlim_start_frac, xlim_end_frac = options['xlim'][0] / data['diffractogram'][0][options['x_vals']].max(), options['xlim'][1] / data['diffractogram'][0][options['x_vals']].max()
-            options['xlim'] = [options['heatmap_xlim'][0]*xlim_start_frac, options['heatmap_xlim'][1]*xlim_end_frac]
+            options['xlim'] = [options['heatmap_xlim'][1]*xlim_start_frac, options['heatmap_xlim'][1]*xlim_end_frac]
 
         if options['heatmap_reverse']:
             data['heatmap'] = data['heatmap'].iloc[::-1]
@@ -213,6 +213,10 @@ def plot_diffractogram(data, options={}):
         if not isinstance(options['highlight_colours'], list):
             options['highlight_colours'] = [options['highlight_colours']]
 
+        if options['heatmap_reverse']:
+            print(len(data['diffractogram']))
+            options['highlight'] = [len(data['diffractogram'])-highlight for highlight in options['highlight']]
+
         colours = []
     
         # Loop through each scan - assign the correct colour to each of the scan intervals in options['highlight']
@@ -254,6 +258,8 @@ def plot_diffractogram(data, options={}):
     # PLOT HEATMAP
     if options['heatmap']:
 
+        options['x_tick_locators'] = None
+
         # Add locators for y-axis - otherwise it will tend to break (too many ticks) when switching between diffractograms and heatmap in interactive mode. These values will be updated later anyway, and is only 
         # to allow the initial call to Seaborn to have values that are sensible.
         # FIXME A more elegant solution to this?
@@ -262,7 +268,6 @@ def plot_diffractogram(data, options={}):
 
         # Call Seaborn to plot the data
         sns.heatmap(data['heatmap'], cmap=options['cmap'], cbar=False, ax=ax)
-     
         
         # Set the ticks and ticklabels to match the data point number with 2th values 
         ax.set_xticks(data['heatmap_xticks'][options['x_vals']])
@@ -397,7 +402,7 @@ def generate_heatmap(data, options={}):
             if d['I'].min() < 0:
                 d['I'] = d['I'] - d['I'].min()
 
-            d['I'] = d['I']**(1/options['contrast_factor'])
+            d['I'] =d['I']**(1/options['contrast_factor'])
 
         twotheta = np.append(twotheta, d['2th'].to_numpy())
         intensities = np.append(intensities, d['I'].to_numpy())
