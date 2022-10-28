@@ -899,3 +899,37 @@ def translate_wavelengths(data: pd.DataFrame, wavelength: float, to_wavelength=N
 
 
 
+def trim_xy_region(path, region):
+
+    df = pd.read_csv(path, header=None, delim_whitespace=True)
+    df.columns = ['2th', 'I']
+
+    df = df.loc[(df['2th'] > region[0]) & (df['2th'] < region[1])]
+    
+    folder = os.path.dirname(path)
+    save_folder = os.path.join(folder, 'trimmed')
+
+    if not os.path.exists(save_folder):
+        os.makedirs(save_folder)
+
+    df.to_csv(os.path.join(save_folder, os.path.basename(path)), sep='\t', header=None, index=None)
+
+
+def raise_intensities_xy(path, region=None):
+
+    df = pd.read_csv(path, header=None, delim_whitespace=True)
+    df.columns = ['2th', 'I']
+
+    if region:
+        df = df.loc[(df['2th'] > region[0]) & (df['2th'] < region[1])]
+
+    df['I'] = df['I'] - df['I'].min()
+
+
+    folder = os.path.dirname(path)
+    save_folder = os.path.join(folder, 'raised')
+
+    if not os.path.exists(save_folder):
+        os.makedirs(save_folder)
+
+    df.to_csv(os.path.join(save_folder, os.path.basename(path)), sep='\t', header=None, index=None)
