@@ -18,9 +18,9 @@ def plot_xanes(data, options={}):
 
 
 	# Update options
-	required_options = ['which_scans', 'xlabel', 'ylabel', 'xunit', 'yunit', 'exclude_scans', 'colours', 'gradient', 'rc_params', 'format_params']	
 	default_options = {
-		'which_scans': 'all', 
+		'which_scans': 'all',  # Use real numbers, not indices - update_scans_list() will adjust.
+		'highlight': [],
         'xlabel': 'Energy', 'ylabel': 'Intensity',
         'xunit': 'keV', 'yunit': 'arb. u.',
         'exclude_scans': [],
@@ -29,7 +29,7 @@ def plot_xanes(data, options={}):
 		'rc_params': {},
 		'format_params': {}}
 
-	options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+	options = aux.update_options(options=options, default_options=default_options)
 
 	
 	if not 'xanes_data' in data.keys():
@@ -49,7 +49,9 @@ def plot_xanes(data, options={}):
 	counter = 0
 	for i, path in enumerate(data['path']):
 		if i in options['which_scans']:
-			data['xanes_data'].plot(x='ZapEnergy', y=path, ax=ax, c=colours[counter])
+			lw = plt.rcParams['lines.linewidth']*5 if i in options['highlight'] else plt.rcParams['lines.linewidth']
+
+			data['xanes_data'].plot(x='ZapEnergy', y=path, ax=ax, c=colours[counter], lw=lw)
 			counter += 1
 
 
@@ -151,22 +153,30 @@ def generate_colours(scans, options):
 	# If gradient is enabled, find start and end points for each colour
 	if options['gradient']:
 
-		add = min([(1-x)*0.75 for x in colour])
+		if isinstance(colour, list) and len(colour) == 2:
+			options['number_of_colours'] = len(scans)
+			colours = btp.mix_colours(colour1=colour[0], colour2=colour[1], options=options)
 
-		colour_start = colour
-		colour_end = [x+add for x in colour]
+
+		else:
+			add = min([(1-x)*0.75 for x in colour])
+
+			colour_start = colour
+			colour_end = [x+add for x in colour]
+			
 
 
 	# Generate lists of colours
-	colours = []
-	
-	for scan_number in range(0, len(scans)):
-		if options['gradient']:
-			weight_start = (len(scans) - scan_number)/len(scans)
-			weight_end = scan_number/len(scans)
+	if not isinstance(colour, list):
+		colours = []
+		for scan_number in range(0, len(scans)):
 
-			colour = [weight_start*start_colour + weight_end*end_colour for start_colour, end_colour in zip(colour_start, colour_end)]
+			if options['gradient']:
+				weight_start = (len(scans) - scan_number)/len(scans)
+				weight_end = scan_number/len(scans)
+
+				colour = [weight_start*start_colour + weight_end*end_colour for start_colour, end_colour in zip(colour_start, colour_end)]
 			
-		colours.append(colour)
-
+			colours.append(colour)
+			
 	return colours
