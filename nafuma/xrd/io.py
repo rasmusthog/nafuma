@@ -759,7 +759,11 @@ def adjust_intensities(diffractogram, wavelength, index, options):
 
     if options['normalise']:
         diffractogram['I'] = diffractogram['I'] / diffractogram['I'].max()
-        diffractogram['I'] = diffractogram['I'] * options['multiply']
+
+        if not isinstance(options['multiply'], list):
+            options['multiply'] = [options['multiply']]
+
+        diffractogram['I'] = diffractogram['I'] * options['multiply'][index]
 
     if options['drawdown']:
         diffractogram['I'] = diffractogram['I'] - diffractogram['I'].mean()
