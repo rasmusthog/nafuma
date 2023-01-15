@@ -572,7 +572,11 @@ def save_htxrd_as_xy(diffractogram, wavelength, timestamp, filename, save_path):
             
 
 def read_xy(data, options={}, index=0):
-    
+    default_options = {
+        'header': False #Adding this options for the situations when a xy-file has been made with header
+    }
+    options = aux.update_options(options=options, default_options=default_options)
+
     #if 'wavelength' not in data.keys():
     # Get wavelength from scan
 
@@ -595,15 +599,17 @@ def read_xy(data, options={}, index=0):
             current_line = f.readline()
             
         f.seek(position)
+        #Adding this for the case of using xy/xye-files with a header, thus integrated in a different way than through the NAFUMA-package
+        if options['header']:
+            diffractogram = pd.read_csv(f, delim_whitespace=True)
+        else:
+            diffractogram = pd.read_csv(f, header=None, delim_whitespace=True)
 
-        diffractogram = pd.read_csv(f, header=None, delim_whitespace=True)
-
-
+    
     if diffractogram.shape[1] == 2:
         diffractogram.columns = ['2th', 'I']
     elif diffractogram.shape[1] == 3:
         diffractogram.columns = ['2th', 'I', 'sigma']
-
 
     return diffractogram, wavelength
 
