@@ -1,13 +1,13 @@
+import datetime
+import json
 import os
+import re
 import shutil
 import subprocess
-import re
-import numpy as np
 import time
-import datetime
 import warnings
-import json
 
+import numpy as np
 import pandas as pd
 
 import nafuma.auxillary as aux
@@ -38,7 +38,8 @@ def make_initial_inp(data: dict, options={}):
         'start': None, # Start value only. Overridden by 'interval' if this is set.
         'finish': None, # Finish value only. Overridden by 'interval' if this is set.
         'exclude': [], # Excluded regions. List of lists.
-        'manual_background': False #Upload a background-file
+        'manual_background': False, #Upload a background-file
+        'output crystallite size and strain': False
     }
 
     options = aux.update_options(options=options, default_options=default_options)
@@ -106,9 +107,10 @@ def make_initial_inp(data: dict, options={}):
 def make_general_background_in_q(data, options):
     #Function where you get a txt.-file of q-values, based on the 2th values you have picked out manually from a data set. Idea is that the same background points can be used for several samples, measured at several wavelengths.
     #The input is a list of 2th-values that the user has found by manually inspecting a data set
-    import numpy as np
-    import nafuma.xrd as xrd
     import matplotlib.pyplot as plt
+    import numpy as np
+
+    import nafuma.xrd as xrd
 
     default_options = {
         'save_dir': 'background',
@@ -126,18 +128,20 @@ def make_general_background_in_q(data, options):
         x_background_points_q.append(q)
 
     background_points=pd.DataFrame(x_background_points_q)
-    background_filename="C:/Users/halvorhv/OneDriveUiO/1_OrderPaper/analysis/exsitu/probing_ordering/refinements/"+options['filename']+"_background_points_in_q.txt"
+    background_filename=options['save_dir']+options['filename']+"_background_points_in_q.txt"
     background_points.to_csv(background_filename,index=None, header=None)#,index=None, header=None,sep=' ')
 
 def make_manual_background(data, options):
     #FIXME generalize this so it works properly
     #FIXME fix so that plotting is optional
-    import numpy as np
-    import nafuma.xrd as xrd
     import matplotlib.pyplot as plt
+    import numpy as np
+
+    import nafuma.xrd as xrd
 
     default_options = {
-        'plot_background':  True,
+        'plot_background':  False,
+        'plot_background_log': False,
         'interval_length':  0.05, #picking out the region to be fitted for each background point, bigger interval-length means a bigger region for each point.
         'save_dir': 'background'
     }
@@ -148,13 +152,12 @@ def make_manual_background(data, options):
 
 
     options = aux.update_options(options=options, default_options=default_options)
-    
     #data['background_in_q'] is a .txt-file with one column of x-values that are good starting points for background determination, as they should not include any peaks for that specific material
     
     #importing the pre-made background points in Q into a dataframe
     df_backgroundpoints_q=pd.read_csv(data['background_in_q'],names=["background_q"])
 
-    diffractogram, wavelength = xrd.io.read_xy(data=data)
+    diffractogram, wavelength = xrd.io.read_xy(data=data,options=options)
 
     #transferring q-range background to the respective wavelength
     x_background_points=[]
@@ -166,8 +169,15 @@ def make_manual_background(data, options):
     
     background=pd.DataFrame()
 
-    for i, x in enumerate(x_background_points):
-        test=diffractogram.loc[(diffractogram["2th"]>x-intervallength) & (diffractogram["2th"]<x+intervallength)]
+    #print(diffractogram["2th"])
+    
+
+    for x in x_background_points:
+        #print(diffractogram["2th"])
+        #print(x-intervallength)
+  
+        #picking out only the values within the interval length of the given background points:
+        test=diffractogram.loc[(diffractogram["2th"] > x-intervallength) & (diffractogram["2th"]<x+intervallength)]
         background = pd.concat([background,test], ignore_index=True, sort=False)
         
     if options['plot_background']:
@@ -175,7 +185,7 @@ def make_manual_background(data, options):
         fig,ax=plt.subplots(figsize=(20,10))
         diffractogram.plot(x="2th",y="I", kind="scatter",ax=ax,title="Background points (red) plotted with "+filename)
         background.plot(x="2th",y="I", ax=ax,color='red',kind="scatter")
-
+    if options['plot_background_log']:
         #Log-figure for closer inspection
         diffractogram["I_log"]=np.log10(diffractogram["I"])
         background["I_log"]=np.log10(background["I"])
@@ -186,9 +196,10 @@ def make_manual_background(data, options):
         diffractogram.plot(x="2th",y="I_log", kind="scatter",ax=ax2, title="Background ploints (red) plotted with "+filename+" (log)")
         background.plot(x="2th",y="I_log", ax=ax2,color='red',kind="scatter")
         
-        ax2.set_ylim(background_logmin,background_logmax)
+        ax2.set_ylim(0.98*background_logmin,1.02*background_logmax)
         
     background[["2th","I"]].to_csv(os.path.join(options['save_dir'],filename+"_background.txt"),index=None, header=None,sep=' ')
+
 
 def write_xdd(fout, data, options):
     import nafuma.xrd as xrd
@@ -217,16 +228,20 @@ def write_xdd(fout, data, options):
             fout.write('\t'+snippets['gauss_fwhm'].format(peak_width_params[0], peak_width_params[1], peak_width_params[2])+'\n')
     
     # Write background
-    fout.write('\tbkg @  ')
-    for i in range(options['background']):
-        fout.write('0    ')
-        #EXTRA for implementation of manual background:
+    if options['background'] == 0:
+        fout.write('\tbkg 0  ')
+    else:
+        fout.write('\tbkg @  ')
+        for i in range(options['background']):
+            fout.write('0    ')
+            #EXTRA for implementation of manual background:
     if options['manual_background']:
         fout.write('\n\t\'manual background file:')
-        fout.write('\n\tuser_y my_shape {_xy #include "'+options['manual_background']+'"} \n')
+        fout.write('\n\tuser_y my_shape_XXXX {')
+        fout.write('\n\t _xy #include "'+options['manual_background']+'"')
+        fout.write('\n\t} \n')
         fout.write('\tprm  !my_scale = 1;:  1.00000')
-        fout.write('\tfit_obj !f_SR_pos1 = my_scale * (my_shape);')
-
+        fout.write('\tfit_obj !f_SR_pos1_XXXX = my_scale * (my_shape_XXXX);')
 
     # Write wavelength and LP-factor
     fout.write('\n\n')
@@ -360,7 +375,8 @@ def write_params(fout, data, options, index=0):
                     for mag_atom in options['magnetic_atoms']:
                         if mag_atom in site:
                             mag.append(site)
-
+       
+        #If error in the next line, double check that the cif you export from Vesta is set to "Isotropic: B" in stead of "Isotropic: U" (Edit data -> Structure parameters)
         fout.write('{: <55}  {: <55}  {: <55} {: <55} {: <55}\n'.format(*params))
 
     fout.write('\n')
@@ -562,7 +578,19 @@ def write_output(fout, data, options, index=0):
     
         )
     )
+    fout.write('\n')
+    ####TRYING TO FIX SO THAT ALSO CRYSTALLITE SIZE IS PRINTED
+    if options['output crystallite size and strain']:
+        fout.write('\t\t{: <40} {: <40} {: <40} {: <40}'.format(
+                                                                        f'Out(csgc_{label}_XXXX, "%11.5f", "%11.5f")',
+                                                                        f'Out(cslc_{label}_XXXX, "%11.5f", "%11.5f")',
+                                                                        f'Out(sgc_{label}_XXXX, "%11.5f", "%11.5f")',
+                                                                        f'Out(slc_{label}_XXXX, "%11.5f", "%11.5f")',
 
+            )
+        )
+
+    ######################
     fout.write('\n\n')
 
     for atom in atoms['atoms']:
@@ -716,7 +744,7 @@ def make_big_inp(data: dict, options={}):
 
 
     # FIXME Strip headers from initial INP file before copying it. 
-
+    # FIXME The "ifdef"-statements in the start.inp does not get properly copied (only the ones commented out seem to be working)
     required_options = ['template', 'output', 'overwrite', 'backup', 'backup_dir', 'include', 'topas_options', 'save_results', 'save_dir', 'log', 'logfile']
 
     default_options = {
@@ -1018,9 +1046,10 @@ def refine(data: dict, options={}):
 
 def read_results(path, options={}):
     
-
+    #FIXME Here I have to add the crystallite size and strain options, for this to work properly
     default_options = {
-        'errors': True
+        'errors': False,
+        'output crystallite size and strain': True
     }
 
     options = aux.update_options(options=options, default_options=default_options)
@@ -1036,15 +1065,27 @@ def read_results(path, options={}):
         'a', 'a_err', 'b', 'b_err', 'c', 'c_err', 'alpha', 'alpha_err', 'beta', 'beta_err', 'gamma', 'gamma_err',
         ]
     
+        
+        # Quick fix when crystallite sizes and strain is of interest
+        if options['output crystallite size and strain']:
+            extra_headers=['csgc','csgc_err','cslc','cslc_err','sgc','sgc_err','slc','slc_err']
+            for head in extra_headers:
+                headers.append(head)
+            
     else:
         atoms = int((results.shape[1] - 15) / 5)
-
+        
         headers = [
             'r_wp', 'r_exp', 'r_p', 'r_p_dash', 'r_exp_dash', 'gof',
             'vol', 'mass', 'wp',
             'a', 'b', 'c', 'alpha', 'beta', 'gamma',
         ]
 
+        # Quick fix when crystallite sizes and strain is of interest
+        if options['output crystallite size and strain']:
+            extra_headers=['csgc','cslc','sgc','slc']
+            for head in extra_headers:
+                headers.append(head)
 
     labels = ['x', 'y', 'z', 'occ', 'beq']
     for i in range(atoms):
