@@ -101,21 +101,32 @@ def background_subtracted_peak(data,options):
     df_peak['I_org']=data_full_y
     df_peak['I_BG']=background_y_fitted
     df_peak['I_corr']=data_minus_background
+    #df_peak['log_BG']=np.log(df_peak['I_BG'])
 
     ################## PLOTTING A CHOSEN NUMBER OF FILES TO DOUBLE CHECK THE VALIDITY OF THE SCRIPT ####################################################################################################################        
     if options['plot_all_background_fits']:
 
         ax = df_peak.plot(x="2th",y="I_BG")
         
-        ax.set_ylim(min(df_peak['I_org'])*0.9,max(df_peak['I_org'])*1.1)
+        ax.set_ylim(min(df_peak['I_org'])*0.9,min(df_peak['I_org'])*1.2)
         
         #ax.set_xlim(options['peak_interval'][0]-2*(options['background_shoulder_left']+options['background_shoulder_right']),options['peak_interval'][1]+2*(options['background_shoulder_left']+options['background_shoulder_right']))
-        ax.set_xlim(options['background_region'][0]*0.95,options['background_region'][1]*1.05)
+        ax.set_xlim(options['background_region'][0]*0.99,options['background_region'][1]*1.01)
         ax.set_title(filename)
         diffractogram.plot(x="2th",y="I",ax=ax)
         
-        plt.axvline(x = options['peak_interval'][0])
-        plt.axvline(x = options['peak_interval'][1])
+        plt.axvline(x = options['peak_interval'][0],c='r')
+        plt.axvline(x = options['peak_interval'][1],c='r')
+        plt.axvline(x=options['background_region'][0],c='m')
+        plt.axvline(x=options['background_region'][1],c='m')
+
+        #[[35.18,35,76],[36.34,36.59],[36.61,36.79]]
+        for i in range(len(options['background_excluded_region'])):
+            plt.axvline(x = options['background_excluded_region'][i][0],c='g')
+            plt.axvline(x = options['background_excluded_region'][i][1],c='g')
+        #plt.axvline(x = options['background_excluded_region'][0])
+        #plt.axvline(x = options['background_excluded_region'][0])
+
 
 #######################################################################################################################################
 
