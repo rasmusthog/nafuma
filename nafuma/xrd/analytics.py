@@ -74,18 +74,19 @@ def background_subtracted_peak(data,options):
         #print(region)
         for i, xval in enumerate(background_shoulders_x):
             if region[0] < xval < region[1]:
-                #because these are numpy arrays I am going via normal arrays to remove the values within the excluded regions:
+                #because these are numpy arrays I am going via normal arrays to remove the values within the excluded regions              
                 background_x_to_list=background_shoulders_x.tolist()
-                background_x_to_list.remove(xval)
-                background_shoulders_x = np.asarray(background_x_to_list)
-                
                 background_y_to_list=background_shoulders_y.tolist()
-                background_y_to_list.pop(i)
+                #finding the index of the x-value in the background-array
+                index_xval=background_x_to_list.index(xval)
+                #removing the y-value with the same index
+                background_y_to_list.pop(index_xval)
+                #going back to a numpy array again
                 background_shoulders_y = np.asarray(background_y_to_list)
 
-                #background_shoulders_y.pop(i)
-       # if region[0] 
-
+                #then removing the xval fro the x-values
+                background_x_to_list.remove(xval)
+                background_shoulders_x = np.asarray(background_x_to_list)
 
     d = np.polyfit(background_shoulders_x, background_shoulders_y,options['background_poly_degree'])
     function_background = np.poly1d(d) #Using the values of the background to make a backgroudn (2. deg polynomial)
@@ -128,9 +129,10 @@ def find_fwhm_of_peak(x,y,start_values,options):
 # =========== Subtracting the peak from the background
 ###############################################################################
     default_options={
-        'lorentzian':True,
+        'lorentzian':False,
         'voigt': False,
         'pseudovoigt': False,
+        'doublePV': False,
         #'starting_guess_lor':   [400,   14.1,   0.01],
         #'starting_guess_gauss': [400,   14.1,   0.01],
         'plot_fit': True,
@@ -142,7 +144,6 @@ def find_fwhm_of_peak(x,y,start_values,options):
     }
     
     options = aux.update_options(options=options, default_options=default_options)
-
     ################################ Fitting  ###################
     def _1Voigt(x, ampL, center, widL, ampG, sigmaG):
         return (ampG*(1/(sigmaG*(np.sqrt(2*np.pi))))*(np.exp(-((x-center)**2)/((2*sigmaG)**2)))) +\
@@ -157,6 +158,23 @@ def find_fwhm_of_peak(x,y,start_values,options):
         LORENTZIAN_PART= 1/np.pi * (PV_fwhm/2)/((x-x0)**2+(PV_fwhm/2)**2)
 
         return (I * (ratio * GAUSSIAN_PART+(1-ratio)*LORENTZIAN_PART))
+
+    def _2PV(x, I_1, x0_1, PV_fwhm_1, ratio_1, I_2, x0_2, PV_fwhm_2, ratio_2):
+        sigma_1=PV_fwhm_1/(2*np.sqrt(2*np.log(2)))
+        a_G_1= 1/(sigma_1*np.sqrt(2*np.pi))
+        b_G_1= 4*np.log(2)/PV_fwhm_1**2
+
+        GAUSSIAN_PART_1= a_G_1*np.exp(-b_G_1*(x-x0_1)**2)
+        LORENTZIAN_PART_1= 1/np.pi * (PV_fwhm_1/2)/((x-x0_1)**2+(PV_fwhm_1/2)**2)
+
+        sigma_2=PV_fwhm_2/(2*np.sqrt(2*np.log(2)))
+        a_G_2= 1/(sigma_2*np.sqrt(2*np.pi))
+        b_G_2= 4*np.log(2)/PV_fwhm_2**2
+
+        GAUSSIAN_PART_2= a_G_2*np.exp(-b_G_2*(x-x0_2)**2)
+        LORENTZIAN_PART_2= 1/np.pi * (PV_fwhm_2/2)/((x-x0_2)**2+(PV_fwhm_2/2)**2)
+
+        return (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2))
 
     def _1Lorentzian(x, ampL, center, widL):
         return ((ampL*widL**2/((x-center)**2+widL**2)) )
@@ -219,7 +237,7 @@ def find_fwhm_of_peak(x,y,start_values,options):
         [I,x0,PV_fwhm,ratio]=popt_PV
         parameters=popt_PV
         errors=perr_PV
-
+        
         sigma=PV_fwhm/(2*np.sqrt(2*np.log(2)))
         a_G= 1/(sigma*np.sqrt(2*np.pi))
         b_G= 4*np.log(2)/PV_fwhm**2
@@ -230,12 +248,64 @@ def find_fwhm_of_peak(x,y,start_values,options):
         y_fit = (I * (ratio * GAUSSIAN_PART+(1-ratio)*LORENTZIAN_PART))
 
         #y_fit= I * (ratio * 1/(PV_fwhm/(2*np.sqrt(2*np.log(2)))*np.sqrt(2*np.pi))*np.exp(-4*np.log(2)/PV_fwhm**2*(x_fit-x0)**2)+(1-ratio)*1/np.pi * (PV_fwhm/2)/((x_fit-x0)**2+(PV_fwhm/2)**2))
-            
+
+    if options['doublePV']:
+        #https://docs.mantidproject.org/nightly/fitting/fitfunctions/PseudoVoigt.html
+        I_1= start_values[0]#PeakIntensity 
+        x0_1 = start_values[1]
+        PV_fwhm_1= start_values[2]
+        ratio_1 = start_values[3]
+    
+        I_2= start_values[4]#PeakIntensity 
+        x0_2 = start_values[5]
+        PV_fwhm_2= start_values[6]
+        ratio_2 = start_values[7]
+        #print('lower bounds below')
+        #print(options['lower_bounds_PV'][:4])
+        lower_bound=options['lower_bounds_PV'][:4]
+        lower_bounds=lower_bound
+        
+        for i in range(len(lower_bound)):
+            lower_bounds.append(lower_bound[i])
+
+        upper_bound=options['upper_bounds_PV'][:4]
+        upper_bounds=upper_bound
+        for i in range(len(upper_bound)):
+            upper_bounds.append(upper_bound[i])
+        #print("lower bounds is "+str(lower_bounds))
+        #print("upper bounds is "+str(upper_bounds))
+        #lower_bounds=np.concatenate(options['lower_bounds_PV'][:4],options['lower_bounds_PV'][:4])
+        #upper_bounds=np.concatenate(options['upper_bounds_PV'][:4],options['upper_bounds_PV'][:4])
+        param_bounds=(lower_bounds,upper_bounds)
+        popt_PV, pcov_PV = scipy.optimize.curve_fit(_2PV, x, y, p0=[I_1,x0_1,PV_fwhm_1,ratio_1,I_2,x0_2,PV_fwhm_2,ratio_2],bounds=param_bounds)
+        
+        perr_PV = np.sqrt(np.diag(pcov_PV))
+
+        [I_1,x0_1,PV_fwhm_1,ratio_1,I_2,x0_2,PV_fwhm_2,ratio_2]=popt_PV
+        parameters=popt_PV
+        errors=perr_PV
+
+        sigma_1=PV_fwhm_1/(2*np.sqrt(2*np.log(2)))
+        a_G_1= 1/(sigma_1*np.sqrt(2*np.pi))
+        b_G_1= 4*np.log(2)/PV_fwhm_1**2
+
+        GAUSSIAN_PART_1= a_G_1*np.exp(-b_G_1*(x_fit-x0_1)**2)
+        LORENTZIAN_PART_1= 1/np.pi * (PV_fwhm_1/2)/((x_fit-x0_1)**2+(PV_fwhm_1/2)**2)
+
+        sigma_2=PV_fwhm_2/(2*np.sqrt(2*np.log(2)))
+        a_G_2= 1/(sigma_2*np.sqrt(2*np.pi))
+        b_G_2= 4*np.log(2)/PV_fwhm_2**2
+
+        GAUSSIAN_PART_2= a_G_2*np.exp(-b_G_2*(x_fit-x0_2)**2)
+        LORENTZIAN_PART_2= 1/np.pi * (PV_fwhm_2/2)/((x_fit-x0_2)**2+(PV_fwhm_2/2)**2)
+
+        y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2))
+
     if options['plot_fit']:
         fig = plt.figure(figsize=[40,10])
         ax = plt.axes()
         ax.plot(x,y,'o')
-    
+        ax.plot(x_fit,y_fit)
     #ax.set_ylim(min(df_peak['I_org'])*0.9,max(df_peak['I_org'])*1.1)
     
     #ax.set_xlim(options['peak_interval'][0]-2*(options['background_shoulder_left']+options['background_shoulder_right']),options['peak_interval'][1]+2*(options['background_shoulder_left']+options['background_shoulder_right']))
@@ -247,7 +317,7 @@ def find_fwhm_of_peak(x,y,start_values,options):
     
     # plt.scatter(x=x,y=y)
 
-        ax.plot(x_fit,y_fit)
+        
     return parameters, errors
 
 def read_timestamps(data,options):
