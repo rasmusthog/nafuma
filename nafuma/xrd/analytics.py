@@ -20,7 +20,7 @@ def background_subtracted_peak(data,options):
     'background_poly_degree': 1,
     'plot_all_background_fits': False
     }
-
+    options = aux.update_options(options=options, default_options=default_options)
     diffractogram, wavelength = xrd.io.read_xy(data=data,options=options)   
 
     if "noheaders" in data['path'][0]:
@@ -28,7 +28,7 @@ def background_subtracted_peak(data,options):
     else:
         filename = os.path.basename(data['path'][0]).split('.')[0]
 
-    options = aux.update_options(options=options, default_options=default_options)
+    
     
     if not options['peak_interval']:
         print("Make sure that you provide an interval defining the 2th-range of the peak")
@@ -69,24 +69,24 @@ def background_subtracted_peak(data,options):
     background_shoulders_y=np.concatenate((background_left_shoulder_y, background_right_shoulder_y))  
     #print(options['background_excluded_region'])
     
-    #if not options['background_excluded_region']) == 0:# is not False:
-    for region in options['background_excluded_region']:
-        #print(region)
-        for i, xval in enumerate(background_shoulders_x):
-            if region[0] < xval < region[1]:
-                #because these are numpy arrays I am going via normal arrays to remove the values within the excluded regions              
-                background_x_to_list=background_shoulders_x.tolist()
-                background_y_to_list=background_shoulders_y.tolist()
-                #finding the index of the x-value in the background-array
-                index_xval=background_x_to_list.index(xval)
-                #removing the y-value with the same index
-                background_y_to_list.pop(index_xval)
-                #going back to a numpy array again
-                background_shoulders_y = np.asarray(background_y_to_list)
+    if options['background_excluded_region']:
+        for region in options['background_excluded_region']:
+            #print(region)
+            for i, xval in enumerate(background_shoulders_x):
+                if region[0] < xval < region[1]:
+                    #because these are numpy arrays I am going via normal arrays to remove the values within the excluded regions              
+                    background_x_to_list=background_shoulders_x.tolist()
+                    background_y_to_list=background_shoulders_y.tolist()
+                    #finding the index of the x-value in the background-array
+                    index_xval=background_x_to_list.index(xval)
+                    #removing the y-value with the same index
+                    background_y_to_list.pop(index_xval)
+                    #going back to a numpy array again
+                    background_shoulders_y = np.asarray(background_y_to_list)
 
-                #then removing the xval fro the x-values
-                background_x_to_list.remove(xval)
-                background_shoulders_x = np.asarray(background_x_to_list)
+                    #then removing the xval fro the x-values
+                    background_x_to_list.remove(xval)
+                    background_shoulders_x = np.asarray(background_x_to_list)
 
     d = np.polyfit(background_shoulders_x, background_shoulders_y,options['background_poly_degree'])
     function_background = np.poly1d(d) #Using the values of the background to make a backgroudn (2. deg polynomial)
@@ -102,10 +102,9 @@ def background_subtracted_peak(data,options):
     df_peak['I_BG']=background_y_fitted
     df_peak['I_corr']=data_minus_background
     #df_peak['log_BG']=np.log(df_peak['I_BG'])
-
+    
     ################## PLOTTING A CHOSEN NUMBER OF FILES TO DOUBLE CHECK THE VALIDITY OF THE SCRIPT ####################################################################################################################        
     if options['plot_all_background_fits']:
-
         ax = df_peak.plot(x="2th",y="I_BG")
         
         ax.set_ylim(min(df_peak['I_org'])*0.9,min(df_peak['I_org'])*1.2)
@@ -121,9 +120,10 @@ def background_subtracted_peak(data,options):
         plt.axvline(x=options['background_region'][1],c='m')
 
         #[[35.18,35,76],[36.34,36.59],[36.61,36.79]]
-        for i in range(len(options['background_excluded_region'])):
-            plt.axvline(x = options['background_excluded_region'][i][0],c='g')
-            plt.axvline(x = options['background_excluded_region'][i][1],c='g')
+        if options['background_excluded_region']:
+            for i in range(len(options['background_excluded_region'])):
+                plt.axvline(x = options['background_excluded_region'][i][0],c='g')
+                plt.axvline(x = options['background_excluded_region'][i][1],c='g')
         #plt.axvline(x = options['background_excluded_region'][0])
         #plt.axvline(x = options['background_excluded_region'][0])
 
@@ -132,6 +132,8 @@ def background_subtracted_peak(data,options):
 
 
     return diffractogram, df_peak
+
+
 
 def find_fwhm_of_peak(x,y,start_values,options):
     #Here the data needs to be two arrays
@@ -189,6 +191,9 @@ def find_fwhm_of_peak(x,y,start_values,options):
 
     def _1Lorentzian(x, ampL, center, widL):
         return ((ampL*widL**2/((x-center)**2+widL**2)) )
+
+    def _1Gaussian(x, I, x0, fwhm_G):
+        return (I * np.exp(-(x - x0) ** 2 / (2 * fwhm_G ** 2)))
     
     # defining starting values for the fit
     ampL = start_values[0]
@@ -212,7 +217,19 @@ def find_fwhm_of_peak(x,y,start_values,options):
         y_fit=  ((ampL*widL**2/((x_fit-center)**2+widL**2)) )
         #     voigt_fit= (ampG1_fitted*(1/(sigmaG1_fitted*(np.sqrt(2*np.pi))))*(np.exp(-((x_values-cenG1_fitted)**2)/((2*sigmaG1_fitted)**2)))) +\
         #   ((ampL1_fitted*widL1_fitted**2/((x_values-cenL1_fitted)**2+widL1_fitted**2)) ) 
-    
+
+    if options['gaussian']:
+        param_bounds=(options['lower_bounds'][:3],options['upper_bounds'][:3])
+        popt_gauss, pcov_gauss = scipy.optimize.curve_fit(_1Gaussian, x, y, p0=[start_values[0], start_values[1], start_values[2]],bounds=param_bounds)
+        
+        perr_gauss = np.sqrt(np.diag(pcov_gauss))
+
+        [I, x0, fwhm_G]=popt_gauss
+        parameters=popt_gauss
+        errors=perr_gauss
+
+
+        y_fit=  (I * np.exp(-(x_fit - x0) ** 2 / (2 * fwhm_G ** 2)))#((ampL*widL**2/((x_fit-center)**2+widL**2)) )
     
     if options['voigt']:
         ampG = start_values[3]
