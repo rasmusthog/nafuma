@@ -133,7 +133,42 @@ def background_subtracted_peak(data,options):
 
     return diffractogram, df_peak
 
+def _1Voigt(x, ampL, center, widL, ampG, sigmaG):
+        return (ampG*(1/(sigmaG*(np.sqrt(2*np.pi))))*(np.exp(-((x-center)**2)/((2*sigmaG)**2)))) +\
+            ((ampL*widL**2/((x-center)**2+widL**2)) )
 
+def _1PV(x, I, x0, PV_fwhm, ratio):
+    sigma=PV_fwhm/(2*np.sqrt(2*np.log(2)))
+    a_G= 1/(sigma*np.sqrt(2*np.pi))
+    b_G= 4*np.log(2)/PV_fwhm**2
+
+    GAUSSIAN_PART= a_G*np.exp(-b_G*(x-x0)**2)
+    LORENTZIAN_PART= 1/np.pi * (PV_fwhm/2)/((x-x0)**2+(PV_fwhm/2)**2)
+
+    return (I * (ratio * GAUSSIAN_PART+(1-ratio)*LORENTZIAN_PART))
+
+def _2PV(x, I_1, x0_1, PV_fwhm_1, ratio_1, I_2, x0_2, PV_fwhm_2, ratio_2):
+    sigma_1=PV_fwhm_1/(2*np.sqrt(2*np.log(2)))
+    a_G_1= 1/(sigma_1*np.sqrt(2*np.pi))
+    b_G_1= 4*np.log(2)/PV_fwhm_1**2
+
+    GAUSSIAN_PART_1= a_G_1*np.exp(-b_G_1*(x-x0_1)**2)
+    LORENTZIAN_PART_1= 1/np.pi * (PV_fwhm_1/2)/((x-x0_1)**2+(PV_fwhm_1/2)**2)
+
+    sigma_2=PV_fwhm_2/(2*np.sqrt(2*np.log(2)))
+    a_G_2= 1/(sigma_2*np.sqrt(2*np.pi))
+    b_G_2= 4*np.log(2)/PV_fwhm_2**2
+
+    GAUSSIAN_PART_2= a_G_2*np.exp(-b_G_2*(x-x0_2)**2)
+    LORENTZIAN_PART_2= 1/np.pi * (PV_fwhm_2/2)/((x-x0_2)**2+(PV_fwhm_2/2)**2)
+
+    return (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2))
+
+def _1Lorentzian(x, ampL, center, widL):
+    return ((ampL*widL**2/((x-center)**2+widL**2)) )
+
+def _1Gaussian(x, I, x0, fwhm_G):
+    return (I * np.exp(-(x - x0) ** 2 / (2 * fwhm_G ** 2)))
 
 def find_fwhm_of_peak(x,y,start_values,options):
     #Here the data needs to be two arrays
@@ -158,42 +193,7 @@ def find_fwhm_of_peak(x,y,start_values,options):
     
     options = aux.update_options(options=options, default_options=default_options)
     ################################ Fitting  ###################
-    def _1Voigt(x, ampL, center, widL, ampG, sigmaG):
-        return (ampG*(1/(sigmaG*(np.sqrt(2*np.pi))))*(np.exp(-((x-center)**2)/((2*sigmaG)**2)))) +\
-            ((ampL*widL**2/((x-center)**2+widL**2)) )
-
-    def _1PV(x, I, x0, PV_fwhm, ratio):
-        sigma=PV_fwhm/(2*np.sqrt(2*np.log(2)))
-        a_G= 1/(sigma*np.sqrt(2*np.pi))
-        b_G= 4*np.log(2)/PV_fwhm**2
-
-        GAUSSIAN_PART= a_G*np.exp(-b_G*(x-x0)**2)
-        LORENTZIAN_PART= 1/np.pi * (PV_fwhm/2)/((x-x0)**2+(PV_fwhm/2)**2)
-
-        return (I * (ratio * GAUSSIAN_PART+(1-ratio)*LORENTZIAN_PART))
-
-    def _2PV(x, I_1, x0_1, PV_fwhm_1, ratio_1, I_2, x0_2, PV_fwhm_2, ratio_2):
-        sigma_1=PV_fwhm_1/(2*np.sqrt(2*np.log(2)))
-        a_G_1= 1/(sigma_1*np.sqrt(2*np.pi))
-        b_G_1= 4*np.log(2)/PV_fwhm_1**2
-
-        GAUSSIAN_PART_1= a_G_1*np.exp(-b_G_1*(x-x0_1)**2)
-        LORENTZIAN_PART_1= 1/np.pi * (PV_fwhm_1/2)/((x-x0_1)**2+(PV_fwhm_1/2)**2)
-
-        sigma_2=PV_fwhm_2/(2*np.sqrt(2*np.log(2)))
-        a_G_2= 1/(sigma_2*np.sqrt(2*np.pi))
-        b_G_2= 4*np.log(2)/PV_fwhm_2**2
-
-        GAUSSIAN_PART_2= a_G_2*np.exp(-b_G_2*(x-x0_2)**2)
-        LORENTZIAN_PART_2= 1/np.pi * (PV_fwhm_2/2)/((x-x0_2)**2+(PV_fwhm_2/2)**2)
-
-        return (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2))
-
-    def _1Lorentzian(x, ampL, center, widL):
-        return ((ampL*widL**2/((x-center)**2+widL**2)) )
-
-    def _1Gaussian(x, I, x0, fwhm_G):
-        return (I * np.exp(-(x - x0) ** 2 / (2 * fwhm_G ** 2)))
+    
     
     # defining starting values for the fit
     ampL = start_values[0]
