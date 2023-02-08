@@ -334,6 +334,30 @@ def find_fwhm_of_peak(x,y,start_values,options):
         ax = plt.axes()
         ax.plot(x,y,'o')
         ax.plot(x_fit,y_fit)
+
+        ##TEST
+
+        plt.axvline(parameters[1]) #center position
+        x_fwhm=[parameters[1]-parameters[2]/2,parameters[1]+parameters[2]/2] #plotting the width of the fwhm
+        #FIXME generalize for other functions than PV:
+#        sigma=PV_fwhm/(2*np.sqrt(2*np.log(2)))
+ #       a_G= 1/(sigma*np.sqrt(2*np.pi))      
+        #y=[(I*a_G)/2,(I*a_G)/2]
+        y_fwhm=[max(y_fit)/2,max(y_fit)/2]
+        ax.plot(x_fwhm,y_fwhm,c='g')
+
+        if options['doublePV']:
+            plt.axvline(parameters[5]) #center position
+            x_fwhm2=[parameters[5]-parameters[6]/2,parameters[5]+parameters[6]/2] #plotting the width of the fwhm
+            #FIXME generalize for other functions than PV:
+    #        sigma=PV_fwhm/(2*np.sqrt(2*np.log(2)))
+    #       a_G= 1/(sigma*np.sqrt(2*np.pi))      
+            #y=[(I*a_G)/2,(I*a_G)/2]
+
+            y2_max=I_2 * (ratio_2 * a_G_2+(1-ratio_2)*(1/(np.pi*PV_fwhm_2/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm2=[y2_max/2,y2_max/2]
+            ax.plot(x_fwhm2,y_fwhm2,c='g')
+            ##TEST
     #ax.set_ylim(min(df_peak['I_org'])*0.9,max(df_peak['I_org'])*1.1)
     
     #ax.set_xlim(options['peak_interval'][0]-2*(options['background_shoulder_left']+options['background_shoulder_right']),options['peak_interval'][1]+2*(options['background_shoulder_left']+options['background_shoulder_right']))
@@ -416,3 +440,123 @@ def find_area_of_peak(x,y,options):
     peak_area = np.trapz(y, dx=dx)
 
     return peak_area
+
+def finding_instrumental_peak_broadening(data,options):
+    #FIXME
+    #use one WL as the standard and plot in all the peak positions
+    #translate these peak positions to the wavelength given
+    #only keep the peak positions that are less than the biggest x-value in the file (so not too many peaks are included and we get an error)
+    #use this to find the start_values-list for each of the peaks, by using som standard distance on each side of the peak and for the background. This should be rather simple for lab6.
+    #Find the fwhm of all peaks, and have an option to print the fwhm as a function of angle
+    #Fit these to a function (fwhm vs 2theta), to extract the estimated fwhm on the specific angle of interest
+    #As a return value the fwhm of the relevant angle is given as e.g. fwhm_instrumental
+    #Then as this value is given to the function working on the actual data, any fwhm value equal to or below this should give an error as that should be impossible and something is obviously wrong
+    default_options = {
+       # 'lorentzian': True,
+        'peak_center': 0,
+        'plot_instrumental_broadening': True,
+        'plot_every_nth': 10
+        #'background_poly_degree': 1
+    }
+    
+    options = aux.update_options(options=options, default_options=default_options)
+    
+    diffractogram, wavelength = xrd.io.read_xy(data=data,options=options)  
+
+    start_values_list=[]
+    peak_range_list=[]
+    background_range_list=[]
+    
+    reference_peak_centers=[8.81678204487931, 12.484732202720007, 15.305588264031849, 17.687216986202827, 19.793091426749534, 21.703371161909057, 25.113360089664365,
+    26.663096159547234, 28.13383083445108, 29.537041574463057, 30.88185501694746, 32.178100946275805, 33.42858705018042, 35.81271399776499, 36.953180739661214, 
+    38.06362325243035, 39.14737970910566, 40.20672810099413, 41.24399752773122, 42.26064266026674, 44.24359987984366, 45.20783351961699, 46.15589302740396,
+    47.086112710436716, 48.908189795887864, 49.80081533788387, 51.55182963558574, 52.4] #all values except the last is found through peak fitting
+    reference_wavelength=0.6390512
+    peak_centers=[]
+    #peak_centers=reference_peak_centers
+
+
+    #value to be used to pick out peak-region and background region
+    peak_shoulders=0.4 
+    background_shoulders=0.45
+    
+#FIXME translation of wavelength 
+    #translating to correct wavelength
+    for peak in reference_peak_centers:
+        #new_peak= 2*np.arcsin(reference_wavelength/data["wavelength"][0]) * 180/np.pi
+        #only including peaks that are actually in the data set
+        new_peak=2*np.arcsin((data["wavelength"][0]/reference_wavelength)*np.sin(peak/2 * np.pi/180))*180/np.pi
+        #print(new_peak)
+        if new_peak > min(diffractogram["2th"])+background_shoulders and new_peak < max(diffractogram["2th"])-background_shoulders:
+            peak_centers.append(new_peak)
+
+    for peak_center in peak_centers:
+        #print(peak_center)
+        start_values_list.append(       [32.29992395, peak_center, 0.06344242,1])#[0.5,  peak_center,  0.1,1])#[0.1,  peak_center,  0.2434226])#,   1.0])
+        peak_range_list.append(         [peak_center-peak_shoulders,peak_center+peak_shoulders])
+        background_range_list.append(   [peak_center-background_shoulders,peak_center+background_shoulders])
+    #print(start_values_list)
+    fwhm_error_list=[]
+    fwhm_parameter_list=[] 
+    pos_error_list=[]
+    pos_parameter_list=[]
+    int_parameter_list=[]
+    #using a fit to get values for fwhm in addition to intensity, peak_position and ratio of gaussian/lorentzian peak shape'''
+    for j in range(len(peak_centers)):
+        set_options= {
+            'background_region': background_range_list[j],
+            'peak_interval': peak_range_list[j],
+            'background_excluded_region':False,
+            'gaussian':False,
+            #'voigt':False,
+            'pseudovoigt': True,
+            #Forcing the fit to be 100% gaussian by limiting the ratio between 0.9999 and 1
+            'lower_bounds_PV': [0,peak_range_list[j][0],0,0.9999],#,0.99],#[0,peak_center-0.2,0,0,0],
+            'upper_bounds_PV': [20000,peak_range_list[j][1],0.5,1]#,1.01],#[200,start_values_list[j][1]+0.2,0.5,1]
+            #'plot_all_background_fits': file_to_plot
+        }
+        #Testing function by printing some of the peak fits
+        #print(options)
+        if j == 0:
+            set_options['background_poly_degree']= 2
+        else:
+            set_options['background_poly_degree']= 1
+        if j % options['plot_every_nth'] == 0:
+            set_options['plot_fit']=True
+            set_options['plot_all_background_fits'] = True
+            
+        else:
+            set_options['plot_fit']=False
+            set_options['plot_all_background_fits']: False
+
+        output = analyze.background_subtracted_peak(data=data,options=set_options)
+        df_peak=output[1]
+        
+        parameters, errors= analyze.find_fwhm_of_peak(x=df_peak["2th"],y=df_peak["I_corr"],start_values=start_values_list[j],options=set_options) 
+        #Visualizing peak_center and fwhm
+        #[I,x0,PV_fwhm,ratio]=parameters
+        #if set_options['plot_fit']:
+        #    plt.axvline(x0) #center position
+        #    x=[x0-PV_fwhm/2,x0+PV_fwhm/2]
+            #FIXME generalize for other functions than PV:
+        #    sigma=PV_fwhm/(2*np.sqrt(2*np.log(2)))
+        #    a_G= 1/(sigma*np.sqrt(2*np.pi))
+    
+            #b_G= 4*np.log(2)/PV_fwhm**2
+            #LORENTZIAN_PART= 1/np.pi * (PV_fwhm/2)/((x_fit-x0)**2+(PV_fwhm/2)**2) #DISREGARDING THIS DUE TO PURELY GAUSSIAN
+            #GAUSSIAN_PART= a_G*np.exp(-b_G*(x_fit-x0)**2)
+
+        #y_fit = (I * (ratio * GAUSSIAN_PART+(1-ratio)*LORENTZIAN_PART))
+        #    y=[(I*a_G)/2,(I*a_G)/2]
+        #    plt.plot(x,y)
+
+        
+        int_parameter_list.append(parameters[0])
+
+        pos_error_list.append(errors[1])
+        pos_parameter_list.append(parameters[1])
+        
+        fwhm_error_list.append(errors[2])
+        fwhm_parameter_list.append(parameters[2])
+        #print(parameters)
+    return int_parameter_list, pos_parameter_list, fwhm_parameter_list, fwhm_error_list
