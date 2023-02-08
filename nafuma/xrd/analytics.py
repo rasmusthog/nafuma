@@ -181,6 +181,7 @@ def find_fwhm_of_peak(x,y,start_values,options):
         'voigt': False,
         'pseudovoigt': False,
         'doublePV': False,
+        'gaussian': False
         #'starting_guess_lor':   [400,   14.1,   0.01],
         #'starting_guess_gauss': [400,   14.1,   0.01],
         'plot_fit': True,
