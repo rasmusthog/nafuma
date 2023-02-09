@@ -181,7 +181,7 @@ def find_fwhm_of_peak(x,y,start_values,options):
         'voigt': False,
         'pseudovoigt': False,
         'doublePV': False,
-        'gaussian': False
+        'gaussian': False,
         #'starting_guess_lor':   [400,   14.1,   0.01],
         #'starting_guess_gauss': [400,   14.1,   0.01],
         'plot_fit': True,
@@ -442,7 +442,78 @@ def find_area_of_peak(x,y,options):
 
     return peak_area
 
+def _DC1(x, ad, bd, cd):
+        return (np.sqrt(ad * np.cos(x*np.pi/180)**4 + bd * np.cos(x*np.pi/180)**2 + cd))
+        
+def find_fit_parameters_for_peak(chosen_peaks,options): #can add wavelength if it will be used on data from another beam time at some point
+    default_options={
+        'temperature': False, #FIXME this is not implemented, but would be a great addition if running on variable-temperature data-sets, using some kind of thermal expansion constant
+        'wavelength': False #FIXME would be nice to enable translation from one beamtime to another 
+                   }
+    
+    options = aux.update_options(options=options, default_options=default_options)
+
+    start_values_list=[]
+    #start_values_list2=[] #for regions of overlapping peaks, such as disorder peak which is splitting over time. Ideally only starting values is necessary, and the background used and the peak region could be the same.
+    peak_range_list=[]
+    #peak_range_list2=[] #this might or might not be necessary, depending on how the fitting goes.
+    background_range_list=[]
+    #number_of_excluded_regions_list=[]
+    BG_poly_degree_list=[]
+    excluded_background_range_list=[] #FIXME add excluded background regions in the analyze-background_subtracted-function
+    #df_peaks=pd.DataFrame(columns=chosen_peaks)
+    if "ord1" in chosen_peaks:
+        peak_center= 14.075
+        start_values_list.append(       [0.1,  peak_center,  0.2434226,   0.5])
+        peak_range_list.append(         [13.9,14.3])
+        background_range_list.append(   [13.5,14.35])
+        BG_poly_degree_list.append(2)        #start_values_list2.append(None)
+        excluded_background_range_list.append([[0,0]])#13.1,13.5]]) #include this for certain peaks that has peaks in close proximity
+        #number_of_excluded_regions_list.append(0) #no excluded regions
+        #df_peaks["ord1"]=start_values
+
+    if "Pt3" in chosen_peaks:
+        peak_center=42.431
+        start_values_list.append([100, peak_center, 0.1, 0.8]) #bad first guesses, fix this
+        peak_range_list.append([42.3,42.56])
+        background_range_list.append([42.25,42.75])
+        #start_values_list2.append(None)
+        excluded_background_range_list.append([[0,0]]) #include this for certain peaks that has peaks in close proximity
+        #number_of_excluded_regions_list.append(0) #three excluded regions in the background region
+        #df_peaks["Pt3"]=start_values
+    #print(excluded_background_range_list)
+        BG_poly_degree_list.append(2)
+    if "char_split" in chosen_peaks: #char as in a characteristic peak that both disordered and ordered phase will have
+        #FIXME Have to add the possibility to have 
+        peak_center=36.10 #43.35
+        peak_center2=36.17 #43.45
+        peak_end=36.27
+        peak_range_list.append([35.82, peak_end])
+        background_range_list.append([35.72,37.25])
+        start_values_list.append([34.63923911, peak_center,  0.0847148,   0.92987947, 34.63923911, peak_center,  0.0847148,   0.92987947]) 
+        #start_values_list2.append([34.63923911, peak_center2,  0.0847148,   0.92987947])
+        #number_of_excluded_regions_list.append(3) #three excluded regions in the background region
+        excluded_background_range_list.append([[peak_end,37.18]])#[[35.23,35.76],[36.34,37.22]]) #include this for certain peaks that has peaks in close proximity and influences the background
+        BG_poly_degree_list.append(1)
+    if "char" in chosen_peaks: #char as in a characteristic peak that both disordered and ordered phase will have
+        #FIXME Have to add the possibility to have 
+        peak_center=36.16 #43.35
+        peak_end=36.27
+        peak_range_list.append([35.82, peak_end])
+        background_range_list.append([35.72,37.25])#[35.76,36.87])
+        start_values_list.append([34.63923911, peak_center,  0.0847148,   0.92987947])#9.61189651 42.43286743  0.07566345  0.816174 
+        #start_values_list2.append(None)
+        #number_of_excluded_regions_list.append(3) #three excluded regions in the background region
+        excluded_background_range_list.append([[peak_end,37.18]])#[[35.18,35.74],[36.34,36.59],[36.61,36.79]])#([,,) #include this for certain peaks that has peaks in close proximity and influences the background
+        BG_poly_degree_list.append(1)
+    if options['temperature']:
+        original_wavelength=0.6390512 #in Å
+        #multiply all values with a temperature dependent factor and change values accordingly
+        print("tempereture dependence not yet implemented")
+    return BG_poly_degree_list,start_values_list,background_range_list, peak_range_list, excluded_background_range_list
+
 def finding_instrumental_peak_broadening(data,options):
+    #This function might not be necessary, as I can use the DC1-function and refine data with TOPAS to find proper parameters. But parts of this can be used for other things.
     #FIXME
     #use one WL as the standard and plot in all the peak positions
     #translate these peak positions to the wavelength given
@@ -530,10 +601,10 @@ def finding_instrumental_peak_broadening(data,options):
             set_options['plot_fit']=False
             set_options['plot_all_background_fits']: False
 
-        output = analyze.background_subtracted_peak(data=data,options=set_options)
+        output = background_subtracted_peak(data=data,options=set_options)
         df_peak=output[1]
         
-        parameters, errors= analyze.find_fwhm_of_peak(x=df_peak["2th"],y=df_peak["I_corr"],start_values=start_values_list[j],options=set_options) 
+        parameters, errors= find_fwhm_of_peak(x=df_peak["2th"],y=df_peak["I_corr"],start_values=start_values_list[j],options=set_options) 
         #Visualizing peak_center and fwhm
         #[I,x0,PV_fwhm,ratio]=parameters
         #if set_options['plot_fit']:
