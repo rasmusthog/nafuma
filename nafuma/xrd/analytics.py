@@ -655,4 +655,24 @@ def read_peak_width_from_refinement(filename):
                 cd = float(line.split('=')[1].strip('; \n'))
     return ad, bd, cd
 
+import re
 
+def get_bm_folder(path):
+    ####################################### 
+    # This is a function made by ChatGTP, that basically finds out what 
+    # beamtime a dataset is from, if there exist a folder in the path 
+    # starting with "bm" and contains 8 numbers (does not matteri if separated 
+    # by dash/underline etc)
+    ############################################
+    # Split the path into its components
+    components = os.path.normpath(path).split(os.sep)
+    
+    # Search for the first folder that matches the specified pattern
+    pattern = r'^(bm|BM)\d{8}$'
+    for component in components:
+        match = re.match(pattern, component)
+        if match:
+            return match.group(0)
+    
+    # Return None if no matching folder was found
+    return None
