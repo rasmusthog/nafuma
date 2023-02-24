@@ -676,3 +676,35 @@ def get_bm_folder(path):
     
     # Return None if no matching folder was found
     return None
+
+import os
+import re
+
+def get_bm_folder_v2(path):
+    # Convert input to a list if it is not already a list
+    if not isinstance(path, list):
+        path = [path]
+
+    bm_folders = []
+    # Search for matching folders in each path in the input list
+    for p in path:
+        # Split the path into its components
+        components = os.path.normpath(p).split(os.sep)
+        
+        # Search for the first folder that matches the specified pattern
+        pattern = r'^(bm|BM)\d{8}$'
+        for component in components:
+            match = re.match(pattern, component)
+            if match:
+                bm_folders.append(match.group(0))
+                break
+            
+    # Return the list of matching folders if the input was a list of paths
+    if len(bm_folders) > 1:
+        return bm_folders
+    # Otherwise, return the name of the bm-folder as output
+    elif len(bm_folders) == 1:
+        return bm_folders[0]
+    # If no matching folder was found, return None
+    else:
+        return None
