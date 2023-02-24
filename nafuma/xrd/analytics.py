@@ -641,5 +641,18 @@ def from_beamtime_to_wavelength(name_of_beamtime):
     else:
         return None # Or raise an exception if the input name is invalid
 
+def read_peak_width_from_refinement(filename):
+    ad = None
+    bd = None
+    cd = None
+    with open(filename) as file:
+        for line in file:
+            if 'prm !ad' in line:
+                ad = float(line.split('=')[1].strip('; \n'))
+            elif 'prm !bd' in line:
+                bd = float(line.split('=')[1].strip('; \n'))
+            elif 'prm !cd' in line:
+                cd = float(line.split('=')[1].strip('; \n'))
+    return ad, bd, cd
 
 
