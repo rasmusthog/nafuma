@@ -463,7 +463,7 @@ def find_fit_parameters_for_peak(chosen_peaks,options): #can add wavelength if i
     excluded_background_range_list=[] #FIXME add excluded background regions in the analyze-background_subtracted-function
     #df_peaks=pd.DataFrame(columns=chosen_peaks)
     if "ord1" in chosen_peaks:
-        peak_center= 14.075
+        peak_center= 14.095
         start_values_list.append(       [0.1,  peak_center,  0.2434226,   0.5])
         peak_range_list.append(         [13.9,14.3])
         background_range_list.append(   [13.5,14.35])
@@ -632,3 +632,14 @@ def finding_instrumental_peak_broadening(data,options):
         fwhm_parameter_list.append(parameters[2])
         #print(parameters)
     return int_parameter_list, pos_parameter_list, fwhm_parameter_list, fwhm_error_list
+
+def from_beamtime_to_wavelength(name_of_beamtime):
+    name_of_beamtime = name_of_beamtime.lower().replace('-', '').replace('_', '')
+    if name_of_beamtime == 'bm01021231':
+        return 0.6390512
+    # Add more conditions for other beamtime names and wavelengths
+    else:
+        return None # Or raise an exception if the input name is invalid
+
+
+
