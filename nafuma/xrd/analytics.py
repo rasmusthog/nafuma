@@ -648,10 +648,8 @@ def read_peak_width_from_refinement(filename):
     cd = None
     if isinstance(filename, list):
         filename=filename[0]
-        print(filename)
     with open(filename) as file:
         for line in file:
-            print(line)
             if 'prm !ad' in line:
                 ad = float(line.split('=')[1].strip('; \n'))
             elif 'prm !bd' in line:
@@ -731,6 +729,66 @@ def instrumental_peak_shape(data,options):
     
 
     ad, bd, cd = read_peak_width_from_refinement(options['refinement_result_path'])
+    min_x=min(diffractogram["2th"])
+    max_x=max(diffractogram["2th"])
+
+    x_fit=np.linspace(min_x,max_x,100)
+    y_dmitry=_DC1(x_fit, ad, bd, cd)
+
+    if options['plot_instrumental_broadening']:
+        plt.plot(x_fit,y_dmitry)
+        plt.title("LaB$_6$ as a function of angle")
+        plt.xlabel("2th (deg)")
+        plt.ylabel("fwhm")
+    return ad,bd,cd
+
+
+
+def find_file(folder_path, file_strings, file_ext):
+    #ChatGTP made this file to find a file (with a certain string in the file name) in a folder and provide the full path of that file
+    matching_files = []
+    for filename in os.listdir(folder_path):
+        match_count = 0
+        for file_string in file_strings:
+            if file_string in filename:
+                match_count += 1
+        if match_count == len(file_strings) and filename.endswith(file_ext):
+            matching_files.append(os.path.join(folder_path, filename))
+    if len(matching_files) == 0:
+        return "No files include the specified string(s)"
+    elif len(matching_files) == 1:
+        return matching_files[0]
+    else:
+        return "Several files include the specified string(s)"
+
+
+
+
+###Testing to make a function that only takes beam time as an argument:
+def instrumental_peak_shape_pos1(beamtime):
+    #default_options = {
+    #    'plot_instrumental_broadening': False,
+    #    'refinement_result_path': None
+    #}
+    PATH="C:/Users/halvorhv/OneDriveUiO/0_Analysis_essentials"
+    PATH_BEAMTIME=os.path.join(PATH,beamtime,"lab6")
+    PATH_BEAMTIME_RESULTS=os.path.join(PATH_BEAMTIME,"results")
+    xy_path = find_file(PATH_BEAMTIME,["_000_00_","_100_80_"],"xy")
+    peak_width_path=find_file(PATH_BEAMTIME_RESULTS,["_000_00_","_100_80_"],"dat") #### HEREEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEEE must add so that another file string is added (that is "peak_width" in this case )
+    #options = aux.update_options(options=options, default_options=default_options)
+    
+    data={
+        'path': xy_path
+    }
+    
+    diffractogram, wavelength = xrd.io.read_xy(data=data)#,options=options)  
+
+    ###### These functions can be put elsewhere, does not serve its purpose here? #####
+    #beamtime = analyze.get_bm_folder_v2(data['path'])
+    #wavelength = analyze.from_beamtime_to_wavelength(beamtime)
+   #####################################################
+    
+    ad, bd, cd = read_peak_width_from_refinement(peak_width_path)
     min_x=min(diffractogram["2th"])
     max_x=max(diffractogram["2th"])
 
