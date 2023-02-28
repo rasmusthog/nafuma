@@ -443,6 +443,7 @@ def find_area_of_peak(x,y,options):
     return peak_area
 
 def _DC1(x, ad, bd, cd):
+        
         return (np.sqrt(ad * np.cos(x*np.pi/180)**4 + bd * np.cos(x*np.pi/180)**2 + cd))
         
 def find_fit_parameters_for_peak(chosen_peaks,options): #can add wavelength if it will be used on data from another beam time at some point
@@ -634,7 +635,7 @@ def finding_instrumental_peak_broadening(data,options):
     return int_parameter_list, pos_parameter_list, fwhm_parameter_list, fwhm_error_list
 
 def from_beamtime_to_wavelength(name_of_beamtime):
-    name_of_beamtime = name_of_beamtime.lower().replace('-', '').replace('_', '')
+    name_of_beamtime = name_of_beamtime[0].lower().replace('-', '').replace('_', '')
     if name_of_beamtime == 'bm01021231':
         return 0.6390512
     # Add more conditions for other beamtime names and wavelengths
@@ -645,8 +646,12 @@ def read_peak_width_from_refinement(filename):
     ad = None
     bd = None
     cd = None
+    if isinstance(filename, list):
+        filename=filename[0]
+        print(filename)
     with open(filename) as file:
         for line in file:
+            print(line)
             if 'prm !ad' in line:
                 ad = float(line.split('=')[1].strip('; \n'))
             elif 'prm !bd' in line:
@@ -708,3 +713,33 @@ def get_bm_folder_v2(path):
     # If no matching folder was found, return None
     else:
         return None
+
+def instrumental_peak_shape(data,options):
+    default_options = {
+        'plot_instrumental_broadening': False,
+        'refinement_result_path': None
+    }
+    
+    options = aux.update_options(options=options, default_options=default_options)
+
+    diffractogram, wavelength = xrd.io.read_xy(data=data,options=options)  
+
+    ###### These functions can be put elsewhere, does not serve its purpose here? #####
+    #beamtime = analyze.get_bm_folder_v2(data['path'])
+    #wavelength = analyze.from_beamtime_to_wavelength(beamtime)
+   #####################################################
+    
+
+    ad, bd, cd = read_peak_width_from_refinement(options['refinement_result_path'])
+    min_x=min(diffractogram["2th"])
+    max_x=max(diffractogram["2th"])
+
+    x_fit=np.linspace(min_x,max_x,100)
+    y_dmitry=_DC1(x_fit, ad, bd, cd)
+
+    if options['plot_instrumental_broadening']:
+        plt.plot(x_fit,y_dmitry)
+        plt.title("LaB$_6$ as a function of angle")
+        plt.xlabel("2th (deg)")
+        plt.ylabel("fwhm")
+    return ad,bd,cd
