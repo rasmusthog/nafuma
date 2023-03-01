@@ -783,7 +783,7 @@ def find_file(folder_path, detector_positions, file_string=None, file_exts=[".da
     else:
         print(f"Several files include the specified string(s) or extension(s) in folder {folder_path}")
         for file in matching_files:
-            print(file)
+            print("The LaB$_6$ xy-file used to define x min and max is "+str(file))
         return None
 
 
@@ -804,19 +804,21 @@ def instrumental_peak_shape_pos1(beamtime,options):
 
     options = aux.update_options(options=options, default_options=default_options)
 
-    PATH="C:/Users/halvorhv/OneDriveUiO/0_Analysis_essentials"
+    PATH=r"C:/Users/halvorhv/OneDriveUiO/0_Analysis_essentials"
     PATH_BEAMTIME=os.path.join(PATH,beamtime,"lab6")
     PATH_BEAMTIME_RESULTS=os.path.join(PATH_BEAMTIME,"results")
-    print(PATH_BEAMTIME,["_000_00_","_100_80_"],"lab6","xy")
-    xy_path = find_file(PATH_BEAMTIME,["_000_00_","_100_80_"],"lab6","xy")
-    peak_width_path=find_file(PATH_BEAMTIME_RESULTS,["_000_00_","_100_80_"],"peak_width","dat")
+    print(PATH_BEAMTIME)
+    #print(PATH_BEAMTIME,["_000_00_","_100_80_"],"lab6","xy")
+    xy_path = find_file(PATH_BEAMTIME,["_000_00_","_100_80_"],"lab6",[".xy",".xye"])
+    peak_width_path=find_file(PATH_BEAMTIME_RESULTS,["_000_00_","_100_80_"],"peak_width",[".dat"])
     
     wavelength= from_beamtime_to_wavelength(beamtime)
+    
     data={
         'path': [xy_path],
         'wavelength': wavelength
     }
-    print(xy_path)
+
     diffractogram, wavelength = xrd.io.read_xy(data=data)#,options=options)  
 
     ###### These functions can be put elsewhere, does not serve its purpose here? #####
