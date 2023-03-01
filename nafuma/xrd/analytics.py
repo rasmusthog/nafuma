@@ -729,7 +729,7 @@ def get_bm_folder_v2(path):
     else:
         return None
 
-def instrumental_peak_shape(data,options):
+def instrumental_peak_shape_plot(data,options):
     default_options = {
         'plot_instrumental_broadening': False,
         'refinement_result_path': None
@@ -797,7 +797,7 @@ def find_file(folder_path, detector_positions, file_string=None, file_exts=[".da
 
 
 ###Testing to make a function that only takes beam time as an argument:
-def instrumental_peak_shape_pos1(beamtime,options):
+def instrumental_peak_shape(beamtime,detector_position,options):
     default_options = {
         'plot_instrumental_broadening': False
         }
@@ -809,8 +809,16 @@ def instrumental_peak_shape_pos1(beamtime,options):
     PATH_BEAMTIME_RESULTS=os.path.join(PATH_BEAMTIME,"results")
     print(PATH_BEAMTIME)
     #print(PATH_BEAMTIME,["_000_00_","_100_80_"],"lab6","xy")
-    xy_path = find_file(PATH_BEAMTIME,["_000_00_","_100_80_"],"lab6",[".xy",".xye"])
-    peak_width_path=find_file(PATH_BEAMTIME_RESULTS,["_000_00_","_100_80_"],"peak_width",[".dat"])
+    if detector_position == "pos1":
+        detector_positions = ["_000_00_","_100_80_"] #representing 1231 and 1257, more to come
+    if detector_position == "pos3":
+        detector_positions = ["_400_100_"] #representing 1257, more to come
+
+    xy_path = find_file(PATH_BEAMTIME,detector_positions,"lab6",[".xy",".xye"])
+    peak_width_path=find_file(PATH_BEAMTIME_RESULTS,detector_positions,"peak_width",[".dat"])
+
+    if peak_width_path is None:
+        print("Cannot find the Lab6 result-file, check detector position")
     
     wavelength= from_beamtime_to_wavelength(beamtime)
     
