@@ -654,6 +654,10 @@ def from_beamtime_to_wavelength(beamtime_name):
     for name in beamtime_name:
         if name == 'bm01021231':
             return 0.6390512
+        if name == 'bm01021239':
+            return 0.6223090446548326
+        if name == 'bm01021257':
+            return 0.6892469162829824
         # Add more conditions for other beamtime names and wavelengths
     # If none of the beamtime names match, return None
     return None
@@ -822,6 +826,7 @@ def instrumental_peak_shape(beamtime,detector_position,options):
     
     wavelength= from_beamtime_to_wavelength(beamtime)
     
+
     data={
         'path': [xy_path],
         'wavelength': wavelength
