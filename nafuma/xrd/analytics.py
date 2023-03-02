@@ -164,6 +164,45 @@ def _2PV(x, I_1, x0_1, PV_fwhm_1, ratio_1, I_2, x0_2, PV_fwhm_2, ratio_2):
 
     return (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2))
 
+def _5PV(x, I_1,x0_1,PV_fwhm_1,ratio_1,I_2,x0_2,PV_fwhm_2,ratio_2,I_3,x0_3,PV_fwhm_3,ratio_3,I_4,x0_4,PV_fwhm_4,ratio_4,I_5,x0_5,PV_fwhm_5,ratio_5):
+
+    sigma_1=PV_fwhm_1/(2*np.sqrt(2*np.log(2)))
+    a_G_1= 1/(sigma_1*np.sqrt(2*np.pi))
+    b_G_1= 4*np.log(2)/PV_fwhm_1**2
+
+    GAUSSIAN_PART_1= a_G_1*np.exp(-b_G_1*(x-x0_1)**2)
+    LORENTZIAN_PART_1= 1/np.pi * (PV_fwhm_1/2)/((x-x0_1)**2+(PV_fwhm_1/2)**2)
+
+    sigma_2=PV_fwhm_2/(2*np.sqrt(2*np.log(2)))
+    a_G_2= 1/(sigma_2*np.sqrt(2*np.pi))
+    b_G_2= 4*np.log(2)/PV_fwhm_2**2
+
+    GAUSSIAN_PART_2= a_G_2*np.exp(-b_G_2*(x-x0_2)**2)
+    LORENTZIAN_PART_2= 1/np.pi * (PV_fwhm_2/2)/((x-x0_2)**2+(PV_fwhm_2/2)**2)
+
+    sigma_3=PV_fwhm_3/(2*np.sqrt(2*np.log(2)))
+    a_G_3= 1/(sigma_3*np.sqrt(2*np.pi))
+    b_G_3= 4*np.log(2)/PV_fwhm_3**2
+
+    GAUSSIAN_PART_3= a_G_3*np.exp(-b_G_3*(x-x0_3)**2)
+    LORENTZIAN_PART_3= 1/np.pi * (PV_fwhm_3/2)/((x-x0_3)**2+(PV_fwhm_3/2)**2)
+    
+    sigma_4=PV_fwhm_4/(2*np.sqrt(2*np.log(2)))
+    a_G_4= 1/(sigma_4*np.sqrt(2*np.pi))
+    b_G_4= 4*np.log(2)/PV_fwhm_4**2
+
+    GAUSSIAN_PART_4= a_G_4*np.exp(-b_G_4*(x-x0_4)**2)
+    LORENTZIAN_PART_4= 1/np.pi * (PV_fwhm_4/2)/((x-x0_4)**2+(PV_fwhm_4/2)**2)
+
+    sigma_5=PV_fwhm_5/(2*np.sqrt(2*np.log(2)))
+    a_G_5= 1/(sigma_5*np.sqrt(2*np.pi))
+    b_G_5= 4*np.log(2)/PV_fwhm_5**2
+
+    GAUSSIAN_PART_5= a_G_5*np.exp(-b_G_5*(x-x0_5)**2)
+    LORENTZIAN_PART_5= 1/np.pi * (PV_fwhm_5/2)/((x-x0_5)**2+(PV_fwhm_5/2)**2)
+
+    return (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2)+ I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5))
+
 def _1Lorentzian(x, ampL, center, widL):
     return ((ampL*widL**2/((x-center)**2+widL**2)) )
 
@@ -446,7 +485,7 @@ def find_fwhm_of_peak(x,y,start_values,options):
             y_fwhm2=[y2_max/2,y2_max/2]
             ax.plot(x_fwhm2,y_fwhm2,c='g')
             ##TEST
-        if options['cluster']:
+        if options['cluster_PV']:
             plt.axvline(parameters[5]) #center position
             x_fwhm2=[parameters[5]-parameters[6]/2,parameters[5]+parameters[6]/2] #plotting the width of the fwhm
             y2_max=I_2 * (ratio_2 * a_G_2+(1-ratio_2)*(1/(np.pi*PV_fwhm_2/2))) #trying to reduce the second peak at x=x0_2
@@ -659,9 +698,12 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
     BG_poly_degree_list=[]
     excluded_background_range_list=[] #FIXME add excluded background regions in the analyze-background_subtracted-function
     #df_peaks=pd.DataFrame(columns=chosen_peaks)
+
+    lower_bounds_list=[]
+    upper_bounds_list=[]
     twoth_exp=0.00001 * T_diff #approximately the increase in twotheta per degree K above RT (just an approx, without any basis from theory)
     
-
+    slack=0.1
     ##Trying to implement a cluster of peaks, have to consider whether sub1 and sub2 must be separated into two peaks as well to acount for peak splitting
     if "cluster" in chosen_peaks:
         peak_center_ord= WL_translate(14.2*(1-twoth_exp),WL,WL_new)
@@ -672,9 +714,23 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
         start_values_list.append(
             [0.1,       peak_center_ord,    0.2434226,  0.5,
              0.1,       peak_center_RS1,    0.2434226,  0.5, 
-             34.6392,   peak_center_sub1,   0.0847148,  0.92987947,
+             30,   peak_center_sub1,   0.0847148,  0.92987947,
              0.1,       peak_center_RS2,    0.2434226,  0.5,
-             34.6392,   peak_center_sub2,   0.0847148,  0.92987947]
+             30,   peak_center_sub2,   0.0847148,  0.92987947]
+        )
+        lower_bounds_list.append(
+            [0,       peak_center_ord-slack,    0,  0,
+             0,       peak_center_RS1-slack,    0,  0, 
+             0,       peak_center_sub1-slack,   0,  0,
+             0,       peak_center_RS2-slack,    0,  0,
+             0,       peak_center_sub2-slack,   0,  0]
+        )   
+        upper_bounds_list.append(
+            [100,       peak_center_ord+slack,    0.3,    1,
+             100,       peak_center_RS1+slack,    0.3,    1, 
+             300,       peak_center_sub1+slack,   0.2,  1,
+             100,       peak_center_RS2+slack,    0.3,    1,
+             300,       peak_center_sub2+slack,   0.2, 1]
         )   
         peak_range_list.append(         [WL_translate(14.0*(1-twoth_exp),WL,WL_new),WL_translate(15.8*(1-twoth_exp),WL,WL_new)])
         background_range_list.append(   [WL_translate(13.6*(1-twoth_exp),WL,WL_new),WL_translate(15.95*(1-twoth_exp),WL,WL_new)])
@@ -742,7 +798,7 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
         excluded_background_range_list.append([[peak_end,37.18]])#[[35.18,35.74],[36.34,36.59],[36.61,36.79]])#([,,) #include this for certain peaks that has peaks in close proximity and influences the background
         BG_poly_degree_list.append(1)
 
-    return BG_poly_degree_list,start_values_list,background_range_list, peak_range_list, excluded_background_range_list
+    return lower_bounds_list,upper_bounds_list, BG_poly_degree_list,start_values_list,background_range_list, peak_range_list, excluded_background_range_list
 
 def finding_instrumental_peak_broadening(data,options):
     #This function might not be necessary, as I can use the DC1-function and refine data with TOPAS to find proper parameters. But parts of this can be used for other things.
