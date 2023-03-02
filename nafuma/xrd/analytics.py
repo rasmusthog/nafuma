@@ -182,6 +182,7 @@ def find_fwhm_of_peak(x,y,start_values,options):
         'pseudovoigt': False,
         'doublePV': False,
         'gaussian': False,
+        'cluster_PV': False,
         #'starting_guess_lor':   [400,   14.1,   0.01],
         #'starting_guess_gauss': [400,   14.1,   0.01],
         'plot_fit': True,
@@ -330,6 +331,92 @@ def find_fwhm_of_peak(x,y,start_values,options):
 
         y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2))
 
+    if options['cluster_PV']:
+        #https://docs.mantidproject.org/nightly/fitting/fitfunctions/PseudoVoigt.html
+        I_1= start_values[0]#PeakIntensity 
+        x0_1 = start_values[1]
+        PV_fwhm_1= start_values[2]
+        ratio_1 = start_values[3]
+
+        I_2= start_values[4]#PeakIntensity 
+        x0_2 = start_values[5]
+        PV_fwhm_2= start_values[6]
+        ratio_2 = start_values[7]
+
+        I_3= start_values[8]#PeakIntensity 
+        x0_3 = start_values[9]
+        PV_fwhm_3= start_values[10]
+        ratio_3 = start_values[11]
+        
+        I_4= start_values[12]#PeakIntensity 
+        x0_4 = start_values[13]
+        PV_fwhm_4= start_values[14]
+        ratio_4 = start_values[15]
+
+        I_5= start_values[16]#PeakIntensity 
+        x0_5 = start_values[17]
+        PV_fwhm_5= start_values[18]
+        ratio_5 = start_values[19]
+        
+    #######============== defining the lower bound of the fit, deciding it should be defined separately for all the five peaks rather than having the same bounds
+   #
+   #      lower_bound=options['lower_bounds_PV'][:4]
+   #     lower_bounds=lower_bound
+        
+ #       for i in range(len(lower_bound)):
+  #          lower_bounds.append(lower_bound[i])
+
+#        upper_bound=options['upper_bounds_PV'][:4]
+#        upper_bounds=upper_bound
+#        for i in range(len(upper_bound)):
+#            upper_bounds.append(upper_bound[i])
+
+        param_bounds=(options['lower_bounds_PV'],options['upper_bounds_PV'])
+        popt_PV, pcov_PV = scipy.optimize.curve_fit(_5PV, x, y, p0=[I_1,x0_1,PV_fwhm_1,ratio_1,I_2,x0_2,PV_fwhm_2,ratio_2,I_3,x0_3,PV_fwhm_3,ratio_3,I_4,x0_4,PV_fwhm_4,ratio_4,I_5,x0_5,PV_fwhm_5,ratio_5],bounds=param_bounds)
+        
+        perr_PV = np.sqrt(np.diag(pcov_PV))
+
+        [I_1,x0_1,PV_fwhm_1,ratio_1,I_2,x0_2,PV_fwhm_2,ratio_2,I_3,x0_3,PV_fwhm_3,ratio_3,I_4,x0_4,PV_fwhm_4,ratio_4,I_5,x0_5,PV_fwhm_5,ratio_5]=popt_PV
+        parameters=popt_PV
+        errors=perr_PV
+
+        sigma_1=PV_fwhm_1/(2*np.sqrt(2*np.log(2)))
+        a_G_1= 1/(sigma_1*np.sqrt(2*np.pi))
+        b_G_1= 4*np.log(2)/PV_fwhm_1**2
+
+        GAUSSIAN_PART_1= a_G_1*np.exp(-b_G_1*(x_fit-x0_1)**2)
+        LORENTZIAN_PART_1= 1/np.pi * (PV_fwhm_1/2)/((x_fit-x0_1)**2+(PV_fwhm_1/2)**2)
+
+        sigma_2=PV_fwhm_2/(2*np.sqrt(2*np.log(2)))
+        a_G_2= 1/(sigma_2*np.sqrt(2*np.pi))
+        b_G_2= 4*np.log(2)/PV_fwhm_2**2
+
+        GAUSSIAN_PART_2= a_G_2*np.exp(-b_G_2*(x_fit-x0_2)**2)
+        LORENTZIAN_PART_2= 1/np.pi * (PV_fwhm_2/2)/((x_fit-x0_2)**2+(PV_fwhm_2/2)**2)
+
+        sigma_3=PV_fwhm_3/(2*np.sqrt(2*np.log(2)))
+        a_G_3= 1/(sigma_3*np.sqrt(2*np.pi))
+        b_G_3= 4*np.log(2)/PV_fwhm_3**2
+
+        GAUSSIAN_PART_3= a_G_3*np.exp(-b_G_3*(x_fit-x0_3)**2)
+        LORENTZIAN_PART_3= 1/np.pi * (PV_fwhm_3/2)/((x_fit-x0_3)**2+(PV_fwhm_3/2)**2)
+        
+        sigma_4=PV_fwhm_4/(2*np.sqrt(2*np.log(2)))
+        a_G_4= 1/(sigma_4*np.sqrt(2*np.pi))
+        b_G_4= 4*np.log(2)/PV_fwhm_4**2
+
+        GAUSSIAN_PART_4= a_G_4*np.exp(-b_G_4*(x_fit-x0_4)**2)
+        LORENTZIAN_PART_4= 1/np.pi * (PV_fwhm_4/2)/((x_fit-x0_4)**2+(PV_fwhm_4/2)**2)
+
+        sigma_5=PV_fwhm_5/(2*np.sqrt(2*np.log(2)))
+        a_G_5= 1/(sigma_5*np.sqrt(2*np.pi))
+        b_G_5= 4*np.log(2)/PV_fwhm_5**2
+
+        GAUSSIAN_PART_5= a_G_5*np.exp(-b_G_5*(x_fit-x0_5)**2)
+        LORENTZIAN_PART_5= 1/np.pi * (PV_fwhm_5/2)/((x_fit-x0_5)**2+(PV_fwhm_5/2)**2)
+
+        y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2)+ I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5))
+
     if options['plot_fit']:
         fig = plt.figure(figsize=[40,10])
         ax = plt.axes()
@@ -359,7 +446,32 @@ def find_fwhm_of_peak(x,y,start_values,options):
             y_fwhm2=[y2_max/2,y2_max/2]
             ax.plot(x_fwhm2,y_fwhm2,c='g')
             ##TEST
-    #ax.set_ylim(min(df_peak['I_org'])*0.9,max(df_peak['I_org'])*1.1)
+        if options['cluster']:
+            plt.axvline(parameters[5]) #center position
+            x_fwhm2=[parameters[5]-parameters[6]/2,parameters[5]+parameters[6]/2] #plotting the width of the fwhm
+            y2_max=I_2 * (ratio_2 * a_G_2+(1-ratio_2)*(1/(np.pi*PV_fwhm_2/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm2=[y2_max/2,y2_max/2]
+            ax.plot(x_fwhm2,y_fwhm2,c='g')
+
+            plt.axvline(parameters[9]) #center position
+            x_fwhm3=[parameters[9]-parameters[10]/2,parameters[9]+parameters[10]/2] #plotting the width of the fwhm
+            y3_max=I_3 * (ratio_3 * a_G_3+(1-ratio_3)*(1/(np.pi*PV_fwhm_3/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm3=[y3_max/2,y3_max/2]
+            ax.plot(x_fwhm3,y_fwhm3,c='g')
+
+            plt.axvline(parameters[13]) #center position
+            x_fwhm4=[parameters[13]-parameters[14]/2,parameters[13]+parameters[14]/2] #plotting the width of the fwhm
+            y4_max=I_4 * (ratio_4 * a_G_4+(1-ratio_4)*(1/(np.pi*PV_fwhm_4/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm4=[y4_max/2,y4_max/2]
+            ax.plot(x_fwhm4,y_fwhm4,c='g')
+
+            plt.axvline(parameters[17]) #center position
+            x_fwhm5=[parameters[17]-parameters[18]/2,parameters[17]+parameters[18]/2] #plotting the width of the fwhm
+            y5_max=I_5 * (ratio_5 * a_G_5+(1-ratio_5)*(1/(np.pi*PV_fwhm_5/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm5=[y5_max/2,y5_max/2]
+            ax.plot(x_fwhm5,y_fwhm5,c='g')
+            ##TEST
+            #ax.set_ylim(min(df_peak['I_org'])*0.9,max(df_peak['I_org'])*1.1)
     
     #ax.set_xlim(options['peak_interval'][0]-2*(options['background_shoulder_left']+options['background_shoulder_right']),options['peak_interval'][1]+2*(options['background_shoulder_left']+options['background_shoulder_right']))
     #ax.set_title(filename)
