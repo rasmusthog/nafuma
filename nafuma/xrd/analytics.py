@@ -446,20 +446,13 @@ def _DC1(x, ad, bd, cd):
         
         return (np.sqrt(ad * np.cos(x*np.pi/180)**4 + bd * np.cos(x*np.pi/180)**2 + cd))
 
-def from_one_wavelength_to_another(twotheta_original,wavelength_original,wavelength_new)
-    #new_peak= 2*np.arcsin(reference_wavelength/data["wavelength"][0]) * 180/np.pi
-    #only including peaks that are actually in the data set
-    twotheta_new=2*np.arcsin((wavelength_new/wavelength_original)*np.sin(twotheta_original/2 * np.pi/180))*180/np.pi
-    return twotheta_new
-
 def find_fit_parameters_for_peak(chosen_peaks,options): #can add wavelength if it will be used on data from another beam time at some point
     default_options={
         'temperature': False, #FIXME this is not implemented, but would be a great addition if running on variable-temperature data-sets, using some kind of thermal expansion constant
-        'wavelength': False #FIXME would be nice to enable translation from one beamtime to another 
+        'wavelength': False 
                    }
-    
     options = aux.update_options(options=options, default_options=default_options)
-
+    
     start_values_list=[]
     #start_values_list2=[] #for regions of overlapping peaks, such as disorder peak which is splitting over time. Ideally only starting values is necessary, and the background used and the peak region could be the same.
     peak_range_list=[]
@@ -471,7 +464,7 @@ def find_fit_parameters_for_peak(chosen_peaks,options): #can add wavelength if i
     #df_peaks=pd.DataFrame(columns=chosen_peaks)
     if "ord1" in chosen_peaks:
         peak_center= 14.095
-        start_values_list.append(       [0.1,  peak_center,  0.2434226,   0.5])
+        start_values_list.append([0.1, peak_center, 0.2434226, 0.5])
         peak_range_list.append(         [13.9,14.3])
         background_range_list.append(   [13.5,14.35])
         BG_poly_degree_list.append(2)        #start_values_list2.append(None)
@@ -501,6 +494,85 @@ def find_fit_parameters_for_peak(chosen_peaks,options): #can add wavelength if i
         #start_values_list2.append([34.63923911, peak_center2,  0.0847148,   0.92987947])
         #number_of_excluded_regions_list.append(3) #three excluded regions in the background region
         excluded_background_range_list.append([[peak_end,37.18]])#[[35.23,35.76],[36.34,37.22]]) #include this for certain peaks that has peaks in close proximity and influences the background
+        BG_poly_degree_list.append(1)
+    if "char" in chosen_peaks: #char as in a characteristic peak that both disordered and ordered phase will have
+        #FIXME Have to add the possibility to have 
+        peak_center=36.16 #43.35
+        peak_end=36.27
+        peak_range_list.append([35.82, peak_end])
+        background_range_list.append([35.72,37.25])#[35.76,36.87])
+        start_values_list.append([34.63923911, peak_center,  0.0847148,   0.92987947])#9.61189651 42.43286743  0.07566345  0.816174 
+        #start_values_list2.append(None)
+        #number_of_excluded_regions_list.append(3) #three excluded regions in the background region
+        excluded_background_range_list.append([[peak_end,37.18]])#[[35.18,35.74],[36.34,36.59],[36.61,36.79]])#([,,) #include this for certain peaks that has peaks in close proximity and influences the background
+        BG_poly_degree_list.append(1)
+    if options['temperature']:
+        original_wavelength=0.6390512 #in Å
+        #multiply all values with a temperature dependent factor and change values accordingly
+        print("tempereture dependence not yet implemented")
+    return BG_poly_degree_list,start_values_list,background_range_list, peak_range_list, excluded_background_range_list
+
+
+def WL_translate(twotheta_original,wavelength_original,wavelength_new):
+    #new_peak= 2*np.arcsin(reference_wavelength/data["wavelength"][0]) * 180/np.pi
+    #only including peaks that are actually in the data set
+    twotheta_new=2*np.arcsin((wavelength_new/wavelength_original)*np.sin(twotheta_original/2 * np.pi/180))*180/np.pi
+    return twotheta_new
+
+def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelength if it will be used on data from another beam time at some point
+    default_options={
+        'temperature': False, #FIXME this is not implemented, but would be a great addition if running on variable-temperature data-sets, using some kind of thermal expansion constant
+        'wavelength': False 
+                   }
+    
+    options = aux.update_options(options=options, default_options=default_options)
+    WL=0.6390512
+    if options['wavelength']:
+        WL_new=options['wavelength']
+    else:
+        print("No wavelength given in options!")
+
+    start_values_list=[]
+    #start_values_list2=[] #for regions of overlapping peaks, such as disorder peak which is splitting over time. Ideally only starting values is necessary, and the background used and the peak region could be the same.
+    peak_range_list=[]
+    #peak_range_list2=[] #this might or might not be necessary, depending on how the fitting goes.
+    background_range_list=[]
+    #number_of_excluded_regions_list=[]
+    BG_poly_degree_list=[]
+    excluded_background_range_list=[] #FIXME add excluded background regions in the analyze-background_subtracted-function
+    #df_peaks=pd.DataFrame(columns=chosen_peaks)
+    if "ord1" in chosen_peaks:
+        peak_center= WL_translate(14.095,WL,WL_new)
+        start_values_list.append([0.1,peak_center, 0.2434226, 0.5]                                )
+        peak_range_list.append(         [WL_translate(13.9,WL,WL_new),WL_translate(14.3,WL,WL_new)])
+        background_range_list.append(   [WL_translate(13.5,WL,WL_new),WL_translate(14.35,WL,WL_new)])
+        BG_poly_degree_list.append(2)        #start_values_list2.append(None)
+        excluded_background_range_list.append([[0,0]])#13.1,13.5]]) #include this for certain peaks that has peaks in close proximity
+        #number_of_excluded_regions_list.append(0) #no excluded regions
+        #df_peaks["ord1"]=start_values
+
+    if "Pt3" in chosen_peaks:
+        peak_center=WL_translate(42.431,WL,WL_new)
+        start_values_list.append([100, peak_center, 0.1, 0.8]) #bad first guesses, fix this
+        peak_range_list.append([WL_translate(42.3,WL,WL_new),WL_translate(42.56,WL,WL_new)])
+        background_range_list.append([WL_translate(42.25,WL,WL_new),WL_translate(42.75,WL,WL_new)])
+        #start_values_list2.append(None)
+        excluded_background_range_list.append([[0,0]]) #include this for certain peaks that has peaks in close proximity
+        #number_of_excluded_regions_list.append(0) #three excluded regions in the background region
+        #df_peaks["Pt3"]=start_values
+    #print(excluded_background_range_list)
+        BG_poly_degree_list.append(2)
+    if "char_split" in chosen_peaks: #char as in a characteristic peak that both disordered and ordered phase will have
+        #FIXME Have to add the possibility to have 
+        peak_center=WL_translate(36.10,WL,WL_new) #43.35
+        peak_center2=WL_translate(36.17,WL,WL_new) #43.45
+        peak_end=WL_translate(36.27,WL,WL_new)
+        peak_range_list.append([WL_translate(35.82,WL,WL_new), peak_end])
+        background_range_list.append([WL_translate(35.72,WL,WL_new),WL_translate(37.25,WL,WL_new)])
+        start_values_list.append([34.63923911, peak_center,  0.0847148,   0.92987947, 34.63923911, peak_center2,  0.0847148,   0.92987947]) 
+        #start_values_list2.append([34.63923911, peak_center2,  0.0847148,   0.92987947])
+        #number_of_excluded_regions_list.append(3) #three excluded regions in the background region
+        excluded_background_range_list.append([[peak_end,WL_translate(37.18,WL,WL_new)]])#[[35.23,35.76],[36.34,37.22]]) #include this for certain peaks that has peaks in close proximity and influences the background
         BG_poly_degree_list.append(1)
     if "char" in chosen_peaks: #char as in a characteristic peak that both disordered and ordered phase will have
         #FIXME Have to add the possibility to have 
