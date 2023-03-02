@@ -445,7 +445,13 @@ def find_area_of_peak(x,y,options):
 def _DC1(x, ad, bd, cd):
         
         return (np.sqrt(ad * np.cos(x*np.pi/180)**4 + bd * np.cos(x*np.pi/180)**2 + cd))
-        
+
+def from_one_wavelength_to_another(twotheta_original,wavelength_original,wavelength_new)
+    #new_peak= 2*np.arcsin(reference_wavelength/data["wavelength"][0]) * 180/np.pi
+    #only including peaks that are actually in the data set
+    twotheta_new=2*np.arcsin((wavelength_new/wavelength_original)*np.sin(twotheta_original/2 * np.pi/180))*180/np.pi
+    return twotheta_new
+
 def find_fit_parameters_for_peak(chosen_peaks,options): #can add wavelength if it will be used on data from another beam time at some point
     default_options={
         'temperature': False, #FIXME this is not implemented, but would be a great addition if running on variable-temperature data-sets, using some kind of thermal expansion constant
@@ -852,3 +858,4 @@ def instrumental_peak_shape(beamtime,detector_position,options):
         plt.xlabel("2th (deg)")
         plt.ylabel("fwhm")
     return ad,bd,cd
+
