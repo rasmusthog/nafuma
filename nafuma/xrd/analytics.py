@@ -231,6 +231,7 @@ def find_fwhm_of_peak(x,y,start_values,options):
         'doublePV': False,
         'gaussian': False,
         'cluster_PV': False,
+        'cluster_without_RS1': False,
         #'starting_guess_lor':   [400,   14.1,   0.01],
         #'starting_guess_gauss': [400,   14.1,   0.01],
         'plot_fit': True,
@@ -385,7 +386,7 @@ def find_fwhm_of_peak(x,y,start_values,options):
         x0_1 = start_values[1]
         PV_fwhm_1= start_values[2]
         ratio_1 = start_values[3]
-        
+
         I_2= start_values[4]#PeakIntensity 
         x0_2 = start_values[5]
         PV_fwhm_2= start_values[6]
@@ -463,7 +464,12 @@ def find_fwhm_of_peak(x,y,start_values,options):
         GAUSSIAN_PART_5= a_G_5*np.exp(-b_G_5*(x_fit-x0_5)**2)
         LORENTZIAN_PART_5= 1/np.pi * (PV_fwhm_5/2)/((x_fit-x0_5)**2+(PV_fwhm_5/2)**2)
 
-        y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2)+ I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5))
+        if options['cluster_without_RS1']:
+            #removing any contribution from I2, the RS1-peak
+            y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5))
+        else:
+            y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2)+ I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5))
+
 
     if options['plot_fit']:
         fig, axes = plt.subplots(nrows=1, ncols=3,figsize=(30,4))
@@ -740,14 +746,15 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
         peak_center_RS1= WL_translate(14.59*(1-twoth_exp),WL,WL_new)#14.67
         peak_center_sub1= WL_translate(14.9*(1-twoth_exp),WL,WL_new)
         peak_center_RS2 = WL_translate(15.3*(1-twoth_exp),WL,WL_new)
-        peak_center_sub2= WL_translate(15.56*(1-twoth_exp),WL,WL_new)
+        peak_center_sub2= WL_translate(15.53*(1-twoth_exp),WL,WL_new)
         start_values_list.append(
-            [0,       peak_center_ord,    0.2434226,  0.5,
-             0,       peak_center_RS1,    0.15,  0.5, 
-             30,   peak_center_sub1,   0.0847148,  0.92987947,
-             0.1,       peak_center_RS2,    0.2434226,  0.5,
-             30,   peak_center_sub2,   0.0847148,  0.92987947]
+            [0,    peak_center_ord,    0.15,  0.9,
+             0,    peak_center_RS1,    0.05,  0.9, 
+             30,   peak_center_sub1,   0.05,  0.9,
+             0.1,  peak_center_RS2,    0.05,  0.9,
+             10,   peak_center_sub2,   0.05,  0.9]
         )
+
         lower_bounds_list.append(
             [0,       peak_center_ord-slack_ord,    0.01,  0,
              0,       peak_center_RS1-slack,    0.01,  0, 
@@ -756,11 +763,11 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
              0,       peak_center_sub2-slack,   0.01,  0]
         )   
         upper_bounds_list.append(
-            [100,       peak_center_ord+slack_ord,    0.3,    1,
-             100,       peak_center_RS1+slack,    0.2,    1, 
+            [20,       peak_center_ord+slack_ord,    0.3,    1,
+             20,       peak_center_RS1+slack,    0.18,    1, 
              300,       peak_center_sub1+slack,   0.3,  1,
              100,       peak_center_RS2+slack,    0.3,    1,
-             300,       peak_center_sub2+slack,   0.3, 1]
+             200,       peak_center_sub2+slack,   0.3, 1]
         )   
         peak_range_list.append(         [WL_translate(13.9*(1-twoth_exp),WL,WL_new),WL_translate(15.8*(1-twoth_exp),WL,WL_new)])
         background_range_list.append(   [WL_translate(13.6*(1-twoth_exp),WL,WL_new),WL_translate(15.95*(1-twoth_exp),WL,WL_new)])
