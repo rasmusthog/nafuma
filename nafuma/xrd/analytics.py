@@ -118,10 +118,15 @@ def background_subtracted_peak(data,options):
         axes[0].set_title(filename)
         diffractogram.plot(x="2th",y="I",ax=axes[0])
         
-        plt.axvline(x = options['peak_interval'][0],c='r')
-        plt.axvline(x = options['peak_interval'][1],c='r')
-        plt.axvline(x=options['background_region'][0],c='m')
-        plt.axvline(x=options['background_region'][1],c='m')
+        axes[0].axvline(x = options['peak_interval'][0],c='r')
+        axes[0].axvline(x = options['peak_interval'][1],c='r')
+        axes[0].axvline(x=options['background_region'][0],c='m')
+        axes[0].axvline(x=options['background_region'][1],c='m')
+        #A plot of only the background subtraction for the ordered peak, to makes sure that is okay from visual inspection
+     #   df_peak.plot(x="2th",y="I_BG",ax=axes[1])
+     #   axes[1].set_title(filename)
+
+    #    axes[1].set_xlim(options['background_region'][0]*0.99,options['background_region'][0]+(options['background_region'][1]-options['background_region'][0])*0.3)
 
         #[[35.18,35,76],[36.34,36.59],[36.61,36.79]]
         if options['background_excluded_region']:
@@ -380,7 +385,7 @@ def find_fwhm_of_peak(x,y,start_values,options):
         x0_1 = start_values[1]
         PV_fwhm_1= start_values[2]
         ratio_1 = start_values[3]
-
+        
         I_2= start_values[4]#PeakIntensity 
         x0_2 = start_values[5]
         PV_fwhm_2= start_values[6]
@@ -461,14 +466,18 @@ def find_fwhm_of_peak(x,y,start_values,options):
         y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2)+ I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5))
 
     if options['plot_fit']:
-        fig, axes = plt.subplots(nrows=1, ncols=2,figsize=(30,4))
+        fig, axes = plt.subplots(nrows=1, ncols=3,figsize=(30,4))
         #fig.suptitle("Background removed data with fit") # or plt.suptitle('Main title')
         axes[0].plot(x,y,'o')
         axes[0].plot(x_fit,y_fit)
 
-        axes[1].plot(x,np.log(y),'o')
-        axes[1].plot(x_fit,np.log(y_fit))
+        axes[1].plot(x,np.cbrt(y),'o')
+        axes[1].plot(x_fit,np.cbrt(y_fit))
+        
+        axes[2].plot(x,y,'o')
+        axes[2].plot(x_fit,y_fit)
         ##TEST
+
 
         axes[0].axvline(parameters[1]) #center position
         x_fwhm1=[parameters[1]-parameters[2]/2,parameters[1]+parameters[2]/2] #plotting the width of the fwhm
@@ -480,12 +489,14 @@ def find_fwhm_of_peak(x,y,start_values,options):
         #y_fwhm=[max(y_fit)/2,max(y_fit)/2]
 
         #is this useful? yes for PV it should be useful
-        y1_max=I_1 * (ratio_1 * a_G_1+(1-ratio_1)*(1/(np.pi*PV_fwhm_1/2))) #trying to reduce the second peak at x=x0_2
+        y1_max=I_1 * (ratio_1 * a_G_1+(1-ratio_1)*(1/(np.pi*PV_fwhm_1/2)))
         y_fwhm1=[y1_max/2,y1_max/2]
         axes[0].plot(x_fwhm1,y_fwhm1,c='g')
-
-
-        axes[1].plot(x_fwhm1,np.log(y_fwhm1),c='g')
+        axes[1].plot(x_fwhm1,np.cbrt(y_fwhm1),c='g')
+        
+        #Trying to plot the ordering-peak
+        #axes[2].plot(x_fit,y1_max)
+        axes[2].set_ylim(0,y1_max*1.5)
 
         if options['doublePV']:
             plt.axvline(parameters[5]) #center position
@@ -505,28 +516,28 @@ def find_fwhm_of_peak(x,y,start_values,options):
             y2_max=I_2 * (ratio_2 * a_G_2+(1-ratio_2)*(1/(np.pi*PV_fwhm_2/2))) #trying to reduce the second peak at x=x0_2
             y_fwhm2=[y2_max/2,y2_max/2]
             axes[0].plot(x_fwhm2,y_fwhm2,c='g')
-            axes[1].plot(x_fwhm2,np.log(y_fwhm2),c='g')
+            axes[1].plot(x_fwhm2,np.cbrt(y_fwhm2),c='g')
 
             plt.axvline(parameters[9]) #center position
             x_fwhm3=[parameters[9]-parameters[10]/2,parameters[9]+parameters[10]/2] #plotting the width of the fwhm
             y3_max=I_3 * (ratio_3 * a_G_3+(1-ratio_3)*(1/(np.pi*PV_fwhm_3/2))) #trying to reduce the second peak at x=x0_2
             y_fwhm3=[y3_max/2,y3_max/2]
             axes[0].plot(x_fwhm3,y_fwhm3,c='g')
-            axes[1].plot(x_fwhm3,np.log(y_fwhm3),c='g')
+            axes[1].plot(x_fwhm3,np.cbrt(y_fwhm3),c='g')
 
             plt.axvline(parameters[13]) #center position
             x_fwhm4=[parameters[13]-parameters[14]/2,parameters[13]+parameters[14]/2] #plotting the width of the fwhm
             y4_max=I_4 * (ratio_4 * a_G_4+(1-ratio_4)*(1/(np.pi*PV_fwhm_4/2))) #trying to reduce the second peak at x=x0_2
             y_fwhm4=[y4_max/2,y4_max/2]
             axes[0].plot(x_fwhm4,y_fwhm4,c='g')
-            axes[1].plot(x_fwhm4,np.log(y_fwhm4),c='g')
+            axes[1].plot(x_fwhm4,np.cbrt(y_fwhm4),c='g')
 
             plt.axvline(parameters[17]) #center position
             x_fwhm5=[parameters[17]-parameters[18]/2,parameters[17]+parameters[18]/2] #plotting the width of the fwhm
             y5_max=I_5 * (ratio_5 * a_G_5+(1-ratio_5)*(1/(np.pi*PV_fwhm_5/2))) #trying to reduce the second peak at x=x0_2
             y_fwhm5=[y5_max/2,y5_max/2]
             axes[0].plot(x_fwhm5,y_fwhm5,c='g')
-            axes[1].plot(x_fwhm5,np.log(y_fwhm5),c='g')
+            axes[1].plot(x_fwhm5,np.cbrt(y_fwhm5),c='g')
             ##TEST
             #ax.set_ylim(min(df_peak['I_org'])*0.9,max(df_peak['I_org'])*1.1)
     
@@ -726,37 +737,38 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
     ##Trying to implement a cluster of peaks, have to consider whether sub1 and sub2 must be separated into two peaks as well to acount for peak splitting
     if "cluster" in chosen_peaks:
         peak_center_ord= WL_translate(14.2*(1-twoth_exp),WL,WL_new)
-        peak_center_RS1= WL_translate(14.67*(1-twoth_exp),WL,WL_new)
+        peak_center_RS1= WL_translate(14.59*(1-twoth_exp),WL,WL_new)#14.67
         peak_center_sub1= WL_translate(14.9*(1-twoth_exp),WL,WL_new)
         peak_center_RS2 = WL_translate(15.3*(1-twoth_exp),WL,WL_new)
         peak_center_sub2= WL_translate(15.56*(1-twoth_exp),WL,WL_new)
         start_values_list.append(
-            [0.1,       peak_center_ord,    0.2434226,  0.5,
-             0.1,       peak_center_RS1,    0.2434226,  0.5, 
+            [0,       peak_center_ord,    0.2434226,  0.5,
+             0,       peak_center_RS1,    0.15,  0.5, 
              30,   peak_center_sub1,   0.0847148,  0.92987947,
              0.1,       peak_center_RS2,    0.2434226,  0.5,
              30,   peak_center_sub2,   0.0847148,  0.92987947]
         )
         lower_bounds_list.append(
-            [0,       peak_center_ord-slack_ord,    0,  0,
-             0,       peak_center_RS1-slack,    0,  0, 
-             0,       peak_center_sub1-slack,   0,  0,
-             0,       peak_center_RS2-slack,    0,  0,
-             0,       peak_center_sub2-slack,   0,  0]
+            [0,       peak_center_ord-slack_ord,    0.01,  0,
+             0,       peak_center_RS1-slack,    0.01,  0, 
+             0,       peak_center_sub1-slack,   0.01,  0,
+             0,       peak_center_RS2-slack,    0.01,  0,
+             0,       peak_center_sub2-slack,   0.01,  0]
         )   
         upper_bounds_list.append(
             [100,       peak_center_ord+slack_ord,    0.3,    1,
-             100,       peak_center_RS1+slack,    0.3,    1, 
+             100,       peak_center_RS1+slack,    0.2,    1, 
              300,       peak_center_sub1+slack,   0.3,  1,
              100,       peak_center_RS2+slack,    0.3,    1,
              300,       peak_center_sub2+slack,   0.3, 1]
         )   
-        peak_range_list.append(         [WL_translate(14.0*(1-twoth_exp),WL,WL_new),WL_translate(15.8*(1-twoth_exp),WL,WL_new)])
+        peak_range_list.append(         [WL_translate(13.9*(1-twoth_exp),WL,WL_new),WL_translate(15.8*(1-twoth_exp),WL,WL_new)])
         background_range_list.append(   [WL_translate(13.6*(1-twoth_exp),WL,WL_new),WL_translate(15.95*(1-twoth_exp),WL,WL_new)])
         BG_poly_degree_list.append(2)        #start_values_list2.append(None)
         excluded_background_range_list.append([[0,0]])#13.1,13.5]]) #include this for certain peaks that has peaks in close proximity
         #number_of_excluded_regions_list.append(0) #no excluded regions
         #df_peaks["ord1"]=start_values 
+
 
     if "Pt3" in chosen_peaks:
         peak_center=WL_translate(42.431,WL,WL_new)
