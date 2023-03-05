@@ -706,6 +706,7 @@ def WL_translate(twotheta_original,wavelength_original,wavelength_new):
     return twotheta_new
 
 def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelength if it will be used on data from another beam time at some point
+    #FIXME add peak splitting of the cluster, 
     default_options={
         'temperature': False, #FIXME this is not implemented, but would be a great addition if running on variable-temperature data-sets, using some kind of thermal expansion constant
         'wavelength': False 
@@ -738,35 +739,36 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
     upper_bounds_list=[]
     twoth_exp=0.00001 * T_diff #approximately the increase in twotheta per degree K above RT (just an approx, without any basis from theory)
     
-    slack=0.1
+    slack=0.09
+    slack_RS=0.05
     slack_ord=0.015
     ##Trying to implement a cluster of peaks, have to consider whether sub1 and sub2 must be separated into two peaks as well to acount for peak splitting
     if "cluster" in chosen_peaks:
         peak_center_ord= WL_translate(14.2*(1-twoth_exp),WL,WL_new)
-        peak_center_RS1= WL_translate(14.59*(1-twoth_exp),WL,WL_new)#14.67
+        peak_center_RS1= WL_translate(14.63*(1-twoth_exp),WL,WL_new)#14.59, 14.67
         peak_center_sub1= WL_translate(14.9*(1-twoth_exp),WL,WL_new)
-        peak_center_RS2 = WL_translate(15.3*(1-twoth_exp),WL,WL_new)
+        peak_center_RS2 = WL_translate(15.32*(1-twoth_exp),WL,WL_new)
         peak_center_sub2= WL_translate(15.53*(1-twoth_exp),WL,WL_new)
         start_values_list.append(
-            [0,    peak_center_ord,    0.15,  0.9,
-             0,    peak_center_RS1,    0.05,  0.9, 
-             30,   peak_center_sub1,   0.05,  0.9,
-             0.1,  peak_center_RS2,    0.05,  0.9,
-             10,   peak_center_sub2,   0.05,  0.9]
+            [0,    peak_center_ord,    0.15,  1,
+             0,    peak_center_RS1,    0.05,  1, 
+             30,   peak_center_sub1,   0.05,  1,
+             0,  peak_center_RS2,    0.05,  1,
+             10,   peak_center_sub2,   0.05,  1]
         )
 
         lower_bounds_list.append(
-            [0,       peak_center_ord-slack_ord,    0.01,  0,
-             0,       peak_center_RS1-slack,    0.01,  0, 
-             0,       peak_center_sub1-slack,   0.01,  0,
-             0,       peak_center_RS2-slack,    0.01,  0,
-             0,       peak_center_sub2-slack,   0.01,  0]
+            [0,       peak_center_ord-slack_ord,    0.01,  0.9,
+             0,       peak_center_RS1-slack_RS,    0.01,  0.9, 
+             0,       peak_center_sub1-slack,   0.01,  0.9,
+             0,       peak_center_RS2-slack_RS,    0.01,  0.9,
+             0,       peak_center_sub2-slack,   0.01,  0.9]
         )   
         upper_bounds_list.append(
             [20,       peak_center_ord+slack_ord,    0.3,    1,
-             20,       peak_center_RS1+slack,    0.18,    1, 
-             300,       peak_center_sub1+slack,   0.3,  1,
-             100,       peak_center_RS2+slack,    0.3,    1,
+             20,       peak_center_RS1+slack_RS,    0.3,    1, 
+             1000,       peak_center_sub1+slack,   0.3,  1,
+             100,       peak_center_RS2+slack_RS,    0.3,    1,
              200,       peak_center_sub2+slack,   0.3, 1]
         )   
         peak_range_list.append(         [WL_translate(13.9*(1-twoth_exp),WL,WL_new),WL_translate(15.8*(1-twoth_exp),WL,WL_new)])
