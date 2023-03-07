@@ -212,6 +212,105 @@ def _5PV(x, I_1,x0_1,PV_fwhm_1,ratio_1,I_2,x0_2,PV_fwhm_2,ratio_2,I_3,x0_3,PV_fw
 
     return (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2)+ I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5))
 
+def _6PV(x, I_1,x0_1,PV_fwhm_1,ratio_1,I_2,x0_2,PV_fwhm_2,ratio_2,I_3,x0_3,PV_fwhm_3,ratio_3,I_4,x0_4,PV_fwhm_4,ratio_4,I_5,x0_5,PV_fwhm_5,ratio_5,I_6,x0_6,PV_fwhm_6,ratio_6):
+
+    sigma_1=PV_fwhm_1/(2*np.sqrt(2*np.log(2)))
+    a_G_1= 1/(sigma_1*np.sqrt(2*np.pi))
+    b_G_1= 4*np.log(2)/PV_fwhm_1**2
+
+    GAUSSIAN_PART_1= a_G_1*np.exp(-b_G_1*(x-x0_1)**2)
+    LORENTZIAN_PART_1= 1/np.pi * (PV_fwhm_1/2)/((x-x0_1)**2+(PV_fwhm_1/2)**2)
+
+    sigma_2=PV_fwhm_2/(2*np.sqrt(2*np.log(2)))
+    a_G_2= 1/(sigma_2*np.sqrt(2*np.pi))
+    b_G_2= 4*np.log(2)/PV_fwhm_2**2
+
+    GAUSSIAN_PART_2= a_G_2*np.exp(-b_G_2*(x-x0_2)**2)
+    LORENTZIAN_PART_2= 1/np.pi * (PV_fwhm_2/2)/((x-x0_2)**2+(PV_fwhm_2/2)**2)
+
+    sigma_3=PV_fwhm_3/(2*np.sqrt(2*np.log(2)))
+    a_G_3= 1/(sigma_3*np.sqrt(2*np.pi))
+    b_G_3= 4*np.log(2)/PV_fwhm_3**2
+
+    GAUSSIAN_PART_3= a_G_3*np.exp(-b_G_3*(x-x0_3)**2)
+    LORENTZIAN_PART_3= 1/np.pi * (PV_fwhm_3/2)/((x-x0_3)**2+(PV_fwhm_3/2)**2)
+    
+    sigma_4=PV_fwhm_4/(2*np.sqrt(2*np.log(2)))
+    a_G_4= 1/(sigma_4*np.sqrt(2*np.pi))
+    b_G_4= 4*np.log(2)/PV_fwhm_4**2
+
+    GAUSSIAN_PART_4= a_G_4*np.exp(-b_G_4*(x-x0_4)**2)
+    LORENTZIAN_PART_4= 1/np.pi * (PV_fwhm_4/2)/((x-x0_4)**2+(PV_fwhm_4/2)**2)
+
+    sigma_5=PV_fwhm_5/(2*np.sqrt(2*np.log(2)))
+    a_G_5= 1/(sigma_5*np.sqrt(2*np.pi))
+    b_G_5= 4*np.log(2)/PV_fwhm_5**2
+
+    GAUSSIAN_PART_5= a_G_5*np.exp(-b_G_5*(x-x0_5)**2)
+    LORENTZIAN_PART_5= 1/np.pi * (PV_fwhm_5/2)/((x-x0_5)**2+(PV_fwhm_5/2)**2)
+
+    sigma_6=PV_fwhm_6/(2*np.sqrt(2*np.log(2)))
+    a_G_6= 1/(sigma_6*np.sqrt(2*np.pi))
+    b_G_6= 4*np.log(2)/PV_fwhm_6**2
+
+    GAUSSIAN_PART_6= a_G_6*np.exp(-b_G_6*(x-x0_6)**2)
+    LORENTZIAN_PART_6= 1/np.pi * (PV_fwhm_6/2)/((x-x0_6)**2+(PV_fwhm_6/2)**2)
+    return (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2)+ I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5)+ I_6 * (ratio_6 * GAUSSIAN_PART_6+(1-ratio_6)*LORENTZIAN_PART_6))
+
+def _7PV(x, I_1,x0_1,PV_fwhm_1,ratio_1,I_2,x0_2,PV_fwhm_2,ratio_2,I_3,x0_3,PV_fwhm_3,ratio_3,I_4,x0_4,PV_fwhm_4,ratio_4,I_5,x0_5,PV_fwhm_5,ratio_5,I_6,x0_6,PV_fwhm_6,ratio_6,I_7,x0_7,PV_fwhm_7,ratio_7):
+
+    sigma_1=PV_fwhm_1/(2*np.sqrt(2*np.log(2)))
+    a_G_1= 1/(sigma_1*np.sqrt(2*np.pi))
+    b_G_1= 4*np.log(2)/PV_fwhm_1**2
+
+    GAUSSIAN_PART_1= a_G_1*np.exp(-b_G_1*(x-x0_1)**2)
+    LORENTZIAN_PART_1= 1/np.pi * (PV_fwhm_1/2)/((x-x0_1)**2+(PV_fwhm_1/2)**2)
+
+    sigma_2=PV_fwhm_2/(2*np.sqrt(2*np.log(2)))
+    a_G_2= 1/(sigma_2*np.sqrt(2*np.pi))
+    b_G_2= 4*np.log(2)/PV_fwhm_2**2
+
+    GAUSSIAN_PART_2= a_G_2*np.exp(-b_G_2*(x-x0_2)**2)
+    LORENTZIAN_PART_2= 1/np.pi * (PV_fwhm_2/2)/((x-x0_2)**2+(PV_fwhm_2/2)**2)
+
+    sigma_3=PV_fwhm_3/(2*np.sqrt(2*np.log(2)))
+    a_G_3= 1/(sigma_3*np.sqrt(2*np.pi))
+    b_G_3= 4*np.log(2)/PV_fwhm_3**2
+
+    GAUSSIAN_PART_3= a_G_3*np.exp(-b_G_3*(x-x0_3)**2)
+    LORENTZIAN_PART_3= 1/np.pi * (PV_fwhm_3/2)/((x-x0_3)**2+(PV_fwhm_3/2)**2)
+    
+    sigma_4=PV_fwhm_4/(2*np.sqrt(2*np.log(2)))
+    a_G_4= 1/(sigma_4*np.sqrt(2*np.pi))
+    b_G_4= 4*np.log(2)/PV_fwhm_4**2
+
+    GAUSSIAN_PART_4= a_G_4*np.exp(-b_G_4*(x-x0_4)**2)
+    LORENTZIAN_PART_4= 1/np.pi * (PV_fwhm_4/2)/((x-x0_4)**2+(PV_fwhm_4/2)**2)
+
+    sigma_5=PV_fwhm_5/(2*np.sqrt(2*np.log(2)))
+    a_G_5= 1/(sigma_5*np.sqrt(2*np.pi))
+    b_G_5= 4*np.log(2)/PV_fwhm_5**2
+
+    GAUSSIAN_PART_5= a_G_5*np.exp(-b_G_5*(x-x0_5)**2)
+    LORENTZIAN_PART_5= 1/np.pi * (PV_fwhm_5/2)/((x-x0_5)**2+(PV_fwhm_5/2)**2)
+
+    sigma_6=PV_fwhm_6/(2*np.sqrt(2*np.log(2)))
+    a_G_6= 1/(sigma_6*np.sqrt(2*np.pi))
+    b_G_6= 4*np.log(2)/PV_fwhm_6**2
+
+    GAUSSIAN_PART_6= a_G_6*np.exp(-b_G_6*(x-x0_6)**2)
+    LORENTZIAN_PART_6= 1/np.pi * (PV_fwhm_6/2)/((x-x0_6)**2+(PV_fwhm_6/2)**2)
+
+    sigma_7=PV_fwhm_7/(2*np.sqrt(2*np.log(2)))
+    a_G_7= 1/(sigma_7*np.sqrt(2*np.pi))
+    b_G_7= 4*np.log(2)/PV_fwhm_7**2
+
+    GAUSSIAN_PART_7= a_G_7*np.exp(-b_G_7*(x-x0_7)**2)
+    LORENTZIAN_PART_7= 1/np.pi * (PV_fwhm_7/2)/((x-x0_7)**2+(PV_fwhm_7/2)**2)
+
+    return (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2)+ I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5)+ I_6 * (ratio_6 * GAUSSIAN_PART_6+(1-ratio_6)*LORENTZIAN_PART_6)+ I_7 * (ratio_7 * GAUSSIAN_PART_7+(1-ratio_7)*LORENTZIAN_PART_7))
+
+
 def _1Lorentzian(x, ampL, center, widL):
     return ((ampL*widL**2/((x-center)**2+widL**2)) )
 
@@ -232,6 +331,10 @@ def find_fwhm_of_peak(x,y,start_values,options):
         'gaussian': False,
         'cluster_PV': False,
         'cluster_without_RS1': False,
+        'cluster_without_RS2': False,
+        'cluster_without_RS': False,
+        'cluster_split_PV': False,
+        'cluster_fullsplit_PV': False,
         #'starting_guess_lor':   [400,   14.1,   0.01],
         #'starting_guess_gauss': [400,   14.1,   0.01],
         'plot_fit': True,
@@ -467,8 +570,233 @@ def find_fwhm_of_peak(x,y,start_values,options):
         if options['cluster_without_RS1']:
             #removing any contribution from I2, the RS1-peak
             y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5))
+        elif options['cluster_without_RS2']:
+            y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1)+ I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2) + I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5))
+        elif options['cluster_without_RS']:
+            y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1)+ I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5))  
         else:
             y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2)+ I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5))
+        
+    if options['cluster_split_PV']:
+        #https://docs.mantidproject.org/nightly/fitting/fitfunctions/PseudoVoigt.html
+        I_1= start_values[0]#PeakIntensity 
+        x0_1 = start_values[1]
+        PV_fwhm_1= start_values[2]
+        ratio_1 = start_values[3]
+
+        I_2= start_values[4]#PeakIntensity 
+        x0_2 = start_values[5]
+        PV_fwhm_2= start_values[6]
+        ratio_2 = start_values[7]
+
+        I_3= start_values[8]#PeakIntensity 
+        x0_3 = start_values[9]
+        PV_fwhm_3= start_values[10]
+        ratio_3 = start_values[11]
+        
+        I_4= start_values[12]#PeakIntensity 
+        x0_4 = start_values[13]
+        PV_fwhm_4= start_values[14]
+        ratio_4 = start_values[15]
+
+        I_5= start_values[16]#PeakIntensity 
+        x0_5 = start_values[17]
+        PV_fwhm_5= start_values[18]
+        ratio_5 = start_values[19]
+        
+        I_6= start_values[20]#PeakIntensity 
+        x0_6 = start_values[21]
+        PV_fwhm_6= start_values[22]
+        ratio_6 = start_values[23]
+    #######============== defining the lower bound of the fit, deciding it should be defined separately for all the five peaks rather than having the same bounds
+   #
+   #      lower_bound=options['lower_bounds_PV'][:4]
+   #     lower_bounds=lower_bound
+        
+ #       for i in range(len(lower_bound)):
+  #          lower_bounds.append(lower_bound[i])
+
+#        upper_bound=options['upper_bounds_PV'][:4]
+#        upper_bounds=upper_bound
+#        for i in range(len(upper_bound)):
+#            upper_bounds.append(upper_bound[i])
+
+        param_bounds=(options['lower_bounds_PV'],options['upper_bounds_PV'])
+        popt_PV, pcov_PV = scipy.optimize.curve_fit(_6PV, x, y, p0=[I_1,x0_1,PV_fwhm_1,ratio_1,I_2,x0_2,PV_fwhm_2,ratio_2,I_3,x0_3,PV_fwhm_3,ratio_3,I_4,x0_4,PV_fwhm_4,ratio_4,I_5,x0_5,PV_fwhm_5,ratio_5,I_6,x0_6,PV_fwhm_6,ratio_6],bounds=param_bounds)
+        
+        perr_PV = np.sqrt(np.diag(pcov_PV))
+
+        [I_1,x0_1,PV_fwhm_1,ratio_1,I_2,x0_2,PV_fwhm_2,ratio_2,I_3,x0_3,PV_fwhm_3,ratio_3,I_4,x0_4,PV_fwhm_4,ratio_4,I_5,x0_5,PV_fwhm_5,ratio_5,I_6,x0_6,PV_fwhm_6,ratio_6]=popt_PV
+        parameters=popt_PV
+        errors=perr_PV
+
+        sigma_1=PV_fwhm_1/(2*np.sqrt(2*np.log(2)))
+        a_G_1= 1/(sigma_1*np.sqrt(2*np.pi))
+        b_G_1= 4*np.log(2)/PV_fwhm_1**2
+
+        GAUSSIAN_PART_1= a_G_1*np.exp(-b_G_1*(x_fit-x0_1)**2)
+        LORENTZIAN_PART_1= 1/np.pi * (PV_fwhm_1/2)/((x_fit-x0_1)**2+(PV_fwhm_1/2)**2)
+
+        sigma_2=PV_fwhm_2/(2*np.sqrt(2*np.log(2)))
+        a_G_2= 1/(sigma_2*np.sqrt(2*np.pi))
+        b_G_2= 4*np.log(2)/PV_fwhm_2**2
+
+        GAUSSIAN_PART_2= a_G_2*np.exp(-b_G_2*(x_fit-x0_2)**2)
+        LORENTZIAN_PART_2= 1/np.pi * (PV_fwhm_2/2)/((x_fit-x0_2)**2+(PV_fwhm_2/2)**2)
+
+        sigma_3=PV_fwhm_3/(2*np.sqrt(2*np.log(2)))
+        a_G_3= 1/(sigma_3*np.sqrt(2*np.pi))
+        b_G_3= 4*np.log(2)/PV_fwhm_3**2
+
+        GAUSSIAN_PART_3= a_G_3*np.exp(-b_G_3*(x_fit-x0_3)**2)
+        LORENTZIAN_PART_3= 1/np.pi * (PV_fwhm_3/2)/((x_fit-x0_3)**2+(PV_fwhm_3/2)**2)
+        
+        sigma_4=PV_fwhm_4/(2*np.sqrt(2*np.log(2)))
+        a_G_4= 1/(sigma_4*np.sqrt(2*np.pi))
+        b_G_4= 4*np.log(2)/PV_fwhm_4**2
+
+        GAUSSIAN_PART_4= a_G_4*np.exp(-b_G_4*(x_fit-x0_4)**2)
+        LORENTZIAN_PART_4= 1/np.pi * (PV_fwhm_4/2)/((x_fit-x0_4)**2+(PV_fwhm_4/2)**2)
+
+        sigma_5=PV_fwhm_5/(2*np.sqrt(2*np.log(2)))
+        a_G_5= 1/(sigma_5*np.sqrt(2*np.pi))
+        b_G_5= 4*np.log(2)/PV_fwhm_5**2
+
+        GAUSSIAN_PART_5= a_G_5*np.exp(-b_G_5*(x_fit-x0_5)**2)
+        LORENTZIAN_PART_5= 1/np.pi * (PV_fwhm_5/2)/((x_fit-x0_5)**2+(PV_fwhm_5/2)**2)
+
+        sigma_6=PV_fwhm_6/(2*np.sqrt(2*np.log(2)))
+        a_G_6= 1/(sigma_6*np.sqrt(2*np.pi))
+        b_G_6= 4*np.log(2)/PV_fwhm_6**2
+
+        GAUSSIAN_PART_6= a_G_6*np.exp(-b_G_6*(x_fit-x0_6)**2)
+        LORENTZIAN_PART_6= 1/np.pi * (PV_fwhm_6/2)/((x_fit-x0_6)**2+(PV_fwhm_6/2)**2)
+
+        if options['cluster_without_RS1']:
+            #removing any contribution from I2, the RS1-peak
+            y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5)+ I_6 * (ratio_6 * GAUSSIAN_PART_6+(1-ratio_6)*LORENTZIAN_PART_6))
+        else: #this means if cluster should have RS1 and peak with split
+            y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2)+ I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5)+ I_6 * (ratio_6 * GAUSSIAN_PART_6+(1-ratio_6)*LORENTZIAN_PART_6))
+
+    if options['cluster_fullsplit_PV']:
+        #https://docs.mantidproject.org/nightly/fitting/fitfunctions/PseudoVoigt.html
+        I_1= start_values[0]#PeakIntensity 
+        x0_1 = start_values[1]
+        PV_fwhm_1= start_values[2]
+        ratio_1 = start_values[3]
+
+        I_2= start_values[4]#PeakIntensity 
+        x0_2 = start_values[5]
+        PV_fwhm_2= start_values[6]
+        ratio_2 = start_values[7]
+
+        I_3= start_values[8]#PeakIntensity 
+        x0_3 = start_values[9]
+        PV_fwhm_3= start_values[10]
+        ratio_3 = start_values[11]
+        
+        I_4= start_values[12]#PeakIntensity 
+        x0_4 = start_values[13]
+        PV_fwhm_4= start_values[14]
+        ratio_4 = start_values[15]
+
+        I_5= start_values[16]#PeakIntensity 
+        x0_5 = start_values[17]
+        PV_fwhm_5= start_values[18]
+        ratio_5 = start_values[19]
+        
+        I_6= start_values[20]#PeakIntensity 
+        x0_6 = start_values[21]
+        PV_fwhm_6= start_values[22]
+        ratio_6 = start_values[23]
+
+        I_7= start_values[24]#PeakIntensity 
+        x0_7 = start_values[25]
+        PV_fwhm_7= start_values[26]
+        ratio_7 = start_values[27]
+    #######============== defining the lower bound of the fit, deciding it should be defined separately for all the five peaks rather than having the same bounds
+   #
+   #      lower_bound=options['lower_bounds_PV'][:4]
+   #     lower_bounds=lower_bound
+        
+ #       for i in range(len(lower_bound)):
+  #          lower_bounds.append(lower_bound[i])
+
+#        upper_bound=options['upper_bounds_PV'][:4]
+#        upper_bounds=upper_bound
+#        for i in range(len(upper_bound)):
+#            upper_bounds.append(upper_bound[i])
+
+        param_bounds=(options['lower_bounds_PV'],options['upper_bounds_PV'])
+        popt_PV, pcov_PV = scipy.optimize.curve_fit(_7PV, x, y, p0=[I_1,x0_1,PV_fwhm_1,ratio_1,I_2,x0_2,PV_fwhm_2,ratio_2,I_3,x0_3,PV_fwhm_3,ratio_3,I_4,x0_4,PV_fwhm_4,ratio_4,I_5,x0_5,PV_fwhm_5,ratio_5,I_6,x0_6,PV_fwhm_6,ratio_6,I_7,x0_7,PV_fwhm_7,ratio_7],bounds=param_bounds)
+        
+        perr_PV = np.sqrt(np.diag(pcov_PV))
+
+        [I_1,x0_1,PV_fwhm_1,ratio_1,I_2,x0_2,PV_fwhm_2,ratio_2,I_3,x0_3,PV_fwhm_3,ratio_3,I_4,x0_4,PV_fwhm_4,ratio_4,I_5,x0_5,PV_fwhm_5,ratio_5,I_6,x0_6,PV_fwhm_6,ratio_6,I_7,x0_7,PV_fwhm_7,ratio_7]=popt_PV
+        parameters=popt_PV
+        errors=perr_PV
+
+        sigma_1=PV_fwhm_1/(2*np.sqrt(2*np.log(2)))
+        a_G_1= 1/(sigma_1*np.sqrt(2*np.pi))
+        b_G_1= 4*np.log(2)/PV_fwhm_1**2
+
+        GAUSSIAN_PART_1= a_G_1*np.exp(-b_G_1*(x_fit-x0_1)**2)
+        LORENTZIAN_PART_1= 1/np.pi * (PV_fwhm_1/2)/((x_fit-x0_1)**2+(PV_fwhm_1/2)**2)
+
+        sigma_2=PV_fwhm_2/(2*np.sqrt(2*np.log(2)))
+        a_G_2= 1/(sigma_2*np.sqrt(2*np.pi))
+        b_G_2= 4*np.log(2)/PV_fwhm_2**2
+
+        GAUSSIAN_PART_2= a_G_2*np.exp(-b_G_2*(x_fit-x0_2)**2)
+        LORENTZIAN_PART_2= 1/np.pi * (PV_fwhm_2/2)/((x_fit-x0_2)**2+(PV_fwhm_2/2)**2)
+
+        sigma_3=PV_fwhm_3/(2*np.sqrt(2*np.log(2)))
+        a_G_3= 1/(sigma_3*np.sqrt(2*np.pi))
+        b_G_3= 4*np.log(2)/PV_fwhm_3**2
+
+        GAUSSIAN_PART_3= a_G_3*np.exp(-b_G_3*(x_fit-x0_3)**2)
+        LORENTZIAN_PART_3= 1/np.pi * (PV_fwhm_3/2)/((x_fit-x0_3)**2+(PV_fwhm_3/2)**2)
+        
+        sigma_4=PV_fwhm_4/(2*np.sqrt(2*np.log(2)))
+        a_G_4= 1/(sigma_4*np.sqrt(2*np.pi))
+        b_G_4= 4*np.log(2)/PV_fwhm_4**2
+
+        GAUSSIAN_PART_4= a_G_4*np.exp(-b_G_4*(x_fit-x0_4)**2)
+        LORENTZIAN_PART_4= 1/np.pi * (PV_fwhm_4/2)/((x_fit-x0_4)**2+(PV_fwhm_4/2)**2)
+
+        sigma_5=PV_fwhm_5/(2*np.sqrt(2*np.log(2)))
+        a_G_5= 1/(sigma_5*np.sqrt(2*np.pi))
+        b_G_5= 4*np.log(2)/PV_fwhm_5**2
+
+        GAUSSIAN_PART_5= a_G_5*np.exp(-b_G_5*(x_fit-x0_5)**2)
+        LORENTZIAN_PART_5= 1/np.pi * (PV_fwhm_5/2)/((x_fit-x0_5)**2+(PV_fwhm_5/2)**2)
+
+        sigma_6=PV_fwhm_6/(2*np.sqrt(2*np.log(2)))
+        a_G_6= 1/(sigma_6*np.sqrt(2*np.pi))
+        b_G_6= 4*np.log(2)/PV_fwhm_6**2
+
+        GAUSSIAN_PART_6= a_G_6*np.exp(-b_G_6*(x_fit-x0_6)**2)
+        LORENTZIAN_PART_6= 1/np.pi * (PV_fwhm_6/2)/((x_fit-x0_6)**2+(PV_fwhm_6/2)**2)
+
+        sigma_7=PV_fwhm_7/(2*np.sqrt(2*np.log(2)))
+        a_G_7= 1/(sigma_7*np.sqrt(2*np.pi))
+        b_G_7= 4*np.log(2)/PV_fwhm_7**2
+
+        GAUSSIAN_PART_7= a_G_7*np.exp(-b_G_7*(x_fit-x0_7)**2)
+        LORENTZIAN_PART_7= 1/np.pi * (PV_fwhm_7/2)/((x_fit-x0_7)**2+(PV_fwhm_7/2)**2)
+
+        if options['cluster_without_RS1']:
+            #removing any contribution from I2, the RS1-peak
+            y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5)+ I_6 * (ratio_6 * GAUSSIAN_PART_6+(1-ratio_6)*LORENTZIAN_PART_6)+ I_7 * (ratio_7 * GAUSSIAN_PART_7+(1-ratio_7)*LORENTZIAN_PART_7))
+        elif options['cluster_without_RS2']:
+            #removing any contribution from I2, the RS1-peak
+            y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1)+ I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2) + I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_6 * (ratio_6 * GAUSSIAN_PART_6+(1-ratio_6)*LORENTZIAN_PART_6)+ I_7 * (ratio_7 * GAUSSIAN_PART_7+(1-ratio_7)*LORENTZIAN_PART_7))
+        elif options['cluster_without_RS']:
+            #removing any contribution from I2, the RS1-peak
+            y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_6 * (ratio_6 * GAUSSIAN_PART_6+(1-ratio_6)*LORENTZIAN_PART_6)+ I_7 * (ratio_7 * GAUSSIAN_PART_7+(1-ratio_7)*LORENTZIAN_PART_7))
+      
+        else: #this means if cluster should have RS1 and peak with split
+            y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1) + I_2 * (ratio_2 * GAUSSIAN_PART_2+(1-ratio_2)*LORENTZIAN_PART_2)+ I_3 * (ratio_3 * GAUSSIAN_PART_3+(1-ratio_3)*LORENTZIAN_PART_3)+ I_4 * (ratio_4 * GAUSSIAN_PART_4+(1-ratio_4)*LORENTZIAN_PART_4)+ I_5 * (ratio_5 * GAUSSIAN_PART_5+(1-ratio_5)*LORENTZIAN_PART_5)+ I_6 * (ratio_6 * GAUSSIAN_PART_6+(1-ratio_6)*LORENTZIAN_PART_6)+ I_7 * (ratio_7 * GAUSSIAN_PART_7+(1-ratio_7)*LORENTZIAN_PART_7))
 
 
     if options['plot_fit']:
@@ -544,6 +872,87 @@ def find_fwhm_of_peak(x,y,start_values,options):
             y_fwhm5=[y5_max/2,y5_max/2]
             axes[0].plot(x_fwhm5,y_fwhm5,c='g')
             axes[1].plot(x_fwhm5,np.cbrt(y_fwhm5),c='g')
+        
+        if options['cluster_split_PV']:
+            plt.axvline(parameters[5]) #center position
+            x_fwhm2=[parameters[5]-parameters[6]/2,parameters[5]+parameters[6]/2] #plotting the width of the fwhm
+            y2_max=I_2 * (ratio_2 * a_G_2+(1-ratio_2)*(1/(np.pi*PV_fwhm_2/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm2=[y2_max/2,y2_max/2]
+            axes[0].plot(x_fwhm2,y_fwhm2,c='g')
+            axes[1].plot(x_fwhm2,np.cbrt(y_fwhm2),c='g')
+
+            plt.axvline(parameters[9]) #center position
+            x_fwhm3=[parameters[9]-parameters[10]/2,parameters[9]+parameters[10]/2] #plotting the width of the fwhm
+            y3_max=I_3 * (ratio_3 * a_G_3+(1-ratio_3)*(1/(np.pi*PV_fwhm_3/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm3=[y3_max/2,y3_max/2]
+            axes[0].plot(x_fwhm3,y_fwhm3,c='g')
+            axes[1].plot(x_fwhm3,np.cbrt(y_fwhm3),c='g')
+
+            plt.axvline(parameters[13]) #center position
+            x_fwhm4=[parameters[13]-parameters[14]/2,parameters[13]+parameters[14]/2] #plotting the width of the fwhm
+            y4_max=I_4 * (ratio_4 * a_G_4+(1-ratio_4)*(1/(np.pi*PV_fwhm_4/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm4=[y4_max/2,y4_max/2]
+            axes[0].plot(x_fwhm4,y_fwhm4,c='g')
+            axes[1].plot(x_fwhm4,np.cbrt(y_fwhm4),c='g')
+
+            plt.axvline(parameters[17]) #center position
+            x_fwhm5=[parameters[17]-parameters[18]/2,parameters[17]+parameters[18]/2] #plotting the width of the fwhm
+            y5_max=I_5 * (ratio_5 * a_G_5+(1-ratio_5)*(1/(np.pi*PV_fwhm_5/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm5=[y5_max/2,y5_max/2]
+            axes[0].plot(x_fwhm5,y_fwhm5,c='g')
+            axes[1].plot(x_fwhm5,np.cbrt(y_fwhm5),c='g')
+
+            plt.axvline(parameters[21]) #center position
+            x_fwhm6=[parameters[21]-parameters[22]/2,parameters[21]+parameters[22]/2] #plotting the width of the fwhm
+            y6_max=I_6 * (ratio_6 * a_G_6+(1-ratio_6)*(1/(np.pi*PV_fwhm_6/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm6=[y6_max/2,y6_max/2]
+            axes[0].plot(x_fwhm6,y_fwhm6,c='g')
+            axes[1].plot(x_fwhm6,np.cbrt(y_fwhm6),c='g')
+            
+            
+        if options['cluster_fullsplit_PV']:
+            plt.axvline(parameters[5]) #center position
+            x_fwhm2=[parameters[5]-parameters[6]/2,parameters[5]+parameters[6]/2] #plotting the width of the fwhm
+            y2_max=I_2 * (ratio_2 * a_G_2+(1-ratio_2)*(1/(np.pi*PV_fwhm_2/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm2=[y2_max/2,y2_max/2]
+            axes[0].plot(x_fwhm2,y_fwhm2,c='g')
+            axes[1].plot(x_fwhm2,np.cbrt(y_fwhm2),c='g')
+
+            plt.axvline(parameters[9]) #center position
+            x_fwhm3=[parameters[9]-parameters[10]/2,parameters[9]+parameters[10]/2] #plotting the width of the fwhm
+            y3_max=I_3 * (ratio_3 * a_G_3+(1-ratio_3)*(1/(np.pi*PV_fwhm_3/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm3=[y3_max/2,y3_max/2]
+            axes[0].plot(x_fwhm3,y_fwhm3,c='g')
+            axes[1].plot(x_fwhm3,np.cbrt(y_fwhm3),c='g')
+
+            plt.axvline(parameters[13]) #center position
+            x_fwhm4=[parameters[13]-parameters[14]/2,parameters[13]+parameters[14]/2] #plotting the width of the fwhm
+            y4_max=I_4 * (ratio_4 * a_G_4+(1-ratio_4)*(1/(np.pi*PV_fwhm_4/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm4=[y4_max/2,y4_max/2]
+            axes[0].plot(x_fwhm4,y_fwhm4,c='g')
+            axes[1].plot(x_fwhm4,np.cbrt(y_fwhm4),c='g')
+
+            plt.axvline(parameters[17]) #center position
+            x_fwhm5=[parameters[17]-parameters[18]/2,parameters[17]+parameters[18]/2] #plotting the width of the fwhm
+            y5_max=I_5 * (ratio_5 * a_G_5+(1-ratio_5)*(1/(np.pi*PV_fwhm_5/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm5=[y5_max/2,y5_max/2]
+            axes[0].plot(x_fwhm5,y_fwhm5,c='g')
+            axes[1].plot(x_fwhm5,np.cbrt(y_fwhm5),c='g')
+
+            plt.axvline(parameters[21]) #center position
+            x_fwhm6=[parameters[21]-parameters[22]/2,parameters[21]+parameters[22]/2] #plotting the width of the fwhm
+            y6_max=I_6 * (ratio_6 * a_G_6+(1-ratio_6)*(1/(np.pi*PV_fwhm_6/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm6=[y6_max/2,y6_max/2]
+            axes[0].plot(x_fwhm6,y_fwhm6,c='g')
+            axes[1].plot(x_fwhm6,np.cbrt(y_fwhm6),c='g')
+
+            plt.axvline(parameters[25]) #center position
+            x_fwhm7=[parameters[25]-parameters[26]/2,parameters[25]+parameters[26]/2] #plotting the width of the fwhm
+            y7_max=I_7 * (ratio_7 * a_G_7+(1-ratio_7)*(1/(np.pi*PV_fwhm_7/2))) #trying to reduce the second peak at x=x0_2
+            y_fwhm7=[y7_max/2,y7_max/2]
+            axes[0].plot(x_fwhm7,y_fwhm7,c='g')
+            axes[1].plot(x_fwhm7,np.cbrt(y_fwhm7),c='g')
+            
             ##TEST
             #ax.set_ylim(min(df_peak['I_org'])*0.9,max(df_peak['I_org'])*1.1)
     
@@ -739,13 +1148,13 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
     upper_bounds_list=[]
     twoth_exp=0.00001 * T_diff #approximately the increase in twotheta per degree K above RT (just an approx, without any basis from theory)
     
-    slack=0.09
+    slack=1.2
     slack_RS=0.05
     slack_ord=0.015
     ##Trying to implement a cluster of peaks, have to consider whether sub1 and sub2 must be separated into two peaks as well to acount for peak splitting
     if "cluster" in chosen_peaks:
         peak_center_ord= WL_translate(14.2*(1-twoth_exp),WL,WL_new)
-        peak_center_RS1= WL_translate(14.63*(1-twoth_exp),WL,WL_new)#14.59, 14.67
+        peak_center_RS1= WL_translate(14.67*(1-twoth_exp),WL,WL_new)#14.59, 14.67
         peak_center_sub1= WL_translate(14.9*(1-twoth_exp),WL,WL_new)
         peak_center_RS2 = WL_translate(15.32*(1-twoth_exp),WL,WL_new)
         peak_center_sub2= WL_translate(15.53*(1-twoth_exp),WL,WL_new)
@@ -758,18 +1167,58 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
         )
 
         lower_bounds_list.append(
-            [0,       peak_center_ord-slack_ord,    0.01,  0.9,
-             0,       peak_center_RS1-slack_RS,    0.01,  0.9, 
-             0,       peak_center_sub1-slack,   0.01,  0.9,
-             0,       peak_center_RS2-slack_RS,    0.01,  0.9,
-             0,       peak_center_sub2-slack,   0.01,  0.9]
+            [0,       peak_center_ord-slack_ord,    0.01,  0.5,
+             0,       peak_center_RS1-slack_RS,    0.01,  0.5, 
+             0,       peak_center_sub1-slack,   0.01,  0.5,
+             0,       peak_center_RS2-slack_RS,    0.01,  0.5,
+             0,       peak_center_sub2-slack,   0.01,  0.5]
         )   
         upper_bounds_list.append(
             [20,       peak_center_ord+slack_ord,    0.3,    1,
-             20,       peak_center_RS1+slack_RS,    0.3,    1, 
-             1000,       peak_center_sub1+slack,   0.3,  1,
-             100,       peak_center_RS2+slack_RS,    0.3,    1,
-             200,       peak_center_sub2+slack,   0.3, 1]
+             20,       peak_center_RS1+slack_RS,    0.2,    1, 
+             1200,       peak_center_sub1+slack,   0.3,  1,
+             150,       peak_center_RS2+slack_RS,    0.3,    1,
+             600,       peak_center_sub2+slack,   0.3, 1]
+        )   
+        peak_range_list.append(         [WL_translate(13.9*(1-twoth_exp),WL,WL_new),WL_translate(15.8*(1-twoth_exp),WL,WL_new)])
+        background_range_list.append(   [WL_translate(13.6*(1-twoth_exp),WL,WL_new),WL_translate(15.95*(1-twoth_exp),WL,WL_new)])
+        BG_poly_degree_list.append(2)        #start_values_list2.append(None)
+        excluded_background_range_list.append([[0,0]])#13.1,13.5]]) #include this for certain peaks that has peaks in close proximity
+        #number_of_excluded_regions_list.append(0) #no excluded regions
+        #df_peaks["ord1"]=start_values 
+    #slack_sub=0.05
+    if "cluster_split" in chosen_peaks:
+        peak_center_ord= WL_translate(14.2*(1-twoth_exp),WL,WL_new)
+        peak_center_RS1= WL_translate(14.67*(1-twoth_exp),WL,WL_new)#14.59, 14.67
+        peak_center_sub1= WL_translate(14.9*(1-twoth_exp),WL,WL_new)
+        peak_center_RS2 = WL_translate(15.32*(1-twoth_exp),WL,WL_new)
+        peak_center_sub2_dis= WL_translate(15.52*(1-twoth_exp),WL,WL_new)
+        peak_center_sub2_ord= WL_translate(15.56*(1-twoth_exp),WL,WL_new)
+
+        start_values_list.append(
+            [0,    peak_center_ord,    0.15,  1,
+             0,    peak_center_RS1,    0.05,  1, 
+             30,   peak_center_sub1,   0.05,  1,
+             0,  peak_center_RS2,    0.05,  1,
+            10, peak_center_sub2_dis, 0.05,1,
+             0,   peak_center_sub2_ord,   0.05,  1]
+        )
+
+        lower_bounds_list.append(
+            [0,       peak_center_ord-slack_ord,    0.01,  0.5,
+             0,       peak_center_RS1-slack_RS,    0.01,  0.5, 
+             0,       peak_center_sub1-slack,   0.01,  0.5,
+             0,       peak_center_RS2-slack_RS,    0.01,  0.5,
+             0,       peak_center_sub2_dis-slack,   0.01,  0.5,
+             0,       peak_center_sub2_ord-slack_ord,   0.01,  0.5]
+        )   
+        upper_bounds_list.append(
+            [20,       peak_center_ord+slack_ord,    0.3,    1,
+             20,       peak_center_RS1+slack_RS,    0.2,    1, 
+             1200,       peak_center_sub1+slack,   0.3,  1,
+             150,       peak_center_RS2+slack_RS,    0.3,    1,
+             600,       peak_center_sub2_dis+slack,   0.3, 1,
+             500,       peak_center_sub2_ord+slack_ord,   0.3, 1]
         )   
         peak_range_list.append(         [WL_translate(13.9*(1-twoth_exp),WL,WL_new),WL_translate(15.8*(1-twoth_exp),WL,WL_new)])
         background_range_list.append(   [WL_translate(13.6*(1-twoth_exp),WL,WL_new),WL_translate(15.95*(1-twoth_exp),WL,WL_new)])
@@ -778,6 +1227,49 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
         #number_of_excluded_regions_list.append(0) #no excluded regions
         #df_peaks["ord1"]=start_values 
 
+    if "cluster_fullsplit" in chosen_peaks:
+        peak_center_ord= WL_translate(14.2*(1-twoth_exp),WL,WL_new)
+        peak_center_RS1= WL_translate(14.65*(1-twoth_exp),WL,WL_new)#14.59, 14.67
+        peak_center_sub1_dis= WL_translate(14.88*(1-twoth_exp),WL,WL_new)
+        peak_center_sub1_ord= WL_translate(14.92*(1-twoth_exp),WL,WL_new)
+        peak_center_RS2 = WL_translate(15.32*(1-twoth_exp),WL,WL_new)
+        peak_center_sub2_dis= WL_translate(15.52*(1-twoth_exp),WL,WL_new)
+        peak_center_sub2_ord= WL_translate(15.56*(1-twoth_exp),WL,WL_new)
+
+        start_values_list.append(
+            [0,    peak_center_ord,    0.15,  1,
+             0,    peak_center_RS1,    0.05,  1, 
+             30,   peak_center_sub1_dis,   0.05,  1,
+             0,   peak_center_sub1_ord,   0.05,  1,
+             0,  peak_center_RS2,    0.05,  1,
+            10, peak_center_sub2_dis, 0.05,1,
+             0,   peak_center_sub2_ord,   0.05,  1]
+        )
+
+        lower_bounds_list.append(
+            [0,       peak_center_ord-slack_ord,    0.05,  0.95,
+             0,       peak_center_RS1-slack_RS,    0.05,  0.95, 
+             0,       peak_center_sub1_dis-slack,   0.05,  0.95,
+             0,       peak_center_sub1_ord-slack_ord,   0.05,  0.95,
+             0,       peak_center_RS2-slack_RS,    0.05,  0.95,
+             0,       peak_center_sub2_dis-slack,   0.05,  0.95,
+             0,       peak_center_sub2_ord-slack_ord,   0.05,  0.95]
+        )   
+        upper_bounds_list.append(
+            [20,       peak_center_ord+slack_ord,    0.3,    1,
+             20,       peak_center_RS1+slack_RS,    0.2,    1, 
+             1200,       peak_center_sub1_dis+slack,   0.18,  1,
+             1000,       peak_center_sub1_ord+slack_ord,   0.18, 1,
+             150,       peak_center_RS2+slack_RS,    0.25,    1,
+             600,       peak_center_sub2_dis+slack,   0.18, 1,
+             500,       peak_center_sub2_ord+slack_ord,   0.18, 1]
+        )   
+        peak_range_list.append(         [WL_translate(13.9*(1-twoth_exp),WL,WL_new),WL_translate(15.8*(1-twoth_exp),WL,WL_new)])
+        background_range_list.append(   [WL_translate(13.6*(1-twoth_exp),WL,WL_new),WL_translate(15.95*(1-twoth_exp),WL,WL_new)])
+        BG_poly_degree_list.append(2)        #start_values_list2.append(None)
+        excluded_background_range_list.append([[0,0]])#13.1,13.5]]) #include this for certain peaks that has peaks in close proximity
+        #number_of_excluded_regions_list.append(0) #no excluded regions
+        #df_peaks["ord1"]=start_values 
 
     if "Pt3" in chosen_peaks:
         peak_center=WL_translate(42.431,WL,WL_new)
