@@ -1087,12 +1087,6 @@ def find_fwhm_of_peak(x,y,start_values,options):
         parameters=np.insert(parameters,16,x0_6)
         #parameters=np.insert(parameters,12,x0_4)
         parameters=np.insert(parameters,5,x0_2)
-           [   0,    peak_center_ord,         0.15,   1,
-                0,                             0.05,   1, 
-                10,   peak_center_sub1,    0.05,   1,
-                0,    peak_center_RS2,           0.05,   1,
-                3,                             0.05,   1]
-    
         x0_3_err=errors[8]
         x0_5_err=errors[12]
         #I_4_err = errors[11]
