@@ -528,29 +528,29 @@ def find_fwhm_of_peak(x,y,start_values,options):
 
     if options['pseudovoigt']:
         #https://docs.mantidproject.org/nightly/fitting/fitfunctions/PseudoVoigt.html
-        I= start_values[0]#PeakIntensity 
+        I_1= start_values[0]#PeakIntensity 
 
-        x0 = start_values[1]
-        PV_fwhm= start_values[2]
-        ratio = start_values[3]
+        x0_1 = start_values[1]
+        PV_fwhm_1= start_values[2]
+        ratio_1 = start_values[3]
                 
         param_bounds=(options['lower_bounds_PV'][:4],options['upper_bounds_PV'][:4])
-        popt_PV, pcov_PV = scipy.optimize.curve_fit(_1PV, x, y, p0=[I,x0,PV_fwhm,ratio],bounds=param_bounds)
+        popt_PV, pcov_PV = scipy.optimize.curve_fit(_1PV, x, y, p0=[I_1,x0_1,PV_fwhm_1,ratio_1],bounds=param_bounds)
         
         perr_PV = np.sqrt(np.diag(pcov_PV))
 
-        [I,x0,PV_fwhm,ratio]=popt_PV
+        [I_1,x0_1,PV_fwhm_1,ratio_1]=popt_PV
         parameters=popt_PV
         errors=perr_PV
         
-        sigma=PV_fwhm/(2*np.sqrt(2*np.log(2)))
-        a_G= 1/(sigma*np.sqrt(2*np.pi))
-        b_G= 4*np.log(2)/PV_fwhm**2
+        sigma_1=PV_fwhm_1/(2*np.sqrt(2*np.log(2)))
+        a_G_1= 1/(sigma_1*np.sqrt(2*np.pi))
+        b_G_1= 4*np.log(2)/PV_fwhm_1**2
 
-        GAUSSIAN_PART= a_G*np.exp(-b_G*(x_fit-x0)**2)
-        LORENTZIAN_PART= 1/np.pi * (PV_fwhm/2)/((x_fit-x0)**2+(PV_fwhm/2)**2)
+        GAUSSIAN_PART_1= a_G_1*np.exp(-b_G_1*(x_fit-x0_1)**2)
+        LORENTZIAN_PART_1= 1/np.pi * (PV_fwhm_1/2)/((x_fit-x0_1)**2+(PV_fwhm_1/2)**2)
 
-        y_fit = (I * (ratio * GAUSSIAN_PART+(1-ratio)*LORENTZIAN_PART))
+        y_fit = (I_1 * (ratio_1 * GAUSSIAN_PART_1+(1-ratio_1)*LORENTZIAN_PART_1))
 
         #y_fit= I * (ratio * 1/(PV_fwhm/(2*np.sqrt(2*np.log(2)))*np.sqrt(2*np.pi))*np.exp(-4*np.log(2)/PV_fwhm**2*(x_fit-x0)**2)+(1-ratio)*1/np.pi * (PV_fwhm/2)/((x_fit-x0)**2+(PV_fwhm/2)**2))
 
@@ -1522,13 +1522,13 @@ def WL_translate(twotheta_original,wavelength_original,wavelength_new):
     #only including peaks that are actually in the data set
     twotheta_new=2*np.arcsin((wavelength_new/wavelength_original)*np.sin(twotheta_original/2 * np.pi/180))*180/np.pi
     return twotheta_new
-
+'''
 def _222_to_311(peak_pos_222):
     #input is the peak position (2th) of the (2 2 2) rock salt peak, and output is estimated pos of the (3 1 1).
     #calculated using braggs law and the relation between a and d for cubic structures (a=1/sqrt(h^2+k^2+l^2))
     peak_pos_311=2*180/np.pi*np.arcsin(np.sqrt(11/12)*np.sin(peak_pos_222/2*np.pi/180))
     return peak_pos_311
-
+'''
 def _peak_pos_calc(pos_0,miller_0,miller_new):
     #input is the peak position (2th) of the (2 2 2) rock salt peak, and output is estimated pos of the (3 1 1).
     #calculated using braggs law and the relation between a and d for cubic structures (a=1/sqrt(h^2+k^2+l^2))
@@ -1570,9 +1570,22 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
     upper_bounds_list=[]
     twoth_exp=0.00001 * T_diff #approximately the increase in twotheta per degree K above RT (just an approx, without any basis from theory)
     
-    slack=0.2
+    slack=0.12
     slack_RS=0.05
     slack_ord=0.015
+
+    if "ord1" in chosen_peaks:
+        peak_center= WL_translate(14.2*(1-twoth_exp),WL,WL_new)
+        start_values_list.append([0.1, peak_center, 0.2434226, 0.5])
+        lower_bounds_list.append([0,       peak_center-slack_ord,    0.01,  0.5])
+        upper_bounds_list.append([20,       peak_center+slack_ord,    0.3,    1])
+        peak_range_list.append(         [13.9,14.4])
+        background_range_list.append(   [13.5,14.45])
+        BG_poly_degree_list.append(2)        #start_values_list2.append(None)
+        excluded_background_range_list.append([[0,0]])#13.1,13.5]]) #include this for certain peaks that has peaks in close proximity
+        #number_of_excluded_regions_list.append(0) #no excluded regions
+        #df_peaks["ord1"]=start_values
+
     ##Trying to implement a cluster of peaks, have to consider whether sub1 and sub2 must be separated into two peaks as well to acount for peak splitting
     if "cluster" in chosen_peaks:
         peak_center_ord= WL_translate(14.2*(1-twoth_exp),WL,WL_new)
@@ -1609,6 +1622,7 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
         #number_of_excluded_regions_list.append(0) #no excluded regions
         #df_peaks["ord1"]=start_values 
     #slack_sub=0.05
+    '''
     if "cluster_split" in chosen_peaks:
         peak_center_ord= WL_translate(14.2*(1-twoth_exp),WL,WL_new)
         peak_center_RS1= WL_translate(14.67*(1-twoth_exp),WL,WL_new)#14.59, 14.67
@@ -1648,7 +1662,7 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
         excluded_background_range_list.append([[0,0]])#13.1,13.5]]) #include this for certain peaks that has peaks in close proximity
         #number_of_excluded_regions_list.append(0) #no excluded regions
         #df_peaks["ord1"]=start_values 
-
+    '''
     if "cluster_fullsplit" in chosen_peaks:
         peak_center_ord= WL_translate(14.2*(1-twoth_exp),WL,WL_new)
         peak_center_RS1= WL_translate(14.65*(1-twoth_exp),WL,WL_new)#14.59, 14.67
@@ -1696,7 +1710,7 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
     if 'PV_cluster_split' in chosen_peaks:
         peak_center_ord= WL_translate(14.2*(1-twoth_exp),WL,WL_new)
         
-        peak_center_sub1_dis= WL_translate(14.88*(1-twoth_exp),WL,WL_new)
+        peak_center_sub1_dis= WL_translate(14.80*(1-twoth_exp),WL,WL_new) #14.88
         #peak_center_sub1_ord= _peak_pos_calc(peak_center_ord,[3,1,0],[3,1,1])# WL_translate(14.92*(1-twoth_exp),WL,WL_new)
         peak_center_RS2 = WL_translate(15.32*(1-twoth_exp),WL,WL_new)
         #peak_center_sub2_dis= _peak_pos_calc(peak_center_sub1_dis,[3,1,1],[2,2,2])#WL_translate(15.52*(1-twoth_exp),WL,WL_new)
@@ -1725,12 +1739,12 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
         )   
         upper_bounds_list.append(
             [20,       peak_center_ord+slack_ord,    0.3,    1,
-             20,           0.2,    1, 
+             20,                                    0.2,    1, 
              1200,       peak_center_sub1_dis+slack,   0.18,  1,
-             1000,          0.18, 1,
+             1000,                                      0.18, 1,
              150,       peak_center_RS2+slack_RS,    0.25,    1,
-             600,          0.18, 1,
-                           0.18, 1]
+             600,                                   0.18, 1,
+                                                    0.18, 1]
         )   
         peak_range_list.append(         [WL_translate(13.9*(1-twoth_exp),WL,WL_new),WL_translate(15.8*(1-twoth_exp),WL,WL_new)])
         background_range_list.append(   [WL_translate(13.6*(1-twoth_exp),WL,WL_new),WL_translate(15.95*(1-twoth_exp),WL,WL_new)])
