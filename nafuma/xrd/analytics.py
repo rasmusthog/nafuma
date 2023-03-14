@@ -1557,7 +1557,7 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
         T_diff = 0
 
     start_values_list=[]
-    #start_values_list2=[] #for regions of overlapping peaks, such as disorder peak which is splitting over time. Ideally only starting values is necessary, and the background used and the peak region could be the same.
+    #start_values_list2=[] #for re_genergions of overlapping peaks, such as disorder peak which is splitting over time. Ideally only starting values is necessary, and the background used and the peak region could be the same.
     peak_range_list=[]
     #peak_range_list2=[] #this might or might not be necessary, depending on how the fitting goes.
     background_range_list=[]
@@ -1579,8 +1579,8 @@ def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelen
         start_values_list.append([0.1, peak_center, 0.2434226, 0.5])
         lower_bounds_list.append([0,       peak_center-slack_ord,    0.01,  0.5])
         upper_bounds_list.append([20,       peak_center+slack_ord,    0.3,    1])
-        peak_range_list.append(         [13.9,14.4])
-        background_range_list.append(   [13.5,14.45])
+        peak_range_list.append(         [WL_translate(13.9*(1-twoth_exp),WL,WL_new),WL_translate(14.4*(1-twoth_exp),WL,WL_new)])
+        background_range_list.append(   [WL_translate(13.5*(1-twoth_exp),WL,WL_new),WL_translate(14.45*(1-twoth_exp),WL,WL_new)])
         BG_poly_degree_list.append(2)        #start_values_list2.append(None)
         excluded_background_range_list.append([[0,0]])#13.1,13.5]]) #include this for certain peaks that has peaks in close proximity
         #number_of_excluded_regions_list.append(0) #no excluded regions
