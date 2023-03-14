@@ -2115,9 +2115,9 @@ def instrumental_peak_shape(beamtime,detector_position,options):
     print(PATH_BEAMTIME)
     #print(PATH_BEAMTIME,["_000_00_","_100_80_"],"lab6","xy")
     if detector_position == "pos1":
-        detector_positions = ["_000_00_","_100_80_"] #representing 1231 and 1257, more to come
+        detector_positions = ["_000_00_","_100_80_","_000_080_"] #representing 1231 and 1257, more to come
     if detector_position == "pos3":
-        detector_positions = ["_400_100_"] #representing 1257, more to come
+        detector_positions = ["_400_100_","_400_180_"] #representing 1257, more to come
 
     xy_path = find_file(PATH_BEAMTIME,detector_positions,"lab6",[".xy",".xye"])
     peak_width_path=find_file(PATH_BEAMTIME_RESULTS,detector_positions,"peak_width",[".dat"])
