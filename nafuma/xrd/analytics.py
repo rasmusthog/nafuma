@@ -1536,6 +1536,18 @@ def _peak_pos_calc(pos_0,miller_0,miller_new):
     peak_pos_new=2*180/np.pi*np.arcsin(d_ratio*np.sin(pos_0/2*np.pi/180))
     return peak_pos_new
 
+
+def _lattice_param_calc(pos,pos_err,miller,wavelength):
+    #Braggs law
+    theta=pos/2 * np.pi/180 
+    theta_err = pos_err/2 * np.pi/180 
+    d = wavelength/(2*np.sin(theta))
+    #d_err = wavelength/(2*np.cos(theta_err))
+    #lattice params and miller indices for cubic systems
+    a = d * np.sqrt(miller[0]**2+miller[1]**2+miller[2]**2)
+    a_err = np.sqrt(wavelength/(2)     *     (miller[0]**2+miller[1]**2+miller[2]**2)      *    (-np.cos(theta)/np.sin(theta)**2)**2)   * theta_err 
+    return a,a_err
+
 def find_fit_parameters_for_peak_general(chosen_peaks,options): #can add wavelength if it will be used on data from another beam time at some point
     #FIXME add peak splitting of the cluster, 
     default_options={
@@ -2112,7 +2124,7 @@ def instrumental_peak_shape(beamtime,detector_position,options):
     PATH=r"C:/Users/halvorhv/OneDriveUiO/0_Analysis_essentials"
     PATH_BEAMTIME=os.path.join(PATH,beamtime,"lab6")
     PATH_BEAMTIME_RESULTS=os.path.join(PATH_BEAMTIME,"results")
-    print(PATH_BEAMTIME)
+    #print(PATH_BEAMTIME)
     #print(PATH_BEAMTIME,["_000_00_","_100_80_"],"lab6","xy")
     if detector_position == "pos1":
         detector_positions = ["_000_00_","_100_80_","_000_080_"] #representing 1231 and 1257, more to come
