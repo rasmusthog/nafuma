@@ -2,7 +2,7 @@ import nafuma.auxillary as aux
 
 import matplotlib.pyplot as plt
 from matplotlib.ticker import (MultipleLocator)
-from mpl_toolkits.axes_grid.inset_locator import (inset_axes, InsetPosition, BboxPatch, BboxConnector)
+from mpl_toolkits.axes_grid1.inset_locator import (inset_axes, InsetPosition, BboxPatch, BboxConnector)
 
 from matplotlib.transforms import TransformedBbox
 from matplotlib.patches import Rectangle
