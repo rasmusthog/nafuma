@@ -2175,3 +2175,77 @@ def find_cbf_files(path):
             if file.endswith(".cbf"):
                 cbf_files.append(os.path.join(root, file))
     return cbf_files
+
+def from_lpa_Pt_to_temp(lpa_Pt):
+    #Update a_0-value
+    #FIXME add option of adding lpa_Pt_err
+       #FIXME make new version with refining zero etc, and removing limits of scale_dis
+#First finding the relation between relative expansion and temperature from Kirkby 1991
+    T=[293.15,300,350,400,500,600,700,800,900,1000,1100,1200,1300]
+    relativeexpansion=[0,61,512,971,1910,2871,3858,4870,5909,6976,8076,9213,10390]
+    T1=285
+    T2=480
+    T3=1250
+    T4=1800
+    #z = np.polyfit(T, relativeexpansion, 3)
+    x=np.linspace(T1,T4,num=T4-T1)
+    #fit=z[0]*x*x*x+z[1]*x*x+z[2]*x+z[3]
+    #print(fit)
+
+    #ax=plt.plot(x, fit, '--', linewidth=2, markersize=12)
+
+    #285-480 is recomended from Kirkby to be a separate fit
+    Tlow=[293.15,300,350,400]; rel_exp_low=[0,61,512,971]
+    Tmed=[500,600,700,800,900,1000,1100,1200]; rel_exp_med=[1910,2871,3858,4870,5909,6976,8076,9213]
+    Thigh=[1300,1400,1500,1600,1700,1800] ;rel_exp_high=[10390,11604,12856,14151,15497,16908]
+
+    zlow = np.polyfit(Tlow, rel_exp_low, 3)
+    xlow=np.linspace(T1,T2,num=T2-T1)
+    #FITTING THE LOW TEMPERATURE REGION
+    fit_low=zlow[0]*xlow*xlow*xlow+zlow[1]*xlow*xlow+zlow[2]*xlow+zlow[3]
+
+    #bx=plt.plot(Tlow, rel_exp_low, 'go', linewidth=2, markersize=5)
+    #bx=plt.plot(xlow, fit_low, '--', linewidth=2, markersize=12)
+    zmed = np.polyfit(Tmed, rel_exp_med, 3)
+    xmed=np.linspace(T2,T3,num=T3-T2)
+    #FITTING HIGH TEMPERATURE REGION
+    fit_med=zmed[0]*xmed*xmed*xmed+zmed[1]*xmed*xmed+zmed[2]*xmed+zmed[3]
+    #print(fit_med)
+    zhigh = np.polyfit(Thigh, rel_exp_high, 3)
+    xhigh=np.linspace(T3,T4,num=T4-T3)
+    #FITTING HIGH TEMPERATURE REGION
+    fit_high=zhigh[0]*xhigh*xhigh*xhigh+zhigh[1]*xhigh*xhigh+zhigh[2]*xhigh+zhigh[3]
+
+    fit_new1=np.append(fit_low,fit_med)
+    fit_new=np.append(fit_new1,fit_high)
+
+    #PLOTTING THE DATA POINTS
+    T=np.array(T)# - 293
+    x=np.array(x)
+    T_C=T-273.15
+    x_C=x-273.15
+
+    #T_C = [T - 293 for x in T]
+
+    #IF plotting:
+    #ax=plt.plot(T_C, relativeexpansion, 'go', linewidth=2, markersize=5)
+
+    #bx=plt.plot(x_C, fit_new, '--', linewidth=2, markersize=12)
+
+    ## ==== value below gave good fit with blower temperatures ...
+    #a_0 = float(3.926000666666667) #from 2023_temperature_calibration.ipynb
+    #a_0_error = float(4.4743714642394187e-05) #from 2023_temperature_calibration.ipynb
+    
+    a_0 = float(3.929536666666667) #too high????
+
+    
+    relative_expansion = (lpa_Pt - a_0)*1000000/a_0
+
+    # using enumerate() + next() to find index of first element in fit_new (temperature calibration) just greater than the calculated halfmax 
+    realtemp_index = next(x for x, val in enumerate(fit_new) 
+                        if val > relative_expansion)
+    
+    #print(realtemp_index)
+    temp = x_C[realtemp_index]
+    return temp
+
