@@ -2268,3 +2268,25 @@ def make_column_in_df_with_calib_temp(df,options):
     if options["plot"]:
         df.plot(y=['Blower','Calib_temp'], use_index=True)
     return df
+
+def line_prepender(filename, line):
+        #function that adds a line in the beginning of a file (adapted for big.inps)
+    with open(filename, 'r+') as f:
+        content = f.read()
+        f.seek(0, 0)
+        f.write(line.rstrip('\r\n') + '\n' + content)
+
+import os
+
+def line_insert_after(filename, line,string_to_locate):
+    #function to add a line of code after a certain string in the file. Ideal for sequential refinement, adding filenames to the .inp-file.
+    temp_filename = filename + '.tmp'
+    with open(filename, 'r') as f:
+        with open(temp_filename, 'w') as temp_file:
+            for current_line in f:
+                temp_file.write(current_line)
+                if string_to_locate in current_line:
+                    temp_file.write(line.rstrip('\r\n') + '\n')
+
+    os.remove(filename)
+    os.rename(temp_filename, filename)
