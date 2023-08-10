@@ -2249,3 +2249,22 @@ def from_lpa_Pt_to_temp(lpa_Pt):
     temp = x_C[realtemp_index]
     return temp
 
+def make_column_in_df_with_calib_temp(df,options):
+# dataframe needs a column with the name "lpa_Pt" for this to work.
+    default_options = {
+        'plot': False
+        }
+
+    options = aux.update_options(options=options, default_options=default_options)
+
+    calib_temp=[]
+    #Plan: Find which row in newnames-column of temp_new.txt contains the "filenumber" from each row of df_new. Take the blower-value from this row and add to a new column in df_new: "blowertemp".
+    for index, row in df.iterrows(): #iterating through each row  
+        lpa_Pt = row['lpa_Pt']
+        temp = from_lpa_Pt_to_temp(lpa_Pt)
+        calib_temp.append(temp)
+        
+    df["Calib_temp"]=calib_temp
+    if options["plot"]:
+        df.plot(y=['Blower','Calib_temp'], use_index=True)
+    return df
