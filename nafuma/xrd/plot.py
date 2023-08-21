@@ -965,7 +965,6 @@ def make_animation(data: dict, options={}):
 
 def plot_refinement(data, options={}):
 
-
     required_options = ['diff_offset', 'index', 'title', 'xlim', 'r_wp', 'r_exp', 'wp']
 
     default_options = {
