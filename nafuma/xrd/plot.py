@@ -1102,6 +1102,165 @@ def plot_refinement(data, options={}):
         for reflections_params, axis in zip(options['reflections_data'], ref_axes):
             plot_reflection_table(data=data, reflections_params=reflections_params, ax=axis, options=options)
 
+def plot_refinement_halvor(data, options={}):
+
+
+    required_options = ['diff_offset', 'index', 'title', 'xlim', 'r_wp', 'r_exp', 'wp']
+
+    default_options = {
+        'diff_offset': .10,
+        'index': -1,
+        'title': None,
+        'xlim': None,
+        'r_wp': True,
+        'r_exp': False,
+        'wp': False,
+        'wavelength': None,
+        'xlabel': '2$\\theta$', 'xunit': '$^{\circ}$',
+        'ylabel': 'Intensity', 'yunit': 'arb. u.',
+        'text': [],
+        'text_pos': [0.7, 0.9],
+        'text_pos_increments': [0, -0.1],
+        'reflections_plot': False, # whether to plot reflections as a plot
+        'reflections_indices': False, # whether to plot the reflection indices
+        'reflections_data': None, # Should be passed as a list of dictionaries on the form {path: rel_path, reflection_indices: number of indices, colour: [r,g,b], min_alpha: 0-1]
+        'log_y': False,
+        'cbrt_y': False,
+    }
+
+    options = aux.update_options(options=options, default_options=default_options, required_options=required_options)
+
+    df = pd.read_csv(data['path'], delim_whitespace=True, header=None)
+    df.columns = ['2th', 'Yobs', 'Ycalc', 'diff']
+    df['diff'] = df['diff'] - options['diff_offset']*(df['Yobs'].max() - df['Yobs'].min())
+    
+    if options['log_y']:
+        df['Yobs_log']=np.log10(df['Yobs'])
+        df['Ycalc_log']=np.log10(df['Ycalc'])
+        df['diff_log']= df['Yobs_log']-df['Ycalc_log']
+    
+    if options['cbrt_y']:
+        df['Yobs_cbrt']=np.cbrt(df['Yobs'])
+        df['Ycalc_cbrt']=np.cbrt(df['Ycalc'])
+        df['diff_cbrt']=df['Yobs_cbrt']-df['Ycalc_cbrt']
+    '''
+    if not isinstance(data['results'], list):
+        data['results'] = [data['results']]
+
+    results = {
+        'vol': [],
+        'mass': [],
+        'wp': [],
+        'a': [],
+        'b': [],
+        'c': [],
+        'alpha': [],
+        'beta': [],
+        'gamma': []
+    }
+
+    for result in data['results']:
+        print(result)
+        result = xrd.refinement.read_results(path=result)
+
+        r_wp = result['r_wp'].iloc[options['index']]
+        r_exp = result['r_exp'].iloc[options['index']]
+
+        for attr in results.keys():
+            results[attr].append(result[attr].iloc[options['index']])
+    '''
+    # CREATE AND ASSIGN AXES
+
+    # Makes a list out of reflections_data if it only passed as a dict, as it will be looped through later
+    if options['reflections_data']:
+        if not isinstance(options['reflections_data'], list):
+            options['reflections_data'] = [options['reflections_data']]
+    
+    
+    # Determine the grid layout based on how many sets of reflections data has been passed
+    if options['reflections_data'] and len(options['reflections_data']) >= 1:
+        options = determine_grid_layout(options=options)
+
+    # Create the Figure and Axes objects
+    fig, ax = btp.prepare_plot(options=options)
+
+    # Assign the correct axes to the indicies, reflections and figure itself
+    if options['reflections_plot'] or options['reflections_indices']:
+        
+        if options['reflections_indices']:
+            indices_ax = ax[0]
+
+            if options['reflections_plot']:
+                ref_axes = [axx for axx in ax[range(1,len(options['reflections_data'])+1)]]
+
+        else:
+            ref_axes = [axx for axx in ax[range(0,len(options['reflections_data']))]]
+
+        ax = ax[-1]
+
+    if options['log_y']:
+        df.plot.scatter(x='2th', y='Yobs_log', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*10)
+        df.plot(x='2th', y='Ycalc_log', ax=ax, c='red')
+        df.plot(x='2th', y='diff_log', ax=ax)
+    elif options['cbrt_y']:
+        df.plot.scatter(x='2th', y='Yobs_cbrt', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*10)
+        df.plot(x='2th', y='Ycalc_cbrt', ax=ax, c='red')
+        df.plot(x='2th', y='diff_cbrt', ax=ax)
+    else:
+        df.plot.scatter(x='2th', y='Yobs', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*10)
+        df.plot(x='2th', y='Ycalc', ax=ax, c='red')
+        df.plot(x='2th', y='diff', ax=ax)
+    
+
+    #FIXME implement whatever parameters is useful in the plot (e.g. r_wp and r_exp)
+    ''' 
+    if options['sample']:
+        options['text'].append([options['sample'], [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+
+    if options['wavelength']:
+        options['text'].append([f'$\lambda$ = {options["wavelength"]} Å', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+
+    if options['wp']:
+        for i, (result, label) in enumerate(zip(data['results'], options['labels'])):
+            options['text'].append([f'{label}: {np.round(float(results["wp"][i]), 1)}%', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+            
+            
+            #ax.text(x=0.7*df['2th'].max(), y=ypos*df['Yobs'].max(), s=f'{label}: {np.round(float(results["wp"][i]), 2)}%', fontsize=20)
+            options['text_pos'][0] += options['text_pos_increments'][0]
+            options['text_pos'][1] += options['text_pos_increments'][1]
+
+    if options['r_wp']:
+        options['text'].append(['R$_{wp}$ = '+f'{np.round(r_wp, 2)}', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+        #ax.text(x=0.7*df['2th'].max(), y=0.7*df['Yobs'].max(), s='R$_{wp}$ = '+f'{r_wp}')
+    
+    if options['r_exp']:
+        options['text'].append(['R$_{exp}$ = '+f'{np.round(r_exp, 2)}', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+        #ax.text(x=0.70*df['2th'].max(), y=0.60*df['Yobs'].max(), s='R$_{exp}$ = '+f'{r_exp}')
+
+    '''
+    if 'xlim' not in options.keys() or options['xlim'] == None:
+        options['xlim'] = [df['2th'].min(), df['2th'].max()]
+
+
+    fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
+
+    # PLOT REFLECTION TABLES
+    if options['reflections_plot'] and options['reflections_data']:
+        options['xlim'] = ax.get_xlim()
+        options['to_wavelength'] = options['wavelength'] # By default, the wavelength of the first diffractogram will be used for these.
+        
+        # Plot each reflection table in the relevant axis
+        for reflections_params, axis in zip(options['reflections_data'], ref_axes):
+            plot_reflection_table(data=data, reflections_params=reflections_params, ax=axis, options=options)
+
 def determine_grid_layout(options):
 
 
