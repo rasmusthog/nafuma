@@ -2290,3 +2290,18 @@ def line_insert_after(filename, line,string_to_locate):
 
     os.remove(filename)
     os.rename(temp_filename, filename)
+
+def find_closest_filename(df, target_time):
+# Calculate the absolute time difference between 'Rel_time' and the target_time in in situ sequential analysis
+    df['time_difference'] = abs(df['Rel_time'] - target_time)
+
+    # Sort the DataFrame based on the 'time_difference' column in ascending order
+    df_sorted = df.sort_values('time_difference')
+
+    # Get the filename from the row with the smallest 'time_difference'
+    closest_filename = df_sorted.iloc[0]['filename']
+
+    # Drop the temporary 'time_difference' column
+    df.drop('time_difference', axis=1, inplace=True)
+
+    return closest_filename
