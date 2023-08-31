@@ -2236,8 +2236,10 @@ def from_lpa_Pt_to_temp(lpa_Pt):
     #a_0 = float(3.926000666666667) #from 2023_temperature_calibration.ipynb
     #a_0_error = float(4.4743714642394187e-05) #from 2023_temperature_calibration.ipynb
   
-
-    a_0 = float(np.average(3.922855,3.923074,3.922450))#3.929536666666667) #too high????
+    a_0_Mn15_8Q_Pt_02=3.922855 #fra v9
+    a_0_Mn15_8Q_Pt_01=3.923074 #fra v9
+    a_0_Mn15_8Q_O2_slowcool_Pt=3.922450 #fra v9
+    a_0 = float(np.average([a_0_Mn15_8Q_Pt_02,a_0_Mn15_8Q_Pt_01,a_0_Mn15_8Q_O2_slowcool_Pt]))#3.929536666666667) #too high????
 
     
     relative_expansion = (lpa_Pt - a_0)*1000000/a_0
