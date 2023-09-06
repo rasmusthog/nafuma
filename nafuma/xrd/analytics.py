@@ -2310,10 +2310,10 @@ def find_closest_filename(df, target_time):
     return closest_filename
 
 def set_value_as_macro(s, parameter_name,macro_name):
-    string = s.rsplit("local "+parameter_name)[-1]
-
+    string = s.rsplit("local "+parameter_name+" ")[1]
+    #print(string)
     value_to_replace = string.split("min")[0]
-    print(value_to_replace)
+    #print(value_to_replace)
     s = s.replace(value_to_replace,"= "+macro_name+" ;:	 0` ")
     s = s.replace("local "+parameter_name,"local !"+parameter_name)
     return s
