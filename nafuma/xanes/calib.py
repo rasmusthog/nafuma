@@ -443,7 +443,7 @@ def smoothing(data: dict, options={}):
         smoothing_interactive(data=data, options=options) # Call interactive version of the function
         return
 
-
+    
     # FIXME Add other types of filters
     for i, filename in enumerate(data['path']):
 
@@ -452,7 +452,13 @@ def smoothing(data: dict, options={}):
             if options['log']:
                 aux.write_log(message=f'Smoothing {filename} with algorithm: {options["smooth_algorithm"]} ({i+1}/{len(data["path"])})', options=options)
 
+
+            if np.isnan(data['xanes_data'][filename]).any():
+                data['xanes_data'][filename] = np.nan_to_num(data['xanes_data'][filename], nan=np.nanmean(data['xanes_data'][filename]))
+
             # Apply savgol filter and add to DataFrame
+            
+            print(data['xanes_data'][filename])
             df_smooth.insert(1, filename, savgol_filter(data['xanes_data'][filename], options['smooth_window_length'], options['smooth_polyorder']))
         
         if options['smooth_save_default']:
@@ -1097,16 +1103,20 @@ def fit_pre_edge_feautre(data: dict, options={}) -> pd.DataFrame:
             options['background_limits'][1][1] += options['background_limits_increments'][1]
 
         peak_background = partial_data.copy()
-
+        #print(peak_background['ZapEnergy'])
         #peak_background.loc[(peak_background['ZapEnergy'] > options['background_limits'][0]) & (peak_background['ZapEnergy'] < options['background_limits'][1])] = np.nan
         peak_background.loc[(peak_background['ZapEnergy'] < options['background_limits'][0][0]) | 
                         ((peak_background['ZapEnergy'] > options['background_limits'][0][1]) &
                         (peak_background['ZapEnergy'] < options['background_limits'][1][0])) |
                         (peak_background['ZapEnergy'] > options['background_limits'][1][1])] = np.nan
+        #print(peak_background['ZapEnergy'])
         peak_background = peak_background.dropna()
+        
 
-
+        
         # FIXME Originally tried with spline and polynomials, but they worked very poorly. This is as best as it gets at this moment, but alternatives should be considered.
+        #print(peak_background[filename])
+        #print(peak_background['ZapEnergy'])
         if options['background_model'] == 'exponential':
             def linear(x, a, b):
                 return a*x + b
@@ -1207,7 +1217,6 @@ def fit_pre_edge_feautre(data: dict, options={}) -> pd.DataFrame:
                                 removed_background_df[filename],
                                 p0=[1, mu_init, 0.001, 0.5]
             )
-
 
         centroids.append(popt)
         errors.append(pcov)
