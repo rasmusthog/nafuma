@@ -1158,7 +1158,7 @@ def fit_pre_edge_feautre(data: dict, options={}) -> pd.DataFrame:
 
 
         mu_init = float(removed_background_df['ZapEnergy'].loc[removed_background_df[filename] == removed_background_df[filename].max()])
-        
+        print(filename)
         if options['peak_model'] == 'gaussian':
             popt, pcov = curve_fit(gauss, 
                                 removed_background_df['ZapEnergy'], 
@@ -1170,7 +1170,7 @@ def fit_pre_edge_feautre(data: dict, options={}) -> pd.DataFrame:
                                         ]
                                 )
 
-
+        
         elif options['peak_model'] == '2gaussian':
             popt, pcov = curve_fit(_2gauss,
                                 removed_background_df['ZapEnergy'], 
@@ -1180,8 +1180,8 @@ def fit_pre_edge_feautre(data: dict, options={}) -> pd.DataFrame:
                                 #        (0, mu_init-0.002, -np.inf), 
                                 #        (0.5, mu_init+0.002, np.inf)
                                 #        ]
-                                #)
                                 )
+                                
 
         elif options['peak_model'] == 'lorentzian':
 
@@ -1215,9 +1215,20 @@ def fit_pre_edge_feautre(data: dict, options={}) -> pd.DataFrame:
             popt, pcov = curve_fit(pseudo_voigt,
                                 removed_background_df['ZapEnergy'],
                                 removed_background_df[filename],
-                                p0=[1, mu_init, 0.001, 0.5]
+                                #p0=[1, mu_init, 0.001, 0.5]
+                                #p0=[1e-04, 8.318, 0.0006, 0.5]
+                                p0 = [5.18619091e+00, -6.08937200e+03,  3.46023848e+01, -2.76818809e+04]
             )
-
+        
+        elif options['peak_model'] == '2pseudo-voigt':
+            popt, pcov = curve_fit(_2pseudo_voigt,
+                                removed_background_df['ZapEnergy'],
+                                removed_background_df[filename],
+                                #p0=[1, mu_init, 0.001, 0.5, 1, mu_init+0.003, 0.001, 0.5],
+                                p0 = [1e-04, 6.54, 6.08774804e-04, 1, 1e-04, 6.54+0.002, 1.34770366e-03, 1]
+                                
+            )
+        print(popt)
         centroids.append(popt)
         errors.append(pcov)
 
@@ -1260,6 +1271,13 @@ def fit_pre_edge_feautre(data: dict, options={}) -> pd.DataFrame:
             elif options['peak_model'] == 'pseudo-voigt':
                 y_fit = pseudo_voigt(removed_background_df['ZapEnergy'], *popt)
                 components = [y_fit]
+            
+            elif options['peak_model'] == '2pseudo-voigt':
+                y_fit = _2pseudo_voigt(removed_background_df['ZapEnergy'], *popt)
+                y_fit1 = pseudo_voigt(removed_background_df['ZapEnergy'], *popt[0:4])
+                y_fit2 = pseudo_voigt(removed_background_df['ZapEnergy'], *popt[4:8])
+
+                components = [y_fit1, y_fit2]
 
             elif options['peak_model'] == '2gaussian':
                 y_fit = _2gauss(removed_background_df['ZapEnergy'], *popt)
@@ -1336,7 +1354,15 @@ def pseudo_voigt(x, A, mu, sigma, eta):
     L = lorentz(x, A, mu, sigma)
 
     return eta*G + (1-eta)*L
-    
+
+def _2pseudo_voigt(x, A1, mu1, sigma1, eta1, A2, mu2, sigma2, eta2):
+    G1 = gauss(x, A1, mu1, sigma1)
+    L1 = lorentz(x, A1, mu1, sigma1)
+    G2 = gauss(x, A2, mu2, sigma2)
+    L2 = lorentz(x, A2, mu2, sigma2)
+
+    return (eta1*G1 + (1-eta1)*L1) + (eta2*G2 + (1-eta2)*L2)
+
 def arctan(x,a,b,c,d):
     return a*np.arctan(x*b+c) + d
 
@@ -1380,6 +1406,7 @@ def save_centroids(data: dict, options={}):
         'save_path': 'centroids.dat',
         'overwrite': False,
         'append': False,
+        'peak_model': 'pseudo_voigt'
     }
 
     options = aux.update_options(options=options, default_options=default_options)
@@ -1407,16 +1434,33 @@ def save_centroids(data: dict, options={}):
     if mode:
         with open(options['save_path'], mode) as f:
             for path, fit, error in zip(data['path'], data['centroid_fit'], data['centroid_fit_errors']):
+                if "2pseudo-voigt" in options["peak_model"]:
+                    A1 = fit[0]
+                    mu1 = fit[1]
+                    sigma1 = fit[2]
+                    eta1 = (fit[3]*1000)-reference
+                    mu_adj1 = (fit[1]*1000)-reference
+                    A2= fit[4]
+                    mu2 = fit[5]
+                    sigma2 = fit[6]
+                    eta2 = (fit[7]*1000)-reference
+                    mu_adj2 = (fit[5]*1000)-reference
+                    print(mu2)
+                    stddevs = np.sqrt(np.diag(error))
 
-                A = fit[0]
-                mu = fit[1]
-                sigma = fit[2]
-                mu_adj = (fit[1]*1000)-reference
+                    #f.write(f'{path} \t {fit[1]*1000} \t {(fit[1]-reference)*1000} \t {fit[0]} \t {fit[2]} \n')
+                    f.write('{: <40} \t {: <25} \t {: <25} \t {: <25} \t {: <25} \t {: <25} \t {: <25}\t {: <25} \t {: <25} \t {: <25} \t {: <25} \t {: <25} \t {: <25}\t {: <25} \t {: <25} \t {: <25} \t {: <25} \t {: <25} \t {: <25}\n'.format(path, mu1*1000, mu_adj1, A1, sigma1, eta1, mu2*1000, mu_adj2, A2, sigma2, eta2, stddevs[1]*1000, stddevs[0], stddevs[2], stddevs[3],stddevs[5]*1000, stddevs[4], stddevs[6], stddevs[7] ))
 
-                stddevs = np.sqrt(np.diag(error))
+                else:
+                    A = fit[0]
+                    mu = fit[1]
+                    sigma = fit[2]
+                    mu_adj = (fit[1]*1000)-reference
 
-                #f.write(f'{path} \t {fit[1]*1000} \t {(fit[1]-reference)*1000} \t {fit[0]} \t {fit[2]} \n')
-                f.write('{: <40} \t {: <25} \t {: <25} \t {: <25} \t {: <25} \t {: <25} \t {: <25} \t {: <25}\n'.format(path, mu*1000, mu_adj, A, sigma, stddevs[1]*1000, stddevs[0], stddevs[2]))
+                    stddevs = np.sqrt(np.diag(error))
+
+                    #f.write(f'{path} \t {fit[1]*1000} \t {(fit[1]-reference)*1000} \t {fit[0]} \t {fit[2]} \n')
+                    f.write('{: <40} \t {: <25} \t {: <25} \t {: <25} \t {: <25} \t {: <25} \t {: <25} \t {: <25}\n'.format(path, mu*1000, mu_adj, A, sigma, stddevs[1]*1000, stddevs[0], stddevs[2]))
 
 
 

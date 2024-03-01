@@ -235,7 +235,7 @@ def adjust_plot(fig, ax, options):
                 active_labels.append(label)
 
     
-
+        print(active_labels)
         ax.legend(active_markers, active_labels, frameon=False, loc=options['legend_position'][0], bbox_to_anchor=options['legend_position'][1], ncol=options['legend_ncol'])
         #fig.legend(handles=patches, loc=options['legend_position'][0], bbox_to_anchor=options['legend_position'][1], frameon=False)
 

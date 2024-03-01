@@ -15,6 +15,7 @@ from PIL import Image
 import nafuma.xrd as xrd
 import nafuma.auxillary as aux
 import nafuma.plotting as btp
+import nafuma.xrd.analytics as analyze
 
 def plot_diffractogram(data, options={}):
     ''' Plots a diffractogram.
@@ -52,6 +53,8 @@ def plot_diffractogram(data, options={}):
         'rc_params': {},
         'format_params': {},
         'plot_diff': False,
+        #'plot_in_Q': False, not needed! only put 'x_vals': 'q'
+        'log_y': False,
         }
 
     if 'offset_y' not in options.keys():
@@ -65,7 +68,7 @@ def plot_diffractogram(data, options={}):
     if not isinstance(data['path'], list):
         data['path'] = [data['path']]
 
-    
+
     ############################################################################################################################################################
     ##### LOADING DATA #########################################################################################################################################
     ############################################################################################################################################################
@@ -74,8 +77,12 @@ def plot_diffractogram(data, options={}):
     if not 'diffractogram' in data.keys():
 
         # This is to set the default values of the diffractogram y-label and -unit so that the actual yunit and ylable can switch back and forth between these and the heatmap values
-        options['diff.yunit'] = 'a.u.'
-        options['diff.ylabel'] = 'Intensity'
+        if options['log_y']:
+            options['diff.yunit'] = 'a.u.'
+            options['diff.ylabel'] = 'log(Intensity)'
+        else:
+            options['diff.yunit'] = 'a.u.'
+            options['diff.ylabel'] = 'Intensity'
 
         # Initialise empty list for diffractograms and wavelengths. If wavelength is not manually passed it should be automatically gathered from the .xy-file
         data['diffractogram'] = [None for _ in range(len(data['path']))]
@@ -107,7 +114,6 @@ def plot_diffractogram(data, options={}):
                 # FIXME This is a quick fix as the image is not reloaded when passing multiple beamline datasets. Should probably be handled in io?
                 data['image'] = None
 
-        
         # Sets the xlim if this has not been specified
         if not options['xlim']:
             options['xlim'] = [data['diffractogram'][0][options['x_vals']].min(), data['diffractogram'][0][options['x_vals']].max()]
@@ -128,7 +134,9 @@ def plot_diffractogram(data, options={}):
         if not isinstance(data['diffractogram'], list):
             data['diffractogram'] = [data['diffractogram']]
             data['wavelength'] = [data['wavelength']]
+    
 
+    
     ############################################################################################################################################################
     ##### INTERACTIVE SESSION ##################################################################################################################################
     ############################################################################################################################################################
@@ -1088,7 +1096,7 @@ def plot_refinement(data, options={}):
 
     if 'xlim' not in options.keys() or options['xlim'] == None:
         options['xlim'] = [df['2th'].min(), df['2th'].max()]
-
+    
 
     fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
 
@@ -1111,6 +1119,8 @@ def plot_refinement_halvor(data, options={}):
         'index': -1,
         'title': None,
         'xlim': None,
+        'ylim': None,
+        'y_space': 0.1,
         'r_wp': True,
         'r_exp': False,
         'wp': False,
@@ -1125,6 +1135,8 @@ def plot_refinement_halvor(data, options={}):
         'reflections_data': None, # Should be passed as a list of dictionaries on the form {path: rel_path, reflection_indices: number of indices, colour: [r,g,b], min_alpha: 0-1]
         'log_y': False,
         'cbrt_y': False,
+        'plot_in_Q': False,
+        'plot_diff': True
     }
 
     options = aux.update_options(options=options, default_options=default_options, required_options=required_options)
@@ -1142,6 +1154,11 @@ def plot_refinement_halvor(data, options={}):
         df['Yobs_cbrt']=np.cbrt(df['Yobs'])
         df['Ycalc_cbrt']=np.cbrt(df['Ycalc'])
         df['diff_cbrt']=df['Yobs_cbrt']-df['Ycalc_cbrt']
+    
+    if options['plot_in_Q']:
+        Q_values = analyze.twotheta_to_Q(df["2th"],data['wavelength'])
+        df["2th"]=Q_values
+
     '''
     if not isinstance(data['results'], list):
         data['results'] = [data['results']]
@@ -1200,15 +1217,18 @@ def plot_refinement_halvor(data, options={}):
     if options['log_y']:
         df.plot.scatter(x='2th', y='Yobs_log', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*10)
         df.plot(x='2th', y='Ycalc_log', ax=ax, c='red')
-        df.plot(x='2th', y='diff_log', ax=ax)
+        if options['plot_diff']:
+            df.plot(x='2th', y='diff_log', ax=ax)
     elif options['cbrt_y']:
         df.plot.scatter(x='2th', y='Yobs_cbrt', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*10)
         df.plot(x='2th', y='Ycalc_cbrt', ax=ax, c='red')
-        df.plot(x='2th', y='diff_cbrt', ax=ax)
+        if options['plot_diff']:
+            df.plot(x='2th', y='diff_cbrt', ax=ax)
     else:
         df.plot.scatter(x='2th', y='Yobs', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*10)
         df.plot(x='2th', y='Ycalc', ax=ax, c='red')
-        df.plot(x='2th', y='diff', ax=ax)
+        if options['plot_diff']:
+            df.plot(x='2th', y='diff', ax=ax)
     
 
     #FIXME implement whatever parameters is useful in the plot (e.g. r_wp and r_exp)
@@ -1217,12 +1237,12 @@ def plot_refinement_halvor(data, options={}):
         options['text'].append([options['sample'], [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
         options['text_pos'][0] += options['text_pos_increments'][0]
         options['text_pos'][1] += options['text_pos_increments'][1]
-
+    
     if options['wavelength']:
         options['text'].append([f'$\lambda$ = {options["wavelength"]} Å', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
         options['text_pos'][0] += options['text_pos_increments'][0]
         options['text_pos'][1] += options['text_pos_increments'][1]
-
+    
     if options['wp']:
         for i, (result, label) in enumerate(zip(data['results'], options['labels'])):
             options['text'].append([f'{label}: {np.round(float(results["wp"][i]), 1)}%', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
@@ -1248,6 +1268,13 @@ def plot_refinement_halvor(data, options={}):
     if 'xlim' not in options.keys() or options['xlim'] == None:
         options['xlim'] = [df['2th'].min(), df['2th'].max()]
 
+    if 'ylim' not in options.keys() or options['ylim'] == None:
+        filtered_df = df[df['2th']>options['xlim'][0]]
+        filtered_df = filtered_df[filtered_df['2th']<options['xlim'][-1]]
+        if options['log_y']:
+            options['ylim'] = [filtered_df['Yobs_log'].min()-options['y_space'], filtered_df['Yobs_log'].max()+options['y_space']]
+        else:
+            options['ylim'] = [filtered_df['Yobs'].min()-options['y_space'], filtered_df['Yobs'].max()+options['y_space']]
 
     fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
 

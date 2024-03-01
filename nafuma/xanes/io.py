@@ -320,7 +320,7 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
         columns.append(filename)
 
         scan_data = pd.read_csv(filename, skiprows=1)
-
+        print(filename)
         if options['mode'] == 'fluoresence':
             if not options['active_roi']:
                 scan_data = scan_data[[determine_active_roi(scan_data)]]
