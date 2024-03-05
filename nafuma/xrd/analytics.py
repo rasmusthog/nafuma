@@ -3278,3 +3278,37 @@ def read_headerex(df, header_path,csv_path):
 
     df.loc[df['filename'] == filename, 'Blower'] = blower_value
     return df
+
+def fetching_analytical_area_from_file(df, analytical_path):
+    # Load the CSV data
+    csv_data = pd.read_csv(analytical_path, delim_whitespace=True)
+    csv_data.columns = csv_data.columns.str.replace(' ', '')  # Remove spaces from column names
+    csv_data['filename'] = csv_data['filename'].str.strip()  # Remove leading/trailing spaces from filenames
+
+    # Filter csv_data to include only rows with filenames present in df
+    csv_data = csv_data[csv_data['filename'].isin(df['filename'])]
+
+    # Create a mapping between filenames and row indices in df
+    filename_mapping = {filename: idx for idx, filename in enumerate(df['filename'])}
+
+    # Reorder the rows in df based on the order of filenames in csv_data
+    df = df.iloc[[filename_mapping[filename] for filename in csv_data['filename']]].copy()
+
+    # Merge the data based on the "filename" column
+    df.loc[:, ['calc_area_310', 'calc_area_cluster']] = csv_data[['area_310_pos1', 'area_cluster_pos1']].values
+
+    df["PO_analytical_total"]=df["calc_area_310"]/df["calc_area_cluster"]
+    df["PO_analytical_ord"]=df["calc_area_310"]/(df["subord_222"]+df["subord_311"])
+    # Display the updated DataFrame
+    return df
+
+def normalize_lattice_parameters(df,parameters):
+    therm_exp_pm_per_K = 20.2*1000
+    #print(therm_exp_angstr_per_K)
+    df["delta_T"]=df["Calib_temp"]-25
+    df["thermal_exp_pm3"]=df["delta_T"]*therm_exp_pm_per_K
+    for params in parameters:
+        df[params+"_vol_pm3"]=(df[params]*100)**3
+        df[params+"_vol_norm_pm3"]=df[params+"_vol_pm3"]-df["thermal_exp_pm3"]
+        df[params+"_norm"]=np.cbrt(df[params+"_vol_norm_pm3"])/100
+    return df
