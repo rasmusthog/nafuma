@@ -3302,6 +3302,34 @@ def fetching_analytical_area_from_file(df, analytical_path):
     # Display the updated DataFrame
     return df
 
+def fetching_data_from_analytical_approach(df, analytical_path):
+    # Load the CSV data
+    csv_data = pd.read_csv(analytical_path, delim_whitespace=True)
+    csv_data.columns = csv_data.columns.str.replace(' ', '')  # Remove spaces from column names
+    csv_data['filename'] = csv_data['filename'].str.strip()  # Remove leading/trailing spaces from filenames
+
+    # Filter csv_data to include only rows with filenames present in df
+    csv_data = csv_data[csv_data['filename'].isin(df['filename'])]
+
+    # Create a mapping between filenames and row indices in df
+    filename_mapping = {filename: idx for idx, filename in enumerate(df['filename'])}
+
+    # Reorder the rows in df based on the order of filenames in csv_data
+    df = df.iloc[[filename_mapping[filename] for filename in csv_data['filename']]].copy()
+
+    # Merge the data based on the "filename" column
+    columns_of_interest =['area_310_pos1', 'area_cluster_pos1', 'maximum_310_pos1', 'maximum_311_pos1', 'fit_int_310_pos1', 'fit_int_310_pos1_err', 'fit_pos_310_pos1', 'fit_pos_310_pos1_err', 'fit_fwhm_310_pos1', 'fit_fwhm_310_pos1_err', 'fit_ratio_310_pos1', 'fit_ratio_310_pos1_err', 'maximum_111_pos1', 'maximum_400_pos1']
+    new_column_names = ['calc_area_310', 'calc_area_cluster', 'maximum_310_pos1', 'maximum_311_pos1', 'fit_int_310_pos1', 'fit_int_310_pos1_err', 'fit_pos_310_pos1', 'fit_pos_310_pos1_err', 'fit_fwhm_310_pos1', 'fit_fwhm_310_pos1_err', 'fit_ratio_310_pos1', 'fit_ratio_310_pos1_err', 'maximum_111_pos1', 'maximum_400_pos1']
+    df.loc[:, new_column_names] = csv_data[columns_of_interest].values
+
+    df["PO_analytical_total"]=df["calc_area_310"]/df["calc_area_cluster"]
+    df["PO_analytical_ord"]=df["calc_area_310"]/(df["subord_222"]+df["subord_311"])
+    df["PO_fitting_total"]=df["fit_int_310_pos1"]/df["calc_area_cluster"]
+    df["111/311"]=df["maximum_111_pos1"]/df["maximum_311_pos1"]
+    df["311/400"]=df["maximum_311_pos1"]/df["maximum_400_pos1"]
+    # Display the updated DataFrame
+    return df
+
 def normalize_lattice_parameters(df,parameters):
     therm_exp_pm_per_K = 20.2*1000
     #print(therm_exp_angstr_per_K)
