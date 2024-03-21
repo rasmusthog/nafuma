@@ -4688,36 +4688,33 @@ def generic_peak_maximum_and_area_in_Q_optimized(data, options, peak):
     }
 
     
-    if peak == "cluster":
+    if "cluster" in peak:
         default_options['region_of_interest'] = [2.3,         2.46, 2.71,         2.75]
         default_options['excluded_regions'] = [[2.41,2.465]]
+
     elif peak == "311":
-        print("NB: Inspect plot and make sure peak does not overlap with other peaks")
+        print("NB: Inspect plot and make sure no overlapping (RS)-peaks. If intention is to include RS-peak, use peak = cluster_311")
         default_options['region_of_interest'] = [2.4,         2.525, 2.585,         2.6]
         default_options['excluded_regions'] = [[2.41,2.465],[2.49,2.52]]
         default_options['plot_result'] = True
     elif peak == "222":
-        print("NB: Inspect plot and make sure peak does not overlap with other peaks")
+        print("NB: Inspect plot and make sure no overlapping (RS)-peaks. If intention is to include RS-peak, use peak = cluster_311")
         default_options['plot_result'] = True
         default_options['region_of_interest'] = [2.64,         2.645, 2.695,         2.7]
         default_options['excluded_regions'] = None
     
     elif peak == "111":
-        default_options['plot_result'] = True
         default_options['region_of_interest'] = [1.21,         1.26,1.364,         1.414]
         default_options['excluded_regions'] = None
     
     elif peak == "400":
-        default_options['plot_result'] = True
         default_options['region_of_interest'] = [2.86,         2.9,3.12 ,        3.13]
         default_options['excluded_regions'] = None
     
     elif peak == "Pt111":
-        default_options['plot_result'] = True
         default_options['region_of_interest'] = [2.69,         2.71,2.82 ,        2.84]
         default_options['excluded_regions'] = None
     elif peak == "Pt400":
-        default_options['plot_result'] = True
         default_options['region_of_interest'] = [6.305,         6.33,6.41  ,       6.42]
         default_options['excluded_regions'] = [[6.31,6.33]]
     else:
@@ -4725,6 +4722,30 @@ def generic_peak_maximum_and_area_in_Q_optimized(data, options, peak):
     
     options = aux.update_options(options=options, default_options=default_options)  
     
+    #making sure that if cluster-222 or cluster-311 is used, the same options as normal cluster should be given and limits are adjusted accordingly to treat each peak semi-separatly:
+
+    if "cluster-" in peak:# == "cluster" or peak == "cluster-311" or peak == "cluster-222":
+        region = options['region_of_interest']
+        excluded_regions_list = options['region_of_interest'][0]
+        split_311_222 = 2.57
+        if peak == "cluster-311":
+            print("NB: Inspect plot and make sure peak RS-peak ends on the correct side of the split, so calculations become correct")
+            #picking out cluster end as the point where background starts, to keep background the same
+            right_background_start=region[2]
+            #updating witth new value for peak stop
+            region[2] = split_311_222
+            options['region_of_interest'] = region
+            excluded_regions_list.append([split_311_222,right_background_start])
+            options['excluded_regions'] = excluded_regions
+        elif peak == "cluster-222":
+            print("NB: Inspect plot and make sure peak RS-peak ends on the correct side of the split, so calculations become correct")
+            #picking out cluster end as the point where background starts, to keep background the same
+            left_background_end=region[1]
+            #updating witth new value for peak startp
+            region[1] = split_311_222
+            options['region_of_interest'] = region
+            excluded_regions_list.append([left_background_end,split_311_222])
+            options['excluded_regions'] = excluded_regions_list
 
     analytical_area,analytical_maximum, peak_pos, df_peak = background_subtracted_peak_in_Q_optimized(data=data,options=options)
 
