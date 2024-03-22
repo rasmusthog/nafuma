@@ -3795,7 +3795,83 @@ def fetching_data_from_analytical_approach_optimized(df, analytical_path):
 
 
     return df
+def fetching_data_from_analytical_approach_optimized_merge_friendly(df, analytical_path,n=1):
+    # Load the CSV data
+    csv_data = pd.read_csv(analytical_path, delim_whitespace=True)
+    csv_data.columns = csv_data.columns.str.replace(' ', '')  # Remove spaces from column names
+    csv_data['filename'] = csv_data['filename'].str.strip()  # Remove leading/trailing spaces from filenames
+    # Filter csv_data to include only rows with filenames present in df
+    csv_data = csv_data[csv_data['filename'].isin(df['filename'])]
+    # Create a mapping between filenames and row indices in df
+    filename_mapping = {filename: idx for idx, filename in enumerate(df['filename'])}
+    # Reorder the rows in df based on the order of filenames in csv_data
+    df = df.iloc[[filename_mapping[filename] for filename in csv_data['filename']]].copy()
 
+    #finding all columns in csvdata except the filename-column:
+    all_columns = csv_data.columns.tolist()
+
+    # Remove the "filename" column
+    columns_except_filename = [col for col in all_columns if col != "filename"]
+   
+    # Merge the data based on the "filename" column  
+    df.loc[:, columns_except_filename] = csv_data[columns_except_filename].values
+    
+    # comparison of peak maximas
+    df["111/311_max"]=df["num_max_111"]/df["num_max_311"] #ratio known from literature
+    df["311/400_max"]=df["num_max_311"]/df["num_max_400"] #ratio known from literature
+    df["222/311_max"]=df["num_max_222"]/df["num_max_311"] #checking how these two change over time
+
+    #comparing to Pt (not normalized to wp_Pt)
+    df["111/Pt111_max"] = df["num_max_111"]/df["num_max_Pt111"]
+    df["311/Pt111_max"] = df["num_max_311"]/df["num_max_Pt111"]
+    df["222/Pt111_max"] = df["num_max_222"]/df["num_max_Pt111"]
+    df["400/Pt111_max"] = df["num_max_400"]/df["num_max_Pt111"]
+    df["cluster/Pt111"] = df["num_area_cluster"]/df["num_max_Pt111"]
+
+    #comparing to Pt (normalized to wp_Pt)
+    df["111/Pt111_max_norm"] = df["num_max_111"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+    df["311/Pt111_max_norm"] = df["num_max_311"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+    df["222/Pt111_max_norm"] = df["num_max_222"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+    df["400/Pt111_max_norm"] = df["num_max_400"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+    df["cluster/Pt111_norm"] = df["num_area_cluster"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+    
+    #checking for absorption issues with Pt
+    df["Pt400/Pt111_max"] = df["num_max_Pt400"]/df["num_max_Pt111"]
+
+    #comparing of peaks, by (estimated) areas
+    df["311/400_area"]=(df["num_area_311"]-n*df["RS_311"])/(df["num_area_400"]-n*df["RS_400"])
+    df["111/311_area"]=(df["num_area_111"]-n*df["RS_111"])/(df["num_area_311"]-n*df["RS_311"])
+    df["222/311_area"]=(df["num_area_222"]-n*df["RS_222"])/(df["num_area_311"]-n*df["RS_311"]) #checking how these two change over time
+
+    #comparing to Pt by area, corrected by refined intensities where area calculation is not sofisticated but not normalized by wp_Pt
+    df["111/Pt111_area"]=(df["num_area_111"]-n*df["RS_111"])/df["num_area_Pt111"]
+    df["311/Pt111_area"]=(df["num_area_311"]-n*df["RS_311"])/df["num_area_Pt111"]
+    df["222/Pt111_area"]=(df["num_area_222"]-n*df["RS_222"])/df["num_area_Pt111"]
+    df["400/Pt111_area"] = (df["num_area_400"]-n*df["RS_400"])/df["num_max_Pt111"]
+
+    #comparing to Pt  by area, corrected by refined intensities where area calculation is not sofisticated AND normalized by wp_Pt
+    df["111/Pt111_area_norm"]=(df["num_area_111"]-n*df["RS_111"])/(df["num_area_Pt111"]/(df["wp_Pt"]/100))
+    df["311/Pt111_area_norm"]=(df["num_area_311"]-n*df["RS_311"])/(df["num_area_Pt111"]/(df["wp_Pt"]/100))
+    df["222/Pt111_area_norm"]=(df["num_area_222"]-n*df["RS_222"])/(df["num_area_Pt111"]/(df["wp_Pt"]/100))
+    df["400/Pt111_area_norm"] = (df["num_area_400"]-n*df["RS_400"])/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+
+    #PO over the whole sample
+    df["310/cluster_num"]=  df["num_area_310"]/df["num_area_cluster"] #see no reason to go for the numeric approach as long as the fit-approach works fine
+    df["310/cluster_fit"]=  df["fit_area_310"]/df["num_area_cluster"] #Standard measurement for PO
+    #PO of the total spinel amount
+    df["310/(311+222)_wp"]=df["fit_area_310"]/(df["num_area_cluster"]*(df["wp_ord"]+df["wp_dis"])/(100-df["wp_Pt"]))   
+    df["310/cluster-RS"] = df["fit_area_310"]/(df["num_area_cluster"]-n*df["RS_311"]-n*df["RS_222"]) 
+    #PO of the ordered phase
+    df["310/subord_ref"]=df["fit_area_310"]/(n*df["subord_222"]+n*df["subord_311"]) #based on the refined intensities of the subord-peaks (ofter underestimating intensity)
+    df["310/subord_wp"]=df["fit_area_310"]/(df["num_area_cluster"]*df["wp_ord"]/(100-df["wp_Pt"])) #based on the assumption that the subord-intensity is directly scaling with the wt% of ord,dis,RS
+    #PO relative to Pt
+    df["310/Pt111_max"] = df["fit_max_310"]/df["num_max_Pt111"]
+    df["310/Pt111_max_norm"] = df["fit_max_310"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+    df["310/Pt111_area"] = df["fit_area_310"]/df["num_max_Pt111"]
+    df["310/Pt111_area_norm"] = df["fit_area_310"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+
+
+    return df
 def normalize_lattice_parameters(df,parameters):
     therm_exp_pm_per_K = 20.2*1000
     #print(therm_exp_angstr_per_K)
