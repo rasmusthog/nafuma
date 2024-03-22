@@ -6113,11 +6113,7 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
             
             bounds_final = (lower_bounds_final, upper_bounds_final)
             
-            print("initial guess (final): " + str(initial_guess_final))
-            print("lower bounds (final): " + str(lower_bounds_final))
-            print("higher bounds (final): " + str(upper_bounds_final))
             fit_params_final, fit_params_final_error = scipy.optimize.curve_fit(poly1_with_PV_BG_and_PV, data_x_to_be_fitted, data_y_to_be_fitted, p0=initial_guess_final, bounds=bounds_final, maxfev=5000)
-            print("fit_params_final: ",fit_params_final)
             y_fitted = poly1_with_PV_BG_and_PV(background_full_x,*fit_params_final)
             y_peak = pseudovoigt(background_full_x,*fit_params_final[-4:])
             final_fitted_background = poly1_with_PV(background_full_x,*fit_params_final[:-4])
@@ -6133,16 +6129,18 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
             
             bounds_final = (lower_bounds_final, upper_bounds_final)
         
-            print("initial guess (final): " + str(initial_guess_final))
-            print("lower bounds (final): " + str(lower_bounds_final))
-            print("higher bounds (final): " + str(upper_bounds_final))
             fit_params_final, fit_params_final_error = scipy.optimize.curve_fit(poly2_with_PV_BG_and_PV, data_x_to_be_fitted, data_y_to_be_fitted, p0=initial_guess_final, bounds=bounds_final)
-            print("fit_params_final: ",fit_params_final)
-
             y_fitted = poly2_with_PV_BG_and_PV(background_full_x,*fit_params_final)
             final_fitted_background = poly2_with_PV(background_full_x,*fit_params_final[:-4])
             y_peak = pseudovoigt(background_full_x,*fit_params_final[-4:])
 
+        errors = np.sqrt(np.diag(fit_params_final_error))
+
+        print("initial guess (final): " + str(initial_guess_final))
+        print("lower bounds (final): " + str(lower_bounds_final))
+        print("higher bounds (final): " + str(upper_bounds_final))
+        print("fit_params_final: ",fit_params_final)        
+        print("fit errors calc: ", errors)
         #####################################################################################################################################
         #============================ Plotting the final result ==========================
         ###################################################################################################################################
@@ -6157,7 +6155,7 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
         df['I_corr']=background_subtracted_data #background after fitting with also the PV
 
 
-
+        
 
         if options['plot_result'] or options['save_dir']:
             fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(15, 5))
@@ -6216,8 +6214,9 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
         #finding area of the fitted PV (with may extra data points)
         PV_area = np.trapz(y_fitted_many_points, x=background_for_plotting_fits)
 
-        errors = np.sqrt(np.diag(fit_params_final_error))
-        parameters =  fit_params_final[-4:]
+
+        PV_parameters =  fit_params_final[-4:]
+        PV_errors = errors[-4:]
     except Exception as e:
         # If an exception occurs during fitting, print an error message
         print(f"Error occurred for {filename}: {e}")
@@ -6246,8 +6245,8 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
 
         PV_area = 0
 
-        errors = [1,1,1,1]
-        parameters =  [0,0,0,0]
+        PV_errors = [1,1,1,1]
+        PV_parameters =  [0,0,0,0]
 
     #fixing the analytical outputs, that shold work regardless of fitting is a success or not
     analytical_maximum = peak_maximum
@@ -6255,5 +6254,5 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
     df_peak = df[(df['2th'] >= peak_interval[0]) & (df['2th'] <= peak_interval[1])]
     analytical_area = np.trapz(df_peak["I_corr_gauss"],x=df_peak["2th"])
     
-    return parameters, errors, PV_area, analytical_area, analytical_maximum
+    return PV_parameters, PV_errors, PV_area, analytical_area, analytical_maximum
 #######################################################################################################################################
