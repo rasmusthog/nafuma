@@ -3735,24 +3735,65 @@ def fetching_data_from_analytical_approach_optimized(df, analytical_path):
 
     # Remove the "filename" column
     columns_except_filename = [col for col in all_columns if col != "filename"]
-
+   
+    # Merge the data based on the "filename" column  
     df.loc[:, columns_except_filename] = csv_data[columns_except_filename].values
-    # Merge the data based on the "filename" column    
-    df["310/cluster_num"]=df["num_area_310"]/df["num_area_cluster"]
-    df["310/cluster_fit"]=df["fit_area_310"]/df["num_area_cluster"]
-    df["111/311_max"]=df["num_max_111"]/df["num_max_311"]
-    df["311/400_max"]=df["num_max_311"]/df["num_max_400"]
-
-    df["310/Pt111_max_norm"] = df["fit_max_310"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
-    df["310/Pt400_max_norm"] = df["fit_max_310"]/(df["num_max_Pt400"]/(df["wp_Pt"]/100))
     
+    # comparison of peak maximas
+    df["111/311_max"]=df["num_max_111"]/df["num_max_311"] #ratio known from literature
+    df["311/400_max"]=df["num_max_311"]/df["num_max_400"] #ratio known from literature
+    df["222/311_max"]=df["num_max_222"]/df["num_max_311"] #checking how these two change over time
+
+    #comparing to Pt (not normalized to wp_Pt)
+    df["111/Pt111_max"] = df["num_max_111"]/df["num_max_Pt111"]
+    df["311/Pt111_max"] = df["num_max_311"]/df["num_max_Pt111"]
+    df["222/Pt111_max"] = df["num_max_222"]/df["num_max_Pt111"]
+    df["400/Pt111_max"] = df["num_max_400"]/df["num_max_Pt111"]
+    df["cluster/Pt111"] = df["num_area_cluster"]/df["num_max_Pt111"]
+
+    #comparing to Pt (normalized to wp_Pt)
+    df["111/Pt111_max_norm"] = df["num_max_111"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+    df["311/Pt111_max_norm"] = df["num_max_311"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+    df["222/Pt111_max_norm"] = df["num_max_222"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+    df["400/Pt111_max_norm"] = df["num_max_400"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
     df["cluster/Pt111_norm"] = df["num_area_cluster"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
     
-    df["111/Pt111"] = df["num_max_111"]/df["num_max_Pt111"]
-    df["311/Pt111"] = df["num_max_311"]/df["num_max_Pt111"]
-    df["400/Pt400"] = df["num_max_400"]/df["num_max_Pt400"]
-    
-    
+    #checking for absorption issues with Pt
+    df["Pt400/Pt111_max"] = df["num_max_Pt400"]/df["num_max_Pt111"]
+
+    #comparing of peaks, by (estimated) areas
+    df["311/400_area"]=(df["num_area_311"]-df["RS_311"])/(df["num_area_400"]-df["RS_400"])
+    df["111/311_area"]=(df["num_area_111"]-df["RS_111"])/(df["num_area_311"]-df["RS_311"])
+    df["222/311_area"]=(df["num_area_222"]-df["RS_222"])/(df["num_area_311"]-df["RS_311"]) #checking how these two change over time
+
+    #comparing to Pt by area, corrected by refined intensities where area calculation is not sofisticated but not normalized by wp_Pt
+    df["111/Pt111_area"]=(df["num_area_111"]-df["RS_111"])/df["num_area_Pt111"]
+    df["311/Pt111_area"]=(df["num_area_311"]-df["RS_311"])/df["num_area_Pt111"]
+    df["222/Pt111_area"]=(df["num_area_222"]-df["RS_222"])/df["num_area_Pt111"]
+    df["400/Pt111_area"] = (df["num_area_400"]-df["RS_400"])/df["num_max_Pt111"]
+
+    #comparing to Pt  by area, corrected by refined intensities where area calculation is not sofisticated AND normalized by wp_Pt
+    df["111/Pt111_area_norm"]=(df["num_area_111"]-df["RS_111"])/(df["num_area_Pt111"]/(df["wp_Pt"]/100))
+    df["311/Pt111_area_norm"]=(df["num_area_311"]-df["RS_311"])/(df["num_area_Pt111"]/(df["wp_Pt"]/100))
+    df["222/Pt111_area_norm"]=(df["num_area_222"]-df["RS_222"])/(df["num_area_Pt111"]/(df["wp_Pt"]/100))
+    df["400/Pt111_area_norm"] = (df["num_area_400"]-df["RS_400"])/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+
+    #PO over the whole sample
+    df["310/cluster_num"]=  df["num_area_310"]/df["num_area_cluster"] #see no reason to go for the numeric approach as long as the fit-approach works fine
+    df["310/cluster_fit"]=  df["fit_area_310"]/df["num_area_cluster"] #Standard measurement for PO
+    #PO of the total spinel amount
+    df["310/(311+222)_wp"]=df["fit_area_310"]/(df["num_area_cluster"]*(df["wp_ord"]+df["wp_dis"])/(100-df["wp_Pt"]))   
+    df["310/cluster-RS"] = df["fit_area_310"]/(df["num_area_cluster"]-df["RS_311"]-df["RS_222"]) 
+    #PO of the ordered phase
+    df["310/subord_ref"]=df["fit_area_310"]/(df["subord_222"]+df["subord_311"]) #based on the refined intensities of the subord-peaks (ofter underestimating intensity)
+    df["310/subord_wp"]=df["fit_area_310"]/(df["num_area_cluster"]*df["wp_ord"]/(100-df["wp_Pt"])) #based on the assumption that the subord-intensity is directly scaling with the wt% of ord,dis,RS
+    #PO relative to Pt
+    df["310/Pt111_max"] = df["fit_max_310"]/df["num_max_Pt111"]
+    df["310/Pt111_max_norm"] = df["fit_max_310"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+    df["310/Pt111_area"] = df["fit_area_310"]/df["num_max_Pt111"]
+    df["310/Pt111_area_norm"] = df["fit_area_310"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+
+
     return df
 
 def normalize_lattice_parameters(df,parameters):
@@ -4442,7 +4483,6 @@ def background_subtracted_peak_in_Q_optimized(data,options):
 
     background_region = [Q_to_twotheta(Q=options['region_of_interest'][0],wavelength=wavelength),Q_to_twotheta(Q=options['region_of_interest'][3],wavelength=wavelength)]
     peak_interval = [Q_to_twotheta(Q=options['region_of_interest'][1],wavelength=wavelength),Q_to_twotheta(Q=options['region_of_interest'][2],wavelength=wavelength)]
-
     for i, twotheta in enumerate(diffractogram["2th"]): #using the background start and end points to define the regions of interest
         #if options['peak_interval'][0]-options['background_shoulder_left'] < twotheta and twotheta < options['peak_interval'][1]+options['background_shoulder_right']:
         if background_region[0] < twotheta and twotheta < background_region[1]:
@@ -4464,7 +4504,7 @@ def background_subtracted_peak_in_Q_optimized(data,options):
     ####################################################################################################
     #============================ Removing any excluded regions (from other peaks etc) ========================
 ####################################################################################################
-    
+    #print("region of interest 2th: ",str([background_region[0], peak_interval, background_region[1]]))
 
     background_x = background_shoulders_x.copy()
     background_y = background_shoulders_y.copy()
@@ -4472,10 +4512,11 @@ def background_subtracted_peak_in_Q_optimized(data,options):
     data_x_to_be_fitted = background_full_x.copy()
     data_y_to_be_fitted = data_full_y.copy()
     if options['excluded_regions']:
+ 
         for excluded_region in options['excluded_regions']:
             excluded_region = [Q_to_twotheta(Q=excluded_region[0], wavelength=wavelength),
                             Q_to_twotheta(Q=excluded_region[1], wavelength=wavelength)]
-
+ 
             for i, xval in enumerate(background_shoulders_x):
                 if excluded_region[0] < xval < excluded_region[1]:
 
@@ -4496,23 +4537,29 @@ def background_subtracted_peak_in_Q_optimized(data,options):
 
                     # Remove xval from data_x_to_be_fitted
                     del data_x_to_be_fitted[index_xval_data]
+            
 
-
+    #### NOT SURE IF THIS PART IS NECESSARY???? (BELOW)
     #fixing when excluded regions are implemented
     background_left_shoulder_x = [x for x in background_x if x <= peak_interval[0]]
+
         # Assuming background_shoulders_y is a NumPy array or list
     background_left_shoulder_y = [background_y[i] for i, x in enumerate(background_x) if x <= peak_interval[0]]
 
     # Convert background_left_shoulder_y to a NumPy array if needed
     background_left_shoulder_y = np.array(background_left_shoulder_y)
-    #### 
 
+    #### NOT SURE IF THIS PART IS NECESSARY???? (ABOVE)
+
+
+    #print("background_left_shoulder",background_left_shoulder_x)
     
     #####################################################################################################################################
     #============================ Step 1: Fitting a polynomial to the left shoulder for good starting values in the fit ========================
     ###################################################################################################################################
     
-    d = np.polyfit(background_shoulders_x, background_shoulders_y,options['BG_poly_degree'])
+    #d = np.polyfit(background_shoulders_x, background_shoulders_y,options['BG_poly_degree'])
+    d = np.polyfit(background_x,background_y,options['BG_poly_degree'])
     function_background = np.poly1d(d) #Using the values of the background to make a backgroudn (2. deg polynomial)
     
 #Applying the fitted function to the twotheta-values of the whole 2-theta region of relevance
@@ -4529,26 +4576,26 @@ def background_subtracted_peak_in_Q_optimized(data,options):
     peak_start= peak_interval[0]
     peak_stop= peak_interval[1]
 
-    df_peak_new=df_peak
-    df_peak_new=df_peak_new.loc[df_peak_new['2th'] > peak_start]
-    df_peak_new=df_peak_new.loc[df_peak_new['2th'] < peak_stop]
-    df_peak_new = df_peak_new.reset_index(drop=True) #Have to reset indexes to make it work in the find_area_of_peaks_function
+    df_only_peak=df_peak
+    df_only_peak=df_only_peak.loc[df_only_peak['2th'] > peak_start]
+    df_only_peak=df_only_peak.loc[df_only_peak['2th'] < peak_stop]
+    df_only_peak = df_only_peak.reset_index(drop=True) #Have to reset indexes to make it work in the find_area_of_peaks_function
     #peak_maximum = df_peak_new["I_corr"].max()
 
     
 
-    analytical_area = find_area_of_peak(x=df_peak_new["2th"],y=df_peak_new["I_corr"],options=options)
+    analytical_area = find_area_of_peak(x=df_only_peak["2th"],y=df_only_peak["I_corr"],options=options)
     
     ##### ============= OPTIMIZED PART ==================
     
     #Aiming to find a more precise description of the maxima and peak position:
     # Find the index of the maximum value in df_peak["I_corr"]
-    max_index = df_peak["I_corr"].idxmax()
+    max_index = df_only_peak["I_corr"].idxmax()
 
     # Extract the corresponding 5 data points closest to the max value
     start_index = max_index - 2
     end_index = max_index + 2
-    selected_data = df_peak.iloc[start_index:end_index + 1]
+    selected_data = df_only_peak.iloc[start_index:end_index + 1]
 
     # Fit a second-degree polynomial to the selected data points
     def second_degree_polynomial(x, a, b, c):
@@ -4573,11 +4620,10 @@ def background_subtracted_peak_in_Q_optimized(data,options):
 
     #### =============== END OF OPTIMIZED PART ==========================
 
-
     if options['plot_result'] or options['save_dir']:
         # Find the index of the maximum value in the "I_corr" column
-        rough_max_index = df_peak_new['I_corr'].idxmax()
-
+        rough_max_index = df_only_peak['I_corr'].idxmax()
+        #rough_max_index = df_only_peak['I_corr'].index(rough_max)
         # Get the corresponding "2th" value
         #max_2th_value = df_peak_new.loc[rough_max_index, '2th']
       
@@ -4585,7 +4631,8 @@ def background_subtracted_peak_in_Q_optimized(data,options):
         plt.plot(df_peak['2th'], df_peak['I_org'], label='Data')
         # plotting maxima maybe not needed for 311-peak
         #plt.vlines(x=max_2th_value, ymin=df_peak_new.loc[max_index, 'I_BG'], ymax=df_peak_new.loc[max_index, 'I_BG'] + peak_maximum, color='b', linestyle='--', label='Peak intensity')
-        plt.vlines(x=peak_pos, ymin=df_peak_new.loc[rough_max_index, 'I_BG'], ymax=df_peak_new.loc[rough_max_index, 'I_BG'] + analytical_maximum, color='b', linestyle='--', label='Peak intensity')
+        #plt.vlines(x=peak_pos, ymin=df_peak_new.loc[rough_max_index, 'I_BG'], ymax=df_peak_new.loc[rough_max_index, 'I_BG'] + analytical_maximum, color='b', linestyle='--', label='Peak intensity')
+        plt.vlines(x=peak_pos, ymin=df_only_peak.loc[rough_max_index, 'I_BG'], ymax=df_only_peak.loc[rough_max_index, 'I_BG'] + analytical_maximum, color='b', linestyle='--', label='Peak intensity')
         plt.axvline(x = peak_interval[0] )
         plt.axvline(x = peak_interval[1] )
 
@@ -4637,12 +4684,12 @@ def generic_peak_maximum_and_area_in_Q(data, options, peak):
         default_options['region_of_interest'] = [2.3,         2.46, 2.71,         2.75]
         default_options['excluded_regions'] = [[2.41,2.465]]
     elif peak == "311":
-        print("NB: Inspect plot and make sure peak does not overlap with other peaks")
+        print("NB: Inspect plot of 311 and make sure peak does not overlap with other peaks")
         default_options['region_of_interest'] = [2.4,         2.525, 2.585,         2.6]
         default_options['excluded_regions'] = [[2.41,2.465],[2.49,2.52]]
         default_options['plot_result'] = True
     elif peak == "222":
-        print("NB: Inspect plot and make sure peak does not overlap with other peaks")
+        print("NB: Inspect plot of 222 and make sure peak does not overlap with other peaks")
         default_options['plot_result'] = True
         default_options['region_of_interest'] = [2.64,         2.645, 2.695,         2.7]
         default_options['excluded_regions'] = None
@@ -4693,12 +4740,12 @@ def generic_peak_maximum_and_area_in_Q_optimized(data, options, peak):
         default_options['excluded_regions'] = [[2.41,2.465]]
 
     elif peak == "311":
-        print("NB: Inspect plot and make sure no overlapping (RS)-peaks. If intention is to include RS-peak, use peak = cluster_311")
+        print("NB: Inspect plot of 311and make sure no overlapping (RS)-peaks. If intention is to include RS-peak, use peak = cluster_311")
         default_options['region_of_interest'] = [2.4,         2.525, 2.585,         2.6]
         default_options['excluded_regions'] = [[2.41,2.465],[2.49,2.52]]
         default_options['plot_result'] = True
     elif peak == "222":
-        print("NB: Inspect plot and make sure no overlapping (RS)-peaks. If intention is to include RS-peak, use peak = cluster_311")
+        print("NB: Inspect plot of 222 and make sure no overlapping (RS)-peaks. If intention is to include RS-peak, use peak = cluster_311")
         default_options['plot_result'] = True
         default_options['region_of_interest'] = [2.64,         2.645, 2.695,         2.7]
         default_options['excluded_regions'] = None
@@ -4717,36 +4764,41 @@ def generic_peak_maximum_and_area_in_Q_optimized(data, options, peak):
     elif peak == "Pt400":
         default_options['region_of_interest'] = [6.305,         6.33,6.41  ,       6.42]
         default_options['excluded_regions'] = [[6.31,6.33]]
+        print("NB: Do not use area_calc from this, only max")
     else:
         print("Must write which peak to analyze")
     
     options = aux.update_options(options=options, default_options=default_options)  
-    
     #making sure that if cluster-222 or cluster-311 is used, the same options as normal cluster should be given and limits are adjusted accordingly to treat each peak semi-separatly:
-
+   
     if "cluster-" in peak:# == "cluster" or peak == "cluster-311" or peak == "cluster-222":
-        region = options['region_of_interest']
-        excluded_regions_list = options['region_of_interest'][0]
+        region = options['region_of_interest'].copy()
+        excluded_region = options['excluded_regions'][0]
+
         split_311_222 = 2.57
         if peak == "cluster-311":
-            print("NB: Inspect plot and make sure peak RS-peak ends on the correct side of the split, so calculations become correct")
+            print("NB: Inspect plot of cluster-311 and make sure peak RS-peak ends on the correct side of the split, so calculations become correct")
             #picking out cluster end as the point where background starts, to keep background the same
             right_background_start=region[2]
             #updating witth new value for peak stop
             region[2] = split_311_222
             options['region_of_interest'] = region
-            excluded_regions_list.append([split_311_222,right_background_start])
-            options['excluded_regions'] = excluded_regions
+            new_excluded_region = [split_311_222,right_background_start]
+            
+            options['excluded_regions'] = [excluded_region,new_excluded_region]
+            
         elif peak == "cluster-222":
-            print("NB: Inspect plot and make sure peak RS-peak ends on the correct side of the split, so calculations become correct")
+            print("NB: Inspect plot of cluster-222 and make sure peak RS-peak ends on the correct side of the split, so calculations become correct")
             #picking out cluster end as the point where background starts, to keep background the same
             left_background_end=region[1]
             #updating witth new value for peak startp
             region[1] = split_311_222
             options['region_of_interest'] = region
-            excluded_regions_list.append([left_background_end,split_311_222])
-            options['excluded_regions'] = excluded_regions_list
+            new_excluded_region = [left_background_end,split_311_222]
+            options['excluded_regions'] = [excluded_region,new_excluded_region]
+            
 
+    #print(peak,options['excluded_regions'],options['region_of_interest'])
     analytical_area,analytical_maximum, peak_pos, df_peak = background_subtracted_peak_in_Q_optimized(data=data,options=options)
 
     return analytical_area, analytical_maximum, peak_pos, df_peak
