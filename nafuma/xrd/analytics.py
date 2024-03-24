@@ -3829,12 +3829,13 @@ def fetching_data_from_analytical_approach_optimized_merge_friendly(df, analytic
     df["cluster/Pt111"] = df["num_area_cluster"]/df["num_max_Pt111"]
 
     #comparing to Pt (normalized to wp_Pt)
-    df["111/Pt111_max_norm"] = df["num_max_111"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
-    df["311/Pt111_max_norm"] = df["num_max_311"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
-    df["222/Pt111_max_norm"] = df["num_max_222"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
-    df["400/Pt111_max_norm"] = df["num_max_400"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
-    df["cluster/Pt111_norm"] = df["num_area_cluster"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
-    
+    df["111/Pt111_max_norm"] = df["num_max_111"]/(df["num_max_Pt111"]/(df["wp_Pt"].mean()/100))
+    df["311/Pt111_max_norm"] = df["num_max_311"]/(df["num_max_Pt111"]/(df["wp_Pt"].mean()/100))
+    df["222/Pt111_max_norm"] = df["num_max_222"]/(df["num_max_Pt111"]/(df["wp_Pt"].mean()/100))
+    df["400/Pt111_max_norm"] = df["num_max_400"]/(df["num_max_Pt111"]/(df["wp_Pt"].mean()/100))
+    df["cluster/Pt111_norm"] = df["num_area_cluster"]/(df["num_max_Pt111"]/(df["wp_Pt"].mean()/100))
+    df["cluster-RS/Pt111_norm"] = (df["num_area_cluster"]-n*df["RS_311"]-n*df["RS_222"])/(df["num_max_Pt111"]/(df["wp_Pt"].mean()/100))
+    df["(311+222)_wp/Pt111_norm"] = (df["num_area_cluster"]*(df["wp_ord"]+df["wp_dis"])/(100-df["wp_Pt"].mean()))/(df["num_max_Pt111"]/(df["wp_Pt"].mean()/100))
     #checking for absorption issues with Pt
     df["Pt400/Pt111_max"] = df["num_max_Pt400"]/df["num_max_Pt111"]
 
@@ -3850,26 +3851,30 @@ def fetching_data_from_analytical_approach_optimized_merge_friendly(df, analytic
     df["400/Pt111_area"] = (df["num_area_400"]-n*df["RS_400"])/df["num_max_Pt111"]
 
     #comparing to Pt  by area, corrected by refined intensities where area calculation is not sofisticated AND normalized by wp_Pt
-    df["111/Pt111_area_norm"]=(df["num_area_111"]-n*df["RS_111"])/(df["num_area_Pt111"]/(df["wp_Pt"]/100))
-    df["311/Pt111_area_norm"]=(df["num_area_311"]-n*df["RS_311"])/(df["num_area_Pt111"]/(df["wp_Pt"]/100))
-    df["222/Pt111_area_norm"]=(df["num_area_222"]-n*df["RS_222"])/(df["num_area_Pt111"]/(df["wp_Pt"]/100))
-    df["400/Pt111_area_norm"] = (df["num_area_400"]-n*df["RS_400"])/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+    df["111/Pt111_area_norm"]=(df["num_area_111"]-n*df["RS_111"])/(df["num_area_Pt111"]/(df["wp_Pt"].mean()/100))
+    df["311/Pt111_area_norm"]=(df["num_area_311"]-n*df["RS_311"])/(df["num_area_Pt111"]/(df["wp_Pt"].mean()/100))
+    df["222/Pt111_area_norm"]=(df["num_area_222"]-n*df["RS_222"])/(df["num_area_Pt111"]/(df["wp_Pt"].mean()/100))
+    df["400/Pt111_area_norm"] = (df["num_area_400"]-n*df["RS_400"])/(df["num_max_Pt111"]/(df["wp_Pt"].mean()/100))
 
     #PO over the whole sample
     df["310/cluster_num"]=  df["num_area_310"]/df["num_area_cluster"] #see no reason to go for the numeric approach as long as the fit-approach works fine
     df["310/cluster_fit"]=  df["fit_area_310"]/df["num_area_cluster"] #Standard measurement for PO
     #PO of the total spinel amount
-    df["310/(311+222)_wp"]=df["fit_area_310"]/(df["num_area_cluster"]*(df["wp_ord"]+df["wp_dis"])/(100-df["wp_Pt"]))   
+    df["310/(311+222)_wp"]=df["fit_area_310"]/(df["num_area_cluster"]*(df["wp_ord"]+df["wp_dis"])/(100-df["wp_Pt"].mean()))   
     df["310/cluster-RS"] = df["fit_area_310"]/(df["num_area_cluster"]-n*df["RS_311"]-n*df["RS_222"]) 
     #PO of the ordered phase
     df["310/subord_ref"]=df["fit_area_310"]/(n*df["subord_222"]+n*df["subord_311"]) #based on the refined intensities of the subord-peaks (ofter underestimating intensity)
-    df["310/subord_wp"]=df["fit_area_310"]/(df["num_area_cluster"]*df["wp_ord"]/(100-df["wp_Pt"])) #based on the assumption that the subord-intensity is directly scaling with the wt% of ord,dis,RS
+    df["310/subord_wp"]=df["fit_area_310"]/(df["num_area_cluster"]*df["wp_ord"]/(100-df["wp_Pt"].mean())) #based on the assumption that the subord-intensity is directly scaling with the wt% of ord,dis,RS
     #PO relative to Pt
     df["310/Pt111_max"] = df["fit_max_310"]/df["num_max_Pt111"]
-    df["310/Pt111_max_norm"] = df["fit_max_310"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
+    df["310/Pt111_max_norm"] = df["fit_max_310"]/(df["num_max_Pt111"]/(df["wp_Pt"].mean()/100))
     df["310/Pt111_area"] = df["fit_area_310"]/df["num_max_Pt111"]
-    df["310/Pt111_area_norm"] = df["fit_area_310"]/(df["num_max_Pt111"]/(df["wp_Pt"]/100))
-
+    df["310/Pt111_area_norm"] = df["fit_area_310"]/(df["num_max_Pt111"]/(df["wp_Pt"].mean()/100))
+    #PO with other peaks as reference
+    df["310/111_area"]=  df["fit_area_310"]/df["num_area_111"]
+    df["310/311_area"]=  df["fit_area_310"]/df["num_area_311"]
+    df["310/222_area"]=  df["fit_area_310"]/df["num_area_222"]
+    
 
     return df
 def normalize_lattice_parameters(df,parameters):
@@ -4588,12 +4593,13 @@ def background_subtracted_peak_in_Q_optimized(data,options):
     data_x_to_be_fitted = background_full_x.copy()
     data_y_to_be_fitted = data_full_y.copy()
     if options['excluded_regions']:
- 
+        print(options['excluded_regions'])
         for excluded_region in options['excluded_regions']:
             excluded_region = [Q_to_twotheta(Q=excluded_region[0], wavelength=wavelength),
                             Q_to_twotheta(Q=excluded_region[1], wavelength=wavelength)]
- 
+            
             for i, xval in enumerate(background_shoulders_x):
+                
                 if excluded_region[0] < xval < excluded_region[1]:
 
                     # Find the index of xval in background_x
@@ -4850,7 +4856,6 @@ def generic_peak_maximum_and_area_in_Q_optimized(data, options, peak):
     if "cluster-" in peak:# == "cluster" or peak == "cluster-311" or peak == "cluster-222":
         region = options['region_of_interest'].copy()
         excluded_region = options['excluded_regions'][0]
-
         split_311_222 = 2.57
         if peak == "cluster-311":
             print("NB: Inspect plot of cluster-311 and make sure peak RS-peak ends on the correct side of the split, so calculations become correct")
@@ -4876,6 +4881,94 @@ def generic_peak_maximum_and_area_in_Q_optimized(data, options, peak):
 
     #print(peak,options['excluded_regions'],options['region_of_interest'])
     analytical_area,analytical_maximum, peak_pos, df_peak = background_subtracted_peak_in_Q_optimized(data=data,options=options)
+
+    return analytical_area, analytical_maximum, peak_pos, df_peak
+
+
+def generic_peak_maximum_and_area_in_Q_optimized_RT(data, options, peak):
+    default_options = {
+    'excluded_regions': None, 
+    'plot_result' : False,
+    'save_dir' : None,
+    'BG_poly_degree': 1,
+    'plot_pre_fitting': False,
+
+    #'plot_2': False,
+    }
+
+    
+    if "cluster" in peak:
+        default_options['region_of_interest'] = [2.3,         2.465, 2.71,         2.75]
+        default_options['excluded_regions'] = [[2.41,2.465]]
+
+
+    elif peak == "311":
+        print("NB: Inspect plot of 311 and make sure no overlapping (RS)-peaks. If intention is to include RS-peak, use peak = cluster_311")
+        default_options['region_of_interest'] = [2.4,         2.525, 2.585,         2.6]
+        default_options['excluded_regions'] = [[2.41,2.465],[2.49,2.52]]
+        default_options['plot_result'] = True
+    elif peak == "222":
+        print("NB: Inspect plot of 222 and make sure no overlapping (RS)-peaks. If intention is to include RS-peak, use peak = cluster_311")
+        default_options['plot_result'] = True
+        default_options['region_of_interest'] = [2.64,         2.645, 2.695,         2.7]
+        default_options['excluded_regions'] = None
+    
+    elif peak == "111":
+        default_options['region_of_interest'] = [1.21,         1.26,1.364,         1.414]
+        default_options['excluded_regions'] = None
+    
+    elif peak == "400":
+        default_options['region_of_interest'] = [2.86,         2.9,3.12 ,        3.13]
+        default_options['excluded_regions'] = None
+    
+    elif peak == "Pt111":
+        default_options['region_of_interest'] = [2.69,         2.71,2.82 ,        2.84]
+        default_options['excluded_regions'] = None
+    elif peak == "Pt400":
+        default_options['region_of_interest'] = [6.305,         6.33,6.41  ,       6.42]
+        default_options['excluded_regions'] = [[6.31,6.33]]
+        print("NB: Do not use area_calc from this, only max")
+    else:
+        print("Must write which peak to analyze")
+    
+    options_new = aux.update_options(options=options, default_options=default_options)  
+    #making sure that if cluster-222 or cluster-311 is used, the same options as normal cluster should be given and limits are adjusted accordingly to treat each peak semi-separatly:
+   
+    if "cluster-" in peak:# == "cluster" or peak == "cluster-311" or peak == "cluster-222":
+        region = options_new['region_of_interest'].copy()
+        excluded_region = options_new['excluded_regions'][0]
+        #split point is the only difference between RT and HT (so far ...)
+        #split_311_222 = 2.57
+        split_311_222 = 2.6
+        print(peak,": region_of_interest input -> ",region)
+        if peak == "cluster-311":
+            print("NB: Inspect plot of cluster-311 and make sure peak RS-peak ends on the correct side of the split, so calculations become correct")
+            #picking out cluster end as the point where background starts, to keep background the same
+            right_background_start=region[2]
+            #updating witth new value for peak stop
+            region[2] = split_311_222
+            options_new['region_of_interest'] = region
+            new_excluded_region = [split_311_222,right_background_start]
+            
+            options_new['excluded_regions'] = [excluded_region,new_excluded_region]
+            
+        elif peak == "cluster-222":
+            print("NB: Inspect plot of cluster-222 and make sure peak RS-peak ends on the correct side of the split, so calculations become correct")
+            #picking out cluster end as the point where background starts, to keep background the same
+            left_background_end=region[1]
+            #updating witth new value for peak startp
+            region[1] = split_311_222
+            options_new['region_of_interest'] = region
+            new_excluded_region = [left_background_end,split_311_222]
+            options_new['excluded_regions'] = [excluded_region,new_excluded_region]
+        
+        print(peak,": region_of_interest output -> ",options_new['region_of_interest'])
+
+    
+    print(peak,"excluding: ",options_new['excluded_regions'])
+
+    #print(peak,options['excluded_regions'],options['region_of_interest'])
+    analytical_area,analytical_maximum, peak_pos, df_peak = background_subtracted_peak_in_Q_optimized(data=data,options=options_new)
 
     return analytical_area, analytical_maximum, peak_pos, df_peak
 
@@ -6332,3 +6425,36 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
     
     return PV_parameters, PV_errors, PV_area, analytical_area, analytical_maximum
 #######################################################################################################################################
+
+def scherrer_domain_size(fwhm, theta, wavelength):
+    """
+    Calculate the domain size using Scherrer's equation.
+    
+    Parameters:
+        fwhm (float): Full Width at Half Maximum (FWHM) of the peak.
+        theta (float): Bragg angle in radians.
+        wavelength (float): Wavelength of the X-rays in the same units as the domain size.
+        
+    Returns:
+        domain_size (float): Estimated domain size based on Scherrer's equation.
+    """
+    k = 0.94  # Scherrer constant
+    
+    # Ensure theta is not a pandas Series
+    if isinstance(theta, pd.Series):
+        theta = theta.iloc[0]  # Select the first value
+    
+    # Convert theta to radians if it's in degrees
+    if np.degrees(theta):
+        theta = np.radians(theta)
+    
+    try:
+        # Calculate the domain size
+        domain_size = k * wavelength / (np.cos(theta) * np.radians(fwhm))
+        if np.isnan(domain_size):
+            return 0
+        else:
+            return domain_size
+    except ZeroDivisionError:
+        return 0
+
