@@ -2697,7 +2697,7 @@ def from_beamtime_to_wavelength(beamtime_name):
         if name == 'bm01021231':
             return 0.6390294679861723
         if name == 'bm01021239':
-            return 0.6222677255993116
+            return 0.6223090396947831#0.6222677255993116
         if name == 'bm01021257':
             return 0.6888274513845507
         if name == 'bm01a0121203':
@@ -6241,7 +6241,7 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
         #upper_bounds = [0.01, 100000, 100000, background_region[1]+5, 1,1]
         #initial_guess_BG = [0,0,1, background_region[1] + 0.1, 0.1, 0]
         #bounds_BG = (lower_bounds, upper_bounds)
-        fit_params_BG, _ = scipy.optimize.curve_fit(poly1_with_PV, background_x, background_y, p0=initial_guess_BG, bounds=bounds_BG)
+        fit_params_BG, _ = scipy.optimize.curve_fit(poly1_with_PV, background_x, background_y, p0=initial_guess_BG, bounds=bounds_BG, maxfev = 10000)
         
         background_y_fitted_BG=poly1_with_PV(background_full_x,*fit_params_BG)
 
@@ -6333,9 +6333,9 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
         if peak == "410":
             peak_pos = Q_to_twotheta(Q=3.17,wavelength=wavelength)
         if peak == "310":
-            peak_pos = Q_to_twotheta(Q=2.434,wavelength=wavelength)
-        fwhm_guess = 0.1
-        ratio_guess = 0.5
+            peak_pos = Q_to_twotheta(Q=2.431,wavelength=wavelength)
+        fwhm_guess = 0.075
+        ratio_guess = 0.1
         initial_guess_PV = [peak_maximum, peak_pos, fwhm_guess, ratio_guess]
     
     initial_guess_final = fit_params_BG + initial_guess_PV
@@ -6346,9 +6346,10 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
         lower_BG_PV_bounds =     [0, background_region[1], 0.001,0]
         higher_BG_PV_bounds =    [np.inf, background_region[1]+5, 10,1]
 
-    lower_PV_bounds =           [peak_maximum*0.9, peak_interval[0], 0.01, 0]
-    higher_PV_bounds =          [peak_maximum*1.1, peak_interval[1], 0.3, 1]
-    
+    #lower_PV_bounds =           [peak_maximum*0.9, peak_interval[0], 0.01, 0]
+    #higher_PV_bounds =          [peak_maximum*1.1, peak_interval[1], 0.3, 1]
+    lower_PV_bounds =           [0, Q_to_twotheta(Q=2.42,wavelength=wavelength), 0.015, 0]
+    higher_PV_bounds =          [peak_maximum*1.1, Q_to_twotheta(Q=2.445,wavelength=wavelength), 0.2, 0.75]
     try: #attempts to fit a PV
         if options['BG_poly_degree'] == 1:
             #lower_poly_bounds = [-np.inf, -np.inf]
@@ -6361,7 +6362,7 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
             
             bounds_final = (lower_bounds_final, upper_bounds_final)
             
-            fit_params_final, fit_params_final_error = scipy.optimize.curve_fit(poly1_with_PV_BG_and_PV, data_x_to_be_fitted, data_y_to_be_fitted, p0=initial_guess_final, bounds=bounds_final, maxfev=5000)
+            fit_params_final, fit_params_final_error = scipy.optimize.curve_fit(poly1_with_PV_BG_and_PV, data_x_to_be_fitted, data_y_to_be_fitted, p0=initial_guess_final, bounds=bounds_final, maxfev=50000)
             y_fitted = poly1_with_PV_BG_and_PV(background_full_x,*fit_params_final)
             y_peak = pseudovoigt(background_full_x,*fit_params_final[-4:])
             final_fitted_background = poly1_with_PV(background_full_x,*fit_params_final[:-4])
@@ -6377,7 +6378,7 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
             
             bounds_final = (lower_bounds_final, upper_bounds_final)
         
-            fit_params_final, fit_params_final_error = scipy.optimize.curve_fit(poly2_with_PV_BG_and_PV, data_x_to_be_fitted, data_y_to_be_fitted, p0=initial_guess_final, bounds=bounds_final)
+            fit_params_final, fit_params_final_error = scipy.optimize.curve_fit(poly2_with_PV_BG_and_PV, data_x_to_be_fitted, data_y_to_be_fitted, p0=initial_guess_final, bounds=bounds_final,  maxfev=50000)
             y_fitted = poly2_with_PV_BG_and_PV(background_full_x,*fit_params_final)
             final_fitted_background = poly2_with_PV(background_full_x,*fit_params_final[:-4])
             y_peak = pseudovoigt(background_full_x,*fit_params_final[-4:])
@@ -6505,6 +6506,109 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
     return PV_parameters, PV_errors, PV_area, analytical_area, analytical_maximum
 #######################################################################################################################################
 
+def calculate_centroid(x, y, x_range):
+    """
+    Calculate the centroid of a given range in the x and y values.
+
+    Parameters:
+    x (pd.Series or np.array): The x-values of the data.
+    y (pd.Series or np.array): The y-values of the data.
+    x_range (tuple): A tuple specifying the range (min, max) for x-values.
+
+    Returns:
+    tuple: The (x, y) coordinates of the centroid.
+    """
+    # Filter the data within the specified range
+    mask = (x >= x_range[0]) & (x <= x_range[1])
+    x_filtered = x[mask]
+    y_filtered = y[mask]
+    
+    # Calculate the centroid
+    if len(x_filtered) == 0 or len(y_filtered) == 0:
+        return (np.nan, np.nan)  # Return NaN if no data is in the specified range
+    
+    x_centroid = np.sum(x_filtered * y_filtered) / np.sum(y_filtered)
+    y_centroid = np.mean(y_filtered)
+    
+    return x_centroid, y_centroid
+
+def calculate_centroid_with_ymax(x, y, x_range):
+    """
+    Calculate the centroid of a given range in the x and y values.
+
+    Parameters:
+    x (pd.Series or np.array): The x-values of the data.
+    y (pd.Series or np.array): The y-values of the data.
+    x_range (tuple): A tuple specifying the range (min, max) for x-values.
+
+    Returns:
+    tuple: The (x, y) coordinates of the centroid and the y-value at the x_centroid position.
+    """
+    # Filter the data within the specified range
+    mask = (x >= x_range[0]) & (x <= x_range[1])
+    x_filtered = x[mask]
+    y_filtered = y[mask]
+    
+    # Calculate the centroid
+    if len(x_filtered) == 0 or len(y_filtered) == 0:
+        return (np.nan, np.nan, np.nan)  # Return NaN if no data is in the specified range
+    
+    x_centroid = np.sum(x_filtered * y_filtered) / np.sum(y_filtered)
+    y_centroid = np.mean(y_filtered)
+    
+    # Interpolate to find the y-value at the x_centroid position
+    y_at_x_centroid = np.interp(x_centroid, x_filtered, y_filtered)
+    
+    #####    adding this, as there seems to be possible for the centroid position to be estimated outside the x-range ... ###
+    if x_centroid > x_range[1]:
+        x_centroid = x_range[1]
+    if x_centroid < x_range[0]:
+        x_centroid = x_range[0]
+    #### ============================================                                    ========================= ###############
+
+    return x_centroid, y_centroid, y_at_x_centroid
+
+def calculate_centroid_with_left_right_max(x, y, x_range):
+    #ideal to help finding 
+    """
+    Calculate the centroid of a given range in the x and y values, and identify the x-positions
+    of the highest y-values to the left and right of the centroid.
+
+    Parameters:
+    x (pd.Series or np.array): The x-values of the data.
+    y (pd.Series or np.array): The y-values of the data.
+    x_range (tuple): A tuple specifying the range (min, max) for x-values.
+
+    Returns:
+    tuple: The (x_centroid, y_centroid, x_left_max, x_right_max).
+    """
+    # Filter the data within the specified range
+    mask = (x >= x_range[0]) & (x <= x_range[1])
+    x_filtered = x[mask]
+    y_filtered = y[mask]
+    
+    # Calculate the centroid
+    if len(x_filtered) == 0 or len(y_filtered) == 0:
+        return (np.nan, np.nan, np.nan, np.nan)  # Return NaN if no data is in the specified range
+    
+    x_centroid = np.sum(x_filtered * y_filtered) / np.sum(y_filtered)
+    y_centroid = np.mean(y_filtered)
+    
+    # Find the highest y-values to the left and right of the centroid
+    left_mask = x_filtered < x_centroid
+    right_mask = x_filtered > x_centroid
+    
+    if np.any(left_mask):
+        x_left_max = x_filtered[left_mask][np.argmax(y_filtered[left_mask])]
+    else:
+        x_left_max = np.nan
+    
+    if np.any(right_mask):
+        x_right_max = x_filtered[right_mask][np.argmax(y_filtered[right_mask])]
+    else:
+        x_right_max = np.nan
+    
+    return x_centroid, y_centroid, x_left_max, x_right_max
 
 
 def peak_maximum_and_area_of_222_in_Q(data,options,peak):
@@ -6522,7 +6626,10 @@ def peak_maximum_and_area_of_222_in_Q(data,options,peak):
     'save_dir': None,
     'BG_poly_degree': 1,
     'plot_pre_fitting': False,
-    'RS_maxpos': None
+    'RS_maxpos': None,
+    'without_RS': False,
+    'ord_spinel_peak_positions_in_2th': False,
+    'dis_spinel_peak_positions_in_2th': False
     #'plot_2': False,
     }
     
@@ -6755,22 +6862,88 @@ def peak_maximum_and_area_of_222_in_Q(data,options,peak):
         if region_maximum < 0:
             region_maximum = 0
         
-        fwhm_guess = 0.05
-        ratio_guess = 0
+        fwhm_guess_RS = 0.07
+        fwhm_guess_D = 0.015
+        fwhm_guess_O = 0.015
+        ratio_guess_RS = 0
+        ratio_guess_D = 0.1
+        ratio_guess_O = 0.1
+
+        #########             ALTERNATIVE WAY TO FIND THE INITIAL GUESSES ####################
+        x_centroid_RS, _ , I_max_RS = calculate_centroid_with_ymax(x=df_peak['2th'], y=df_peak['I_corr'], x_range=[Q_to_twotheta(Q=2.6,wavelength=wavelength),Q_to_twotheta(Q=2.64,wavelength=wavelength)])
+        x_centroid_spinel, _ = calculate_centroid(x=df_peak['2th'], y=df_peak['I_corr'], x_range=[Q_to_twotheta(Q=2.64,wavelength=wavelength),background_region[-1]])
+        
+       #if centroid position at 2.65 --> assume very little ordering
+       #if cenroid position at 2.662 --> mostly ordering
+       #Difference is 0.012
+       #Ratio of disordered phase = (2.662 - centroid_position)/0.012 --> 0 if centroid is 2.662, 1 if centroid is 2.65
+
+       #Being even more crude, just to avoid ratios outside [0,1]:
+       #Ratio of disordered phase = (2.665 - centroid_position)/0.02 --> 0 if centroid is 2.662, 1 if centroid is 2.665
+        print("spinel centroid between ",str(Q_to_twotheta(Q=2.64,wavelength=wavelength))," and ",background_region[-1]," is found to be: ",x_centroid_spinel," (in Q:",str(twotheta_to_Q(x_centroid_spinel,wavelength_original=wavelength)),")")
+        print("RS centroid between ",str(Q_to_twotheta(Q=2.6,wavelength=wavelength))," and ",str(Q_to_twotheta(Q=2.64,wavelength=wavelength))," is found to be: ",x_centroid_RS," (in Q:",str(twotheta_to_Q(x_centroid_RS,wavelength_original=wavelength)),")")
+        estimated_relative_share_of_dis = (2.67 - twotheta_to_Q(x_centroid_spinel,wavelength_original=wavelength))/0.02
+        print("estimated_relative_share_of_dis: ",estimated_relative_share_of_dis)
+        intensity_guess_D = region_maximum*estimated_relative_share_of_dis
+        intensity_guess_O = region_maximum*(1-estimated_relative_share_of_dis)
+
+        if intensity_guess_D > region_maximum or intensity_guess_O < 0:
+            intensity_guess_D = region_maximum
+            intensity_guess_O = 0
+        if intensity_guess_O > region_maximum or intensity_guess_D < 0:
+            intensity_guess_D = region_maximum
+            intensity_guess_O = 0
+        print("intensity guess of dis: ",intensity_guess_D)
+        print("intensity guess of ord: ",intensity_guess_O)
+        #############
 
         #The RS-phase
-        peak_pos_RS = Q_to_twotheta(Q=2.623,wavelength=wavelength)
-        #initial_guess_PV_RS = [region_maximum*0.1, peak_pos_RS, fwhm_guess, ratio_guess]
+        
+        if options["without_RS"]:
+            intensity_guess_RS = 0
+            peak_pos_RS = Q_to_twotheta(Q=2.62,wavelength=wavelength)
+        else:
+            intensity_guess_RS = I_max_RS
+            peak_pos_RS = x_centroid_RS #Q_to_twotheta(Q=2.615,wavelength=wavelength)
 
-        initial_guess_PV_RS = [0, peak_pos_RS, fwhm_guess, ratio_guess]
+        initial_guess_PV_RS = [intensity_guess_RS, peak_pos_RS, fwhm_guess_RS, ratio_guess_RS]
         #print("initial_guess_PV_RS",initial_guess_PV_RS)
         #The d-LMNO phase
-        peak_pos_D = Q_to_twotheta(Q=2.66,wavelength=wavelength)
-        initial_guess_PV_D = [region_maximum/2, peak_pos_D, fwhm_guess, ratio_guess]
+        #peak_pos_D = Q_to_twotheta(Q=2.66,wavelength=wavelength)
+
+        peak_pos_D = x_centroid_spinel - 0.01
+        #initial_guess_PV_D = [region_maximum*1/5, peak_pos_D, fwhm_guess_D, ratio_guess_D]
+        
         #print("initial_guess_PV_D",initial_guess_PV_D)
         #The o-LMNO phase
-        peak_pos_O = Q_to_twotheta(Q=2.666,wavelength=wavelength)
-        initial_guess_PV_O = [region_maximum/2, peak_pos_O, fwhm_guess, ratio_guess]
+        peak_pos_O = Q_to_twotheta(Q=2.662,wavelength=wavelength)
+        if options['ord_spinel_peak_positions_in_2th']:
+            #peak_pos_O = Q_to_twotheta(Q=options['ord_spinel_peak_positions_in_2th'],wavelength=wavelength)
+            peak_pos_O = options['ord_spinel_peak_positions_in_2th']
+           # Create an array of 2theta positions from df_peak
+            theta_positions = df_peak['2th'].values
+
+            # Find the index of the 2theta value closest to peak_pos_O
+            #closest_indices_O = [np.abs(theta_positions - pos).argmin() for pos in peak_pos_O]
+            closest_index_O = np.abs(theta_positions - peak_pos_O).argmin()
+            # Extract the corresponding intensity values
+            intensity_guess_O = df_peak['I_corr'].values[closest_index_O]
+
+        if options['dis_spinel_peak_positions_in_2th']:
+            #peak_pos_D = Q_to_twotheta(Q=options['dis_spinel_peak_positions_in_2th'],wavelength=wavelength)
+            peak_pos_D = options['dis_spinel_peak_positions_in_2th']
+            # Create an array of 2theta positions from df_peak
+            theta_positions = df_peak['2th'].values
+
+            # Find the index of the 2theta value closest to peak_pos_O
+            #closest_indices_D = [np.abs(theta_positions - pos).argmin() for pos in peak_pos_D]
+            closest_index_D = np.abs(theta_positions - peak_pos_D).argmin()
+            # Extract the corresponding intensity values
+            intensity_guess_D = df_peak['I_corr'].values[closest_index_D]
+        
+        initial_guess_PV_D = [intensity_guess_D, peak_pos_D, fwhm_guess_D, ratio_guess_D]
+        #initial_guess_PV_O = [region_maximum*4/5, peak_pos_O, fwhm_guess_O, ratio_guess_O]
+        initial_guess_PV_O = [intensity_guess_O, peak_pos_O, fwhm_guess_O, ratio_guess_O]
         #print("initial_guess_PV_O",initial_guess_PV_O)
         initial_guess_PVs = initial_guess_PV_RS + initial_guess_PV_D + initial_guess_PV_O
 
@@ -6779,25 +6952,50 @@ def peak_maximum_and_area_of_222_in_Q(data,options,peak):
   
     lower_BG_PV_bounds =     [0, background_region[0]-5, 0.001,0]
     higher_BG_PV_bounds =    [np.inf, background_region[0], 10,1]
+   
     if options["RS_maxpos"]:
         RS_maxpos = options["RS_maxpos"]
     else:
         RS_maxpos = Q_to_twotheta(Q=2.64,wavelength=wavelength)
-    lower_PV_RS_bounds =           [0, Q_to_twotheta(Q=2.615,wavelength=wavelength), 0.01, 0] #peak position of Mn15-order: 2.618
-    higher_PV_RS_bounds =          [region_maximum*0.5, RS_maxpos, 0.3, 1] #peak position of Mn15-9Q: 2.628
+
+    if options["without_RS"]:
+        lower_PV_RS_bounds =           [0, peak_pos_RS,        fwhm_guess_RS, ratio_guess_RS] #peak position of Mn15-order: 2.618
+        higher_PV_RS_bounds =          [0.00000000001, peak_pos_RS+0.00000000001, fwhm_guess_RS+0.00000000001, ratio_guess_RS+0.00000000001] #peak position of Mn15-9Q: 2.628
+
+        lower_PV_D_bounds =           [0, Q_to_twotheta(Q=2.58,wavelength=wavelength), 0.01, 0] #Mn16-8Q-O2-500C with peak position at 2.6618
+    else:
+        lower_PV_RS_bounds =           [0, Q_to_twotheta(Q=2.615,wavelength=wavelength), 0.01, 0] #peak position of Mn15-order: 2.618
+        higher_PV_RS_bounds =          [I_max_RS*1.2, RS_maxpos, 0.2, 0.001] #peak position of Mn15-9Q: 2.628
+
+        lower_PV_D_bounds =           [0, Q_to_twotheta(Q=2.65,wavelength=wavelength), 0.01, 0] #Mn16-8Q-O2-500C with peak position at 2.6618
     
-    lower_PV_D_bounds =           [0, Q_to_twotheta(Q=2.654,wavelength=wavelength), 0.01, 0] #minimum angle arbitrarily chosen 
-    higher_PV_D_bounds =          [region_maximum*1.1, Q_to_twotheta(Q=2.6618,wavelength=wavelength), 0.07, 1] #max angle same as minimum angle for ordered phase
+    #lower_PV_RS_bounds =           [0, Q_to_twotheta(Q=2.615,wavelength=wavelength), 0.01, 0] #peak position of Mn15-order: 2.618
+    #higher_PV_RS_bounds =          [region_maximum*0.5, RS_maxpos, 0.3, 1] #peak position of Mn15-9Q: 2.628
+    
+    #lower_PV_D_bounds =           [0, Q_to_twotheta(Q=2.654,wavelength=wavelength), 0.01, 0] #minimum angle arbitrarily chosen 
+    higher_PV_D_bounds =          [region_maximum, x_centroid_spinel, 0.07, 0.5] #max angle same as minimum angle for ordered phase
    
-    lower_PV_O_bounds =           [0, Q_to_twotheta(Q=2.6618,wavelength=wavelength), 0.01, 0] #Mn16-8Q-O2-500C with peak position at 2.6618
-    higher_PV_O_bounds =          [region_maximum*1.1, Q_to_twotheta(Q=2.67,wavelength=wavelength), 0.07, 1] #Mn15-order with peak position at 2.6665
-    
+    #lower_PV_O_bounds =           [0, Q_to_twotheta(Q=2.662,wavelength=wavelength), 0.01, 0] #Mn16-8Q-O2-500C with peak position at 2.6618
+    lower_PV_O_bounds =           [0, Q_to_twotheta(Q=2.661,wavelength=wavelength), 0.01, 0] #Mn16-8Q-O2-500C with peak position at 2.6618
+    higher_PV_O_bounds =          [region_maximum, Q_to_twotheta(Q=2.665,wavelength=wavelength), 0.07, 0.5] #Mn15-order with peak position at 2.6665
+    print("initial_guess_PV_RS: ",initial_guess_PV_RS)
+    print("lower_PV_RS_bounds: ",lower_PV_RS_bounds)
+    print("higher_PV_RS_bounds: ",higher_PV_RS_bounds)
+
+    print("initial_guess_PV_D: ",initial_guess_PV_D)
+    print("lower_PV_D_bounds: ",lower_PV_D_bounds)
+    print("higher_PV_D_bounds: ",higher_PV_D_bounds)
+
+    print("initial_guess_PV_O: ",initial_guess_PV_O)
+    print("lower_PV_O_bounds: ",lower_PV_O_bounds)
+    print("higher_PV_O_bounds: ",higher_PV_O_bounds)
+
     try: #attempts to fit a PV
         if options['BG_poly_degree'] == 1:
             #lower_poly_bounds = [-np.inf, -np.inf]
             #higher_poly_bounds = [np.inf, np.inf]
-            lower_poly_bounds = [fit_params_BG[0]-np.abs(fit_params_BG[0])*0.0001, fit_params_BG[1]-np.abs(fit_params_BG[1])*0.0001]
-            higher_poly_bounds = [fit_params_BG[0]+np.abs(fit_params_BG[0])*0.0001, fit_params_BG[1]+np.abs(fit_params_BG[1])*0.0001]
+            lower_poly_bounds = [fit_params_BG[0]-np.abs(fit_params_BG[0])*0.01, fit_params_BG[1]-np.abs(fit_params_BG[1])*0.01]
+            higher_poly_bounds = [fit_params_BG[0]+np.abs(fit_params_BG[0])*0.01, fit_params_BG[1]+np.abs(fit_params_BG[1])*0.01]
 
             lower_bounds_final = lower_poly_bounds + lower_BG_PV_bounds + lower_PV_RS_bounds + lower_PV_D_bounds + lower_PV_O_bounds
             upper_bounds_final = higher_poly_bounds + higher_BG_PV_bounds + higher_PV_RS_bounds + higher_PV_D_bounds + higher_PV_O_bounds
@@ -6808,7 +7006,7 @@ def peak_maximum_and_area_of_222_in_Q(data,options,peak):
             #print("bounds_final :",bounds_final)
             #print(len(lower_bounds_final))
             #print(len(upper_bounds_final))
-            fit_params_final, fit_params_final_error = scipy.optimize.curve_fit(poly_with_PV_BG_and_3PV, data_x_to_be_fitted, data_y_to_be_fitted, p0=initial_guess_final, bounds=bounds_final, maxfev=5000)
+            fit_params_final, fit_params_final_error = scipy.optimize.curve_fit(poly_with_PV_BG_and_3PV, data_x_to_be_fitted, data_y_to_be_fitted, p0=initial_guess_final, bounds=bounds_final, maxfev=50000)
             
             y_fitted = poly_with_PV_BG_and_3PV(background_full_x,*fit_params_final)
             y_peak_RS = pseudovoigt(background_full_x,*fit_params_final[-12:-8])
@@ -6823,19 +7021,11 @@ def peak_maximum_and_area_of_222_in_Q(data,options,peak):
             print("need to make a function named poly2_with_PV_BG_and_3PV for this to work with a 2nd degree polynomial")
 
             
-        print("initial_guess_PV_RS: ",initial_guess_PV_RS)
-        print("lower_PV_RS_bounds: ",lower_PV_RS_bounds)
-        print("higher_PV_RS_bounds: ",higher_PV_RS_bounds)
+       
         print("fitted_RS: ",fit_params_final[-12:-8])
         
-        print("initial_guess_PV_D: ",initial_guess_PV_D)
-        print("lower_PV_D_bounds: ",lower_PV_D_bounds)
-        print("higher_PV_D_bounds: ",higher_PV_D_bounds)
         print("fitted_D: ",fit_params_final[-8:-4])
         
-        print("initial_guess_PV_O: ",initial_guess_PV_O)
-        print("lower_PV_O_bounds: ",lower_PV_O_bounds)
-        print("higher_PV_O_bounds: ",higher_PV_O_bounds)
         print("fitted_O: ",fit_params_final[-4:])
 
         errors = np.sqrt(np.diag(fit_params_final_error))
@@ -6980,11 +7170,8 @@ def peak_maximum_and_area_of_222_in_Q(data,options,peak):
 #######################################################################################################################################
 
 
-
-
-
+'''
 def peak_maximum_and_area_of_222_in_Q_pos1(data,options,peak):
-    #Addition June 2024: add an option, 'rock salt' that is true by default, so that it does not interfere with e.g. ND/SXRD data. But when stated as false, the RS peak should not be attempted to fit!
 
 
     #NEWPLAN
@@ -7000,7 +7187,7 @@ def peak_maximum_and_area_of_222_in_Q_pos1(data,options,peak):
     'save_dir': None,
     'BG_poly_degree': 1,
     'plot_pre_fitting': False,
-    'RS_maxpos': None
+    'RS_maxpos': None,
     #'plot_2': False,
     }
     
@@ -7130,7 +7317,7 @@ def peak_maximum_and_area_of_222_in_Q_pos1(data,options,peak):
         plt.show()
         
     #####################################################################################################################################
-    #============================ Step 2: Fitting a gaussian to the right part of the region for good starting values in the fit ========
+    #============================ Step 2: Fitting a gaussian to the LEFT  part of the region for good starting values in the fit ========
     ###################################################################################################################################
 
     #d2 = np.polyfit(background_left_shoulder_x, background_left_shoulder_y,2) #estimating the linear background
@@ -7192,23 +7379,6 @@ def peak_maximum_and_area_of_222_in_Q_pos1(data,options,peak):
     #####################################################################################################################################
     #============================ Step 3: Final fitting, using the former as a starting point ==========================
     ###################################################################################################################################
-    def poly_with_PV_BG_and_2PV(x, a, b, I_pvBG, pos_pvBG, sigma_pvBG, ratio_pvBG, I_pvRS, pos_pvRS, sigma_pvRS, ratio_pvRS, I_pvO, pos_pvO, sigma_pvO, ratio_pvO):
-        x = np.asarray(x, dtype=np.float64)
-        a, b, I_pvBG, pos_pvBG, sigma_pvBG, ratio_pvBG, I_pvRS, pos_pvRS, sigma_pvRS, ratio_pvRS, I_pvO, pos_pvO, sigma_pvO, ratio_pvO = map(float, (a, b, I_pvBG, pos_pvBG, sigma_pvBG, ratio_pvBG, I_pvRS, pos_pvRS, sigma_pvRS, ratio_pvRS, I_pvO, pos_pvO, sigma_pvO, ratio_pvO))
-        
-        # PV-function (BG)
-        pvBG = (1 - ratio_pvBG) * I_pvBG * np.exp(-((x - pos_pvBG)**2) / (2 * sigma_pvBG**2)) + ratio_pvBG * (I_pvBG / (1 + ((x - pos_pvBG) / sigma_pvBG)**2))
-        
-        # Pseudo-Voigt function (rock salt)
-        pvRS = (1 - ratio_pvRS) * I_pvRS * np.exp(-((x - pos_pvRS)**2) / (2 * sigma_pvRS**2)) + ratio_pvRS * (I_pvRS / (1 + ((x - pos_pvRS) / sigma_pvRS)**2))
-
-        # Pseudo-Voigt function (ordered spinel)
-        pvO = (1 - ratio_pvO) * I_pvO * np.exp(-((x - pos_pvO)**2) / (2 * sigma_pvO**2)) + ratio_pvO * (I_pvO / (1 + ((x - pos_pvO) / sigma_pvO)**2))
-        
-        # Linear polynomial
-        linear = a * x + b
-        
-        return linear + pvBG + pvRS + pvO
     
     fit_params_BG = fit_params_BG.tolist()
     if options['initial_guess_PV']:
@@ -7434,9 +7604,524 @@ def peak_maximum_and_area_of_222_in_Q_pos1(data,options,peak):
 
     return PV_parameters, PV_errors, PV_area#, analytical_area, analytical_maximum 
 #######################################################################################################################################
+'''
+def poly_with_PV_BG_and_2PV(x, a, b, I_pvBG, pos_pvBG, sigma_pvBG, ratio_pvBG, I_pvRS, pos_pvRS, sigma_pvRS, ratio_pvRS, I_pvO, pos_pvO, sigma_pvO, ratio_pvO):
+        x = np.asarray(x, dtype=np.float64)
+        a, b, I_pvBG, pos_pvBG, sigma_pvBG, ratio_pvBG, I_pvRS, pos_pvRS, sigma_pvRS, ratio_pvRS, I_pvO, pos_pvO, sigma_pvO, ratio_pvO = map(float, (a, b, I_pvBG, pos_pvBG, sigma_pvBG, ratio_pvBG, I_pvRS, pos_pvRS, sigma_pvRS, ratio_pvRS, I_pvO, pos_pvO, sigma_pvO, ratio_pvO))
+        
+        # PV-function (BG)
+        pvBG = (1 - ratio_pvBG) * I_pvBG * np.exp(-((x - pos_pvBG)**2) / (2 * sigma_pvBG**2)) + ratio_pvBG * (I_pvBG / (1 + ((x - pos_pvBG) / sigma_pvBG)**2))
+        
+        # Pseudo-Voigt function (rock salt)
+        pvRS = (1 - ratio_pvRS) * I_pvRS * np.exp(-((x - pos_pvRS)**2) / (2 * sigma_pvRS**2)) + ratio_pvRS * (I_pvRS / (1 + ((x - pos_pvRS) / sigma_pvRS)**2))
+
+        # Pseudo-Voigt function (ordered spinel)
+        pvO = (1 - ratio_pvO) * I_pvO * np.exp(-((x - pos_pvO)**2) / (2 * sigma_pvO**2)) + ratio_pvO * (I_pvO / (1 + ((x - pos_pvO) / sigma_pvO)**2))
+        
+        # Linear polynomial
+        linear = a * x + b
+        
+        return linear + pvBG + pvRS + pvO
+        
+
+def peak_maximum_and_area_of_222_in_Q_pos1(data,options,peak):
+    #upgrade with th eoption to run without the RS-peak
+    default_options = {
+    'excluded_regions': None,
+    'initial_guess_PV': None,#[amplitude_pv, mean_pv, sigma_pv, fraction_pv], [1, options['background_region'][1] + 0.1, 0.1] #d_test has the same dimension as the ['background_poly_degree']
+    'plot_result' : False,
+    'save_dir': None,
+    'BG_poly_degree': 1,
+    'plot_pre_fitting': False,
+    'RS_maxpos': None,
+    'without_RS': False
+    #'plot_2': False,
+    }
+    
+    if peak == "222":
+        default_options['region_of_interest'] = [2.58,         2.599, 2.7,         2.73]
+
+    options = aux.update_options(options=options, default_options=default_options)
+    diffractogram, wavelength = xrd.io.read_xy(data=data,options=options)   
+
+    if "noheaders" in data['path'][0]:
+        filename = os.path.basename(data['path'][0]).split('_noheaders.')[0]
+    else:
+        filename = os.path.basename(data['path'][0]).split('.')[0]
+    ####################################################################################################
+    #============================ Defining the background  and fit regions ========================
+    ####################################################################################################
+
+    background_left_shoulder_x=[] #for each peak of interest, I hereby fill in the x-values of the background before and after the peak
+    background_left_shoulder_y=[] #for each peak of interest, I hereby fill  in the y-values of the background before and after the peak
+    background_right_shoulder_x=[] #for each peak of interest, I hereby fill in the x-values of the background before and after the peak
+    background_right_shoulder_y=[] #for each peak of interest, I hereby fill  in the y-values of the background before and after the peak
+    background_full_x=[]
+    data_full_y=[]
+    peak_x=[] # for each peak of interest, I hereby fill in the x-values of the peak
+    peak_y=[] #for each peak of interest, I hereby fill in the y-values of the peak 
+    
+
+    background_region = [Q_to_twotheta(Q=options['region_of_interest'][0],wavelength=wavelength),Q_to_twotheta(Q=options['region_of_interest'][3],wavelength=wavelength)]
+    peak_interval = [Q_to_twotheta(Q=options['region_of_interest'][1],wavelength=wavelength),Q_to_twotheta(Q=options['region_of_interest'][2],wavelength=wavelength)]
+
+    for i, twotheta in enumerate(diffractogram["2th"]): #using the background start and end points to define the regions of interest
+        #if options['peak_interval'][0]-options['background_shoulder_left'] < twotheta and twotheta < options['peak_interval'][1]+options['background_shoulder_right']:
+        if background_region[0] < twotheta and twotheta < background_region[1]:
+            background_full_x.append(twotheta)
+            data_full_y.append(diffractogram['I'][i])
+            if  twotheta < peak_interval[0]:
+                background_left_shoulder_x.append(twotheta)
+                background_left_shoulder_y.append(diffractogram["I"][i])
+            elif twotheta < peak_interval[1]:
+                peak_x.append(twotheta)
+                peak_y.append(diffractogram["I"][i])
+            elif twotheta < background_region[1]:
+                background_right_shoulder_x.append(twotheta)
+                background_right_shoulder_y.append(diffractogram["I"][i])
+
+    background_shoulders_x=np.concatenate((background_left_shoulder_x, background_right_shoulder_x))
+    background_shoulders_y=np.concatenate((background_left_shoulder_y, background_right_shoulder_y))
+
+    ####################################################################################################
+    #============================ Removing any excluded regions (from other peaks etc) ========================
+####################################################################################################
+    
+
+    background_x = background_shoulders_x.copy()
+    background_y = background_shoulders_y.copy()
+
+    data_x_to_be_fitted = background_full_x.copy()
+    data_y_to_be_fitted = data_full_y.copy()
+    if options['excluded_regions']:
+        for excluded_region in options['excluded_regions']:
+            excluded_region = [Q_to_twotheta(Q=excluded_region[0], wavelength=wavelength),
+                            Q_to_twotheta(Q=excluded_region[1], wavelength=wavelength)]
+
+            for i, xval in enumerate(background_shoulders_x):
+                if excluded_region[0] < xval < excluded_region[1]:
+
+                    # Find the index of xval in background_x
+                    index_xval = np.where(background_x == xval)[0]
+
+                    # Remove the corresponding y-value from background_y
+                    background_y = np.delete(background_y, index_xval)
+
+                    # Remove xval from background_x
+                    background_x = np.delete(background_x, index_xval)
+
+                    # Find the index of xval in data_x_to_be_fitted
+                    index_xval_data = data_x_to_be_fitted.index(xval)
+
+                    # Remove the corresponding y-value from data_y_to_be_fitted
+                    del data_y_to_be_fitted[index_xval_data]
+
+                    # Remove xval from data_x_to_be_fitted
+                    del data_x_to_be_fitted[index_xval_data]
 
 
+    #fixing when excluded regions are implemented
+    background_left_shoulder_x = [x for x in background_x if x <= peak_interval[0]]
+        # Assuming background_shoulders_y is a NumPy array or list
+    background_left_shoulder_y = [background_y[i] for i, x in enumerate(background_x) if x <= peak_interval[0]]
 
+    # Convert background_left_shoulder_y to a NumPy array if needed
+    background_left_shoulder_y = np.array(background_left_shoulder_y)
+    #### 
+
+    
+    #####################################################################################################################################
+    #============================ Step 1: Fitting a polynomial to the right shoulder for good starting values in the fit ========================
+    ###################################################################################################################################
+    if peak == "222":
+        d_poly = np.polyfit(background_right_shoulder_x, background_right_shoulder_y,options['BG_poly_degree'])
+
+    function_background_poly = np.poly1d(d_poly) #Using the values of the background to make a backgroudn (2. deg polynomial)
+    
+    #Applying the fitted function to the twotheta-values of the whole 2-theta region of relevance
+    background_y_poly=function_background_poly(background_full_x)
+    if options['plot_pre_fitting']:
+        # Plotting background_y_test vs background_full_x
+        plt.close()
+        plt.plot(background_full_x, background_y_poly, label=str(options['BG_poly_degree'])+' deg polynomial Background')
+        #plt.plot(background_left_shoulder_x, background_left_shoulder_y, label='Background Fit Region')
+        plt.plot(background_full_x, data_full_y, label = 'data')
+        # Add labels and title
+        plt.xlim(background_region[0],background_region[1])
+
+        plt.axvline(x=peak_interval[0], color='red', linestyle='--')#
+        plt.axvline(x=peak_interval[1], color='red', linestyle='--', label='Peak interval')
+
+
+        plt.xlabel('2theta')
+        plt.ylabel('Background Intensity')
+        plt.title('Polynomial Background Fit')
+
+        # Display the legend
+        plt.legend()
+
+        # Show the plot
+        plt.show()
+        
+    #####################################################################################################################################
+    #============================ Step 2: Fitting a gaussian to the LEFT  part of the region for good starting values in the fit ========
+    ###################################################################################################################################
+
+    #d2 = np.polyfit(background_left_shoulder_x, background_left_shoulder_y,2) #estimating the linear background
+
+    
+
+    poly_fit_parameters = d_poly.tolist()
+    initial_guess_BG = poly_fit_parameters + [1, background_region[0] - 0.1, 0.05, 0] #d_test has the same dimension as the options['background_poly_degree']
+    
+    d_lower_bounds = [] #making a list to fill in with only slightly lower values than in the original d_test, just to keep this fit *constant*
+    for fit_parameter in poly_fit_parameters:
+        fit_parameter_slightly_lower = fit_parameter - np.abs(fit_parameter)*0.00000000001
+        d_lower_bounds.append(fit_parameter_slightly_lower) 
+    lower_bounds_BG = d_lower_bounds + [0, background_region[0]-2.5, 0.001,0]
+    upper_bounds_BG = poly_fit_parameters + [100000, background_region[0], 1,1]
+    print("lower_bounds_BG: ",lower_bounds_BG)
+    print("upper_bounds_BG: ",upper_bounds_BG)
+    bounds_BG = (lower_bounds_BG, upper_bounds_BG)
+
+    if options['BG_poly_degree'] == 1:
+        #if not options['lock_initial_BG_fit']:
+        #lower_bounds = [0, 0, 0, background_region[1], 0.001,0]
+        #upper_bounds = [0.01, 100000, 100000, background_region[1]+5, 1,1]
+        #initial_guess_BG = [0,0,1, background_region[1] + 0.1, 0.1, 0]
+        #bounds_BG = (lower_bounds, upper_bounds)
+        print("initial_guess_BG: ",initial_guess_BG)
+        fit_params_BG, _ = scipy.optimize.curve_fit(poly1_with_PV, background_x, background_y, p0=initial_guess_BG, bounds=bounds_BG, maxfev=10000)
+        print("fit_params_BG: ",fit_params_BG)
+        background_y_fitted_BG=poly1_with_PV(background_full_x,*fit_params_BG)
+
+    elif options['BG_poly_degree'] == 2:
+        #if not options['lock_initial_BG_fit']:
+        #    lower_bounds = [0.1, -16000, 0, 0, options['background_region'][1], 0.001]
+        #    upper_bounds = [400, 0, 100000, 100000, options['background_region'][1]+0.5, 1]
+        #    bounds = (lower_bounds, upper_bounds)
+        fit_params_BG, _ = scipy.optimize.curve_fit(poly2_with_PV, background_x, background_y, p0=initial_guess_BG, bounds=bounds_BG)
+        background_y_fitted_BG=poly2_with_PV(background_full_x,*fit_params_BG)
+    #print("fit after gauss:" + str(fit_params_gauss))
+
+    if options['plot_pre_fitting']:
+        print("initial guess BG :",initial_guess_BG)
+        print("lower_bounds_BG :",lower_bounds_BG)
+        print("upper_bounds_BG :",upper_bounds_BG)
+        print("fit_params_BG :",fit_params_BG)
+        # Plotting background_y_test vs background_full_x
+        plt.plot(background_full_x, background_y_fitted_BG, label=str(options['BG_poly_degree'])+' deg polynomial and PV background')
+        #plt.plot(background_left_shoulder_x, background_left_shoulder_y, label='Background Fit Region')
+        plt.plot(background_full_x, data_full_y, label = 'data')
+        # Add labels and title
+        plt.xlim(background_region[0],background_region[1])
+        plt.xlabel('2theta')
+        plt.ylabel('Background Intensity')
+        plt.title('Poly+Gauss BG Fit (used to calc analytical_area)')
+
+        # Display the legend
+        plt.legend()
+
+        # Show the plot
+        plt.show()
+        
+    #####################################################################################################################################
+    #============================ Step 3: Final fitting, using the former as a starting point ==========================
+    ###################################################################################################################################
+    
+    
+    fit_params_BG = fit_params_BG.tolist()
+    if options['initial_guess_PV']:
+        initial_guess_PVs = options['initial_guess_PV']   
+    else:
+        # Calculating sensible starting values by looking at the background subtracted data #######
+        region_start= peak_interval[0]
+        region_stop= peak_interval[1]
+        #Subtracting the background from the peak to be left with the peak itelf
+        data_minus_background = data_full_y - background_y_fitted_BG
+        df_peak = pd.DataFrame()
+        df_peak['2th']=background_full_x
+        df_peak['I_corr']=data_minus_background
+        df_peak=df_peak.loc[df_peak['2th'] > region_start]
+        df_peak=df_peak.loc[df_peak['2th'] < region_stop]
+        df_peak = df_peak.reset_index(drop=True) #Have to reset indexes to make it work in the find_area_of_peaks_function
+        #### generic starting values for the PV fit: ###############
+        region_maximum = df_peak["I_corr"].max()
+        if region_maximum < 0:
+            region_maximum = 0
+        
+        # Find the index of the maximum value in the "I_corr" column
+        max_index = df_peak["I_corr"].idxmax()
+
+        # Get the corresponding value in the "2th" column
+        x_value_at_region_max = df_peak.loc[max_index, "2th"]
+
+
+        fwhm_guess_RS = 0.07
+        ratio_guess_RS = 0
+        
+        fwhm_guess_O = 0.03
+        ratio_guess_O = 0.1
+        #########             ALTERNATIVE WAY TO FIND THE INITIAL GUESSES ####################
+        x_centroid_RS, _ , I_max_RS = calculate_centroid_with_ymax(x=df_peak['2th'], y=df_peak['I_corr'], x_range=[Q_to_twotheta(Q=2.6,wavelength=wavelength),Q_to_twotheta(Q=2.64,wavelength=wavelength)])
+        print("RS centroid between ",str(Q_to_twotheta(Q=2.6,wavelength=wavelength))," and ",str(Q_to_twotheta(Q=2.64,wavelength=wavelength))," is found to be: ",x_centroid_RS," (in Q:",str(twotheta_to_Q(x_centroid_RS,wavelength_original=wavelength)),")")
+  
+        #############
+
+        #The RS-phase
+        
+        if options["without_RS"]:
+            intensity_guess_RS = 0
+            peak_pos_RS = Q_to_twotheta(Q=2.62,wavelength=wavelength)
+        else:
+            intensity_guess_RS = I_max_RS
+            peak_pos_RS = x_centroid_RS #Q_to_twotheta(Q=2.615,wavelength=wavelength)
+
+        initial_guess_PV_RS = [intensity_guess_RS, peak_pos_RS, fwhm_guess_RS, ratio_guess_RS]
+        #print("initial_guess_PV_RS",initial_guess_PV_RS)
+        #The d-LMNO phase
+        #peak_pos_D = Q_to_twotheta(Q=2.66,wavelength=wavelength)
+
+        peak_pos_O = x_value_at_region_max#Q_to_twotheta(Q=2.662,wavelength=wavelength)
+        #initial_guess_PV_O = [region_maximum*4/5, peak_pos_O, fwhm_guess_O, ratio_guess_O]
+        initial_guess_PV_O = [region_maximum, peak_pos_O, fwhm_guess_O, ratio_guess_O]
+        #print("initial_guess_PV_O",initial_guess_PV_O)
+        initial_guess_PVs = initial_guess_PV_RS + initial_guess_PV_O
+
+    
+    initial_guess_final = fit_params_BG + initial_guess_PVs
+  
+    lower_BG_PV_bounds =     [0, background_region[0]-5, 0.001,0]
+    higher_BG_PV_bounds =    [np.inf, background_region[0], 10,1]
+   
+    if options["RS_maxpos"]:
+        RS_maxpos = options["RS_maxpos"]
+    else:
+        RS_maxpos = Q_to_twotheta(Q=2.64,wavelength=wavelength)
+
+    if options["without_RS"]:
+        lower_PV_RS_bounds =           [0, peak_pos_RS,        fwhm_guess_RS, ratio_guess_RS] #peak position of Mn15-order: 2.618
+        higher_PV_RS_bounds =          [0.00000000001, peak_pos_RS+0.00000000001, fwhm_guess_RS+0.00000000001, ratio_guess_RS+0.00000000001] #peak position of Mn15-9Q: 2.628
+
+        #lower_PV_O_bounds =           [0, Q_to_twotheta(Q=2.58,wavelength=wavelength), 0.01, 0] #Mn16-8Q-O2-500C with peak position at 2.6618
+    else:
+        lower_PV_RS_bounds =           [0, Q_to_twotheta(Q=2.6,wavelength=wavelength), 0.01, 0] #peak position of Mn15-order: 2.618
+        higher_PV_RS_bounds =          [I_max_RS*1.2, RS_maxpos, 0.2, 0.001] #peak position of Mn15-9Q: 2.628
+
+    lower_PV_O_bounds =           [0, Q_to_twotheta(Q=2.63,wavelength=wavelength), 0.01, 0] #Mn16-8Q-O2-500C with peak position at 2.6618
+
+    '''
+        #The RS-phase
+        peak_pos_RS = Q_to_twotheta(Q=2.623,wavelength=wavelength)
+        #initial_guess_PV_RS = [region_maximum*0.1, peak_pos_RS, fwhm_guess, ratio_guess]
+        #if options["without_RS"]:
+        #    initial_guess_PV_RS = [0, Q_to_twotheta(Q=2.615,wavelength=wavelength),        0.01, 0]
+        #else:
+        initial_guess_PV_RS = [0, peak_pos_RS, fwhm_guess, ratio_guess]
+        #print("initial_guess_PV_RS",initial_guess_PV_RS)
+
+        #The o-LMNO phase
+        peak_pos_O = Q_to_twotheta(Q=2.665,wavelength=wavelength)
+        initial_guess_PV_O = [region_maximum, peak_pos_O, fwhm_guess, ratio_guess]
+        #print("initial_guess_PV_O",initial_guess_PV_O)
+        initial_guess_PVs = initial_guess_PV_RS  + initial_guess_PV_O
+
+    
+    initial_guess_final = fit_params_BG + initial_guess_PVs
+  
+    lower_BG_PV_bounds =     [0, background_region[0]-5, 0.001,0]
+    higher_BG_PV_bounds =    [np.inf, background_region[0], 10,1]
+    if options["RS_maxpos"]:
+        RS_maxpos = options["RS_maxpos"]
+    else:
+        RS_maxpos = Q_to_twotheta(Q=2.64,wavelength=wavelength)
+    if options["without_RS"]:
+        lower_PV_RS_bounds =           [0, Q_to_twotheta(Q=2.615,wavelength=wavelength),        0.01, 0] #peak position of Mn15-order: 2.618
+        higher_PV_RS_bounds =          [0.000001, Q_to_twotheta(Q=2.6151,wavelength=wavelength), 0.011, 0.001] #peak position of Mn15-9Q: 2.628
+
+        lower_PV_O_bounds =           [0, Q_to_twotheta(Q=2.58,wavelength=wavelength), 0.01, 0] #Mn16-8Q-O2-500C with peak position at 2.6618
+    else:
+        lower_PV_RS_bounds =           [0, Q_to_twotheta(Q=2.615,wavelength=wavelength), 0.01, 0] #peak position of Mn15-order: 2.618
+        higher_PV_RS_bounds =          [region_maximum*0.5, RS_maxpos, 0.3, 0.001] #peak position of Mn15-9Q: 2.628
+
+        lower_PV_O_bounds =           [0, Q_to_twotheta(Q=2.65,wavelength=wavelength), 0.01, 0] #Mn16-8Q-O2-500C with peak position at 2.6618
+    '''
+    
+    higher_PV_O_bounds =          [region_maximum*1.1, Q_to_twotheta(Q=2.7,wavelength=wavelength), 0.3, 1] #Mn15-order with peak position at 2.6665
+    
+    try: #attempts to fit a PV
+        if options['BG_poly_degree'] == 1:
+            #lower_poly_bounds = [-np.inf, -np.inf]
+            #higher_poly_bounds = [np.inf, np.inf]
+            lower_poly_bounds = [fit_params_BG[0]-np.abs(fit_params_BG[0])*0.5, fit_params_BG[1]-np.abs(fit_params_BG[1])*0.5]
+            higher_poly_bounds = [fit_params_BG[0]+np.abs(fit_params_BG[0])*0.5, fit_params_BG[1]+np.abs(fit_params_BG[1])*0.5]
+
+            lower_bounds_final = lower_poly_bounds + lower_BG_PV_bounds + lower_PV_RS_bounds +  lower_PV_O_bounds
+            upper_bounds_final = higher_poly_bounds + higher_BG_PV_bounds + higher_PV_RS_bounds + higher_PV_O_bounds
+            
+            bounds_final = (lower_bounds_final, upper_bounds_final)
+            print("trying to fit 2 PVs")
+            print("initial_guess_final",initial_guess_final) 
+            print(len(initial_guess_final))
+            #print("bounds_final :",bounds_final)
+            print(len(lower_bounds_final))
+            print(len(upper_bounds_final))
+            fit_params_final, fit_params_final_error = scipy.optimize.curve_fit(poly_with_PV_BG_and_2PV, data_x_to_be_fitted, data_y_to_be_fitted, p0=initial_guess_final, bounds=bounds_final, maxfev=10000)
+            
+            print("fitted 3 PVs")
+            y_fitted = poly_with_PV_BG_and_2PV(background_full_x,*fit_params_final)
+            y_peak_RS = pseudovoigt(background_full_x,*fit_params_final[-8:-4])
+            y_peak_O = pseudovoigt(background_full_x,*fit_params_final[-4:])
+
+            final_fitted_background = poly1_with_PV(background_full_x,*fit_params_final[:-8])
+
+            
+        elif options['BG_poly_degree'] == 2:
+            print("need to make a function named poly2_with_PV_BG_and_3PV for this to work with a 2nd degree polynomial")
+
+        print("fitted PV-shoulder: ",fit_params_final[:6])
+        print("initial_guess_PV_RS: ",initial_guess_PV_RS)
+        print("lower_PV_RS_bounds: ",lower_PV_RS_bounds)
+        print("higher_PV_RS_bounds: ",higher_PV_RS_bounds)
+        print("fitted_RS: ",fit_params_final[-8:-4])
+        
+       
+        print("initial_guess_PV_O: ",initial_guess_PV_O)
+        print("lower_PV_O_bounds: ",lower_PV_O_bounds)
+        print("higher_PV_O_bounds: ",higher_PV_O_bounds)
+        print("fitted_O: ",fit_params_final[-4:])
+
+        errors = np.sqrt(np.diag(fit_params_final_error))
+        #print("initial guess (final): " + str(initial_guess_final))
+        #print("lower bounds (final): " + str(lower_bounds_final))
+        #print("higher bounds (final): " + str(upper_bounds_final))
+        #print("fit_params_final: ",fit_params_final)        
+        #print("fit errors calc: ", errors)
+        #####################################################################################################################################
+        #============================ Plotting the final result ==========================
+        ###################################################################################################################################
+        
+        background_subtracted_data = data_full_y - final_fitted_background
+        #Subtracting the background from the peak to be left with the peak itelf
+        df = pd.DataFrame()
+        df['2th']=background_full_x
+        df['I_org']=data_full_y
+        df['I_BG']=final_fitted_background
+        df['I_corr_gauss'] = data_full_y - background_y_fitted_BG #background with only polynomial and gauss
+        df['I_corr']=background_subtracted_data #background after fitting with also the PV
+
+
+        
+
+        if options['plot_result'] or options['save_dir']:
+            fig, axes = plt.subplots(nrows=1, ncols=2, figsize=(15, 5))
+
+            # Plotting peak fitting and background in axes[0]
+            axes[0].scatter(diffractogram["2th"], diffractogram["I"], color='black', s=2)
+            axes[0].plot(background_full_x, y_fitted, label='Peak fitting')
+            axes[0].scatter(background_full_x, data_full_y, label='Raw data', marker='o', color='black', s=2, alpha=0.5)
+            axes[0].scatter(data_x_to_be_fitted, data_y_to_be_fitted, label='Fitted data', marker='o', color='red', s=10, alpha=0.5)
+            axes[0].plot(background_full_x, final_fitted_background, label='Background', c='green')
+
+            # Add labels and title to axes[0]
+            axes[0].set_xlabel('2theta')
+            axes[0].set_ylabel('Intensity (a.u.)')
+            axes[0].set_title(str(peak)+"-peak: "+str(filename))
+            axes[0].legend()
+            axes[0].set_ylim(min(df['I_org']) * 0.99, max(df['I_org']) * 1.01)
+            axes[0].set_xlim(background_region[0] * 0.99, background_region[1] * 1.01)
+            # Plotting the chosen number of files for validation in axes[1]
+            axes[1].scatter(df["2th"], df["I_corr"], label="Background subtracted data")
+            axes[1].plot(background_full_x, y_peak_RS,label='Peak fitting',color = 'g')
+            axes[1].plot(background_full_x, y_peak_O,label='Peak fitting',color = 'y')
+            #diffractogram.plot(x="2th", y="I", ax=axes[1])
+
+            # Adjust limits and add vertical lines to axes[1]
+
+            axes[1].axvline(x=peak_interval[0], c='r', label='Peak Interval')
+            axes[1].axvline(x=peak_interval[1], c='r')
+            axes[1].set_title('Fit details (might not be needed)')
+
+            if options['excluded_regions']:
+                for i, excluded_region in enumerate(options['excluded_regions']):
+                    excluded_region = [Q_to_twotheta(Q=excluded_region[0], wavelength=wavelength),
+                        Q_to_twotheta(Q=excluded_region[1], wavelength=wavelength)]
+                    axes[1].axvline(x = excluded_region[0],c='g')
+                    axes[1].axvline(x = excluded_region[1],c='g')
+            # Show the plot
+                
+            if options['save_dir']:
+                try:
+                    os.makedirs(options['save_dir'], exist_ok=True)  # Create directory if it doesn't exist
+                    plt.savefig(os.path.join(options['save_dir'], filename))
+                    if not options['plot_result']:
+                        plt.close()  # Close the plot after saving
+                except FileNotFoundError:
+                    print(f"Error: The directory '{options['save_dir']}' does not exist.")
+                except Exception as e:
+                    print(f"Error occurred while saving the plot: {e}")
+            if options['plot_result']:
+                plt.show()
+    #####################################################################################################################################
+    #============================ Picking out parameters to return ==========================
+    ###################################################################################################################################
+        background_for_plotting_fits = np.linspace(background_region[0], background_region[1], 1000).tolist()
+        y_fitted_many_points = pseudovoigt(background_for_plotting_fits,*fit_params_final[-4:]) 
+
+        #finding area of the fitted PV (with may extra data points)
+        PV_area = np.trapz(y_fitted_many_points, x=background_for_plotting_fits)
+
+
+        PV_parameters =  fit_params_final[-4:]
+        PV_errors = errors[-4:]
+    except Exception as e:
+        # If an exception occurs during fitting, print an error message
+        print(f"Error occurred for {filename}: {e}")
+        
+        #Plotting the background-fitted data, where the PV-fit failed:
+        plt.plot(background_full_x, background_y_fitted_BG, label=str("Background (poly+PV-edge)"))
+        #plt.plot(background_left_shoulder_x, background_left_shoulder_y, label='Background Fit Region')
+        plt.plot(background_full_x, data_full_y, label = 'data')
+        # Add labels and title
+        plt.xlim(background_region[0],background_region[1])
+        plt.xlabel('2theta')
+        plt.ylabel('Background Intensity')
+        plt.title('BG fit from which PV-fit failed')
+
+        # Display the legend
+        plt.legend()
+
+        # Show the plot
+        plt.show()
+
+
+        df = pd.DataFrame()
+        df['2th']=background_full_x
+        df['I_org']=data_full_y
+        df['I_corr_gauss'] = data_full_y - background_y_fitted_BG #background with only polynomial and gauss
+
+        PV_area = 0
+
+        PV_errors = [1,1,1,1]
+        PV_parameters =  [0,0,0,0]
+
+    #fixing the analytical outputs, that shold work regardless of fitting is a success or not
+    #picking out the relevant region of df to integrate and find the "analytical area"
+    df_peak = df[(df['2th'] >= peak_interval[0]) & (df['2th'] <= peak_interval[1])]
+    
+    analytical_is_fixed = False #probably need to subtract the RS-peak to obtain something reasonable for the analytical area --> much more interesting with just the peak area
+
+    if analytical_is_fixed:
+        analytical_area = np.trapz(df_peak["I_corr_gauss"],x=df_peak["2th"])
+        analytical_maximum = region_maximum
+
+    else:
+        analytical_area = np.nan
+        analytical_maximum = np.nan
+
+
+    return PV_parameters, PV_errors, PV_area#, analytical_area, analytical_maximum 
+#######################################################################################################################################
 
 
 
@@ -7671,7 +8356,7 @@ def scherrer_domain_size_general(fwhm, Q, wavelength, path, detector_position = 
     theta = twotheta/2
 
     instrumental_broadening = parse_instrumental_broadening(path)
-    #print(instrumental_broadening)
+    
 
     if "ad_SR_"+detector_position in instrumental_broadening:
         #print("yes dmitry: ",instrumental_broadening["ad_SR_"+detector_position])
@@ -7697,8 +8382,9 @@ def scherrer_domain_size_general(fwhm, Q, wavelength, path, detector_position = 
         PR3 = 0
         PR4 = 0
         #print("no pr1_",detector_position," given at ",path,". ad,bd,cd set to 0.")
-
+    
     if instrumental_broadening and fwhm > 0:
+        print("A,B,C: ",A,B,C," PR1,PR2,PR3,PR4: ",PR1,PR2,PR3,PR4)
         gauss_fwhm_dmitry = np.sqrt(A * np.cos(twotheta)**4 + B * np.cos(twotheta)**2 + C)
         #print("gauss_fwhm_dmitry: ",gauss_fwhm_dmitry)
         gauss_fwhm_evans = PR3 * np.tan(theta) + PR4/np.cos(theta)
@@ -7713,7 +8399,8 @@ def scherrer_domain_size_general(fwhm, Q, wavelength, path, detector_position = 
         '''
         fwhm = np.sqrt(fwhm**2 - gauss_fwhm_dmitry**2 - gauss_fwhm_evans**2 - lor_fwhm_evans**2)
         #print(gauss_fwhm)
-
+    else:
+        print("no instrumental correction; either due to no instrumental_broadening registered or negative FWHM")
     
     try:
         # Calculate the domain size
@@ -8365,3 +9052,85 @@ def line_prepender(filename, line):
         content = f.read()
         f.seek(0, 0)
         f.write(line.rstrip('\r\n') + '\n' + content)
+
+
+def scientific_notation(number, precision=0):
+
+    """
+    Convert a number to scientific notation with a specified precision.
+
+    Parameters:
+    - number (float): The number to be converted.
+    - precision (int): The number of decimal places to include (default is 1).
+
+    Returns:
+    - str: The number in scientific notation.
+    """
+    # Using the format method to format the number in scientific notation with specified precision
+    return "{:.{}e}".format(number, precision)
+
+def subscript(number):
+    subscript_digits = str.maketrans("0123456789.", "₀₁₂₃₄₅₆₇₈₉·")
+    number_as_subscript = str(number).translate(subscript_digits)
+    return number_as_subscript
+
+def supscript(number):
+    superscript_digits = str.maketrans("0123456789.", "⁰¹²³⁴⁵⁶⁷⁸⁹·")
+    number_as_supscript = str(number).translate(superscript_digits)
+    return number_as_supscript
+
+def add_error_to_value_v2(value, error,multiplyer=False):
+    if float(error) == 0: #this goes for alues that are locked (not refining), getting a (*) rather than a value
+        decimals = 2
+        formatted_value = "{:.{}f}".format(value, decimals)
+        value_with_error = "{}(*)".format(formatted_value)
+    else:
+        if multiplyer:
+            error = multiplyer * error
+        if error >= value:
+            decimals = 2
+            formatted_value = "{:.{}f}".format(value, decimals)
+            value_with_error = "{}(**)".format(formatted_value)
+        else:
+            error_scientific = scientific_notation(error, precision=0)
+            error_value = error_scientific.split("e")[0]
+            error_digit = int(float(error_scientific.split("e")[-1]))
+
+            if error_digit < 0:
+                decimals = -error_digit
+                formatted_value = "{:.{}f}".format(value, decimals)
+                value_with_error = "{}({})".format(formatted_value, error_value)
+                
+            elif error_digit < 1:
+                #this is for the ase of an error between 10^0 and 10^1, meaning from 1-9, in which case it is a simple process:
+                formatted_value = "{:.{}f}".format(value, error_digit)
+                value_with_error = "{}({})".format(formatted_value, error_value)
+            else:
+                #picking out digits before the dot
+                digits_error = len(str(error).split(".")[0])
+                digits_value = len(str(value).split(".")[0])
+                
+                #finding the difference, as this will be indicating how many decimals of the value should be used
+                decimals = digits_value - digits_error
+                #Rewriting to scientific notation, keeping all digits for now (subtracting 1, as the first digit is not a decimal)
+                error_scientific = scientific_notation(error, precision=len(str(error))-1)
+
+                #Same for the value, only also subtracting "decimals" to obtain the correct amount of significant digits
+                #value_scientific = scientific_notation(value, precision=len(str(value))-1-decimals)
+                value_scientific = scientific_notation(value, precision=decimals)
+                error_value = int(round(float(error_scientific.split("e")[0]),0))
+                #error_digit = int(float(error_scientific.split("e")[-1]))
+                #value_exponent = int(float(value_scientific.split("e")[-1]))
+                formatted_value = value_scientific.split("e")[0]
+                value_exponent = int(float(value_scientific.split("e")[-1]))
+                #value_with_error = formatted_value + "("+error_value+")"+"10$^{}".format(value_exponent)
+                #value_with_error = "{}({})".format(formatted_value, error_value) + "10^{}".format(value_exponent)
+                
+                #superscript_digits = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
+                #value_with_error = "{}({})".format(formatted_value, error_value) + " x 10{}".format(str(value_exponent).translate(superscript_digits))
+                value_with_error = "{}({})".format(formatted_value, error_value) + " x 10"+supscript(value_exponent)
+
+
+
+            #print("{} +/- {} has been rewritten into {}".format(value, error, value_with_error))
+    return value_with_error
