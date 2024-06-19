@@ -6082,7 +6082,7 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
     if peak == "310":
         default_options['region_of_interest'] = [2.28,        2.405, 2.456,        2.495] #Provide an interval [x1,x2]
     if peak == "410":
-        default_options['region_of_interest'] = [3.11,         3.145,3.22,         3.235]
+        default_options['region_of_interest'] = [3.11,         3.145,3.21,         3.235]
 
 
     options = aux.update_options(options=options, default_options=default_options)
