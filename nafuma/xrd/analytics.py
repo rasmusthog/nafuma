@@ -1964,7 +1964,6 @@ def twotheta_to_Q(twotheta,wavelength_original):
 
 def Q_to_twotheta(Q, wavelength):
     twotheta = 2 * np.arcsin(Q * (wavelength / (4 * np.pi))) * 180 / np.pi
-    print("halvor")
     return twotheta
 
 '''
@@ -6060,7 +6059,7 @@ def poly2_with_PV(x, a, b, c, amplitude_pv, mean_pv, sigma_pv, fraction_pv):
     
     return a * x**2 + b * x + c + pv
     
-def fitting_superstructure_peaks_with_poly_and_PV_v3(data,options,peak):
+def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
     #v2: Adding a way out in case fitting of PV fails
     
     #####       
@@ -6083,7 +6082,7 @@ def fitting_superstructure_peaks_with_poly_and_PV_v3(data,options,peak):
     if peak == "310":
         default_options['region_of_interest'] = [2.28,        2.405, 2.456,        2.495] #Provide an interval [x1,x2]
     if peak == "410":
-        default_options['region_of_interest'] = [3.115,         3.145,3.205,         3.235]
+        default_options['region_of_interest'] = [3.11,         3.145,3.21,         3.235]
 
 
     options = aux.update_options(options=options, default_options=default_options)
@@ -6179,13 +6178,11 @@ def fitting_superstructure_peaks_with_poly_and_PV_v3(data,options,peak):
     #####################################################################################################################################
     #============================ Step 1: Fitting a polynomial to the left shoulder for good starting values in the fit ========================
     ###################################################################################################################################
-    print("before")
     if peak == "410":
         d_poly = np.polyfit(background_right_shoulder_x, background_right_shoulder_y,options['BG_poly_degree'])
     if peak == "310":
         d_poly = np.polyfit(background_left_shoulder_x, background_left_shoulder_y,options['BG_poly_degree'])
     function_background_poly = np.poly1d(d_poly) #Using the values of the background to make a backgroudn (2. deg polynomial)
-    print("after")
     #Applying the fitted function to the twotheta-values of the whole 2-theta region of relevance
     background_y_poly=function_background_poly(background_full_x)
     if options['plot_pre_fitting']:
@@ -6236,7 +6233,6 @@ def fitting_superstructure_peaks_with_poly_and_PV_v3(data,options,peak):
         upper_bounds_BG = poly_fit_parameters + [100000, background_region[1]+1.5, 1,1]
 
     bounds_BG = (lower_bounds_BG, upper_bounds_BG)
-
     if options['BG_poly_degree'] == 1:
         #if not options['lock_initial_BG_fit']:
         #lower_bounds = [0, 0, 0, background_region[1], 0.001,0]
@@ -6255,7 +6251,6 @@ def fitting_superstructure_peaks_with_poly_and_PV_v3(data,options,peak):
         fit_params_BG, _ = scipy.optimize.curve_fit(poly2_with_PV, background_x, background_y, p0=initial_guess_BG, bounds=bounds_BG)
         background_y_fitted_BG=poly2_with_PV(background_full_x,*fit_params_BG)
     #print("fit after gauss:" + str(fit_params_gauss))
-
     if options['plot_pre_fitting']:
         print("initial guess BG :",initial_guess_BG)
         print("lower_bounds_BG :",lower_bounds_BG)
@@ -6344,14 +6339,20 @@ def fitting_superstructure_peaks_with_poly_and_PV_v3(data,options,peak):
     if peak == "410":
         lower_BG_PV_bounds =     [0, background_region[0]-5, 0.001,0]
         higher_BG_PV_bounds =    [np.inf, background_region[0], 10,1]
+        lower_PV_bounds =           [0, Q_to_twotheta(Q=3.155,wavelength=wavelength), 0.015, 0]
+        higher_PV_bounds =          [peak_maximum*1.1, Q_to_twotheta(Q=3.185,wavelength=wavelength), 0.2, 0.75]
+
     if peak == "310":
         lower_BG_PV_bounds =     [0, background_region[1], 0.001,0]
         higher_BG_PV_bounds =    [np.inf, background_region[1]+5, 10,1]
+        lower_PV_bounds =           [0, Q_to_twotheta(Q=2.42,wavelength=wavelength), 0.015, 0]
+        higher_PV_bounds =          [peak_maximum*1.1, Q_to_twotheta(Q=2.445,wavelength=wavelength), 0.2, 0.75]
+
 
     #lower_PV_bounds =           [peak_maximum*0.9, peak_interval[0], 0.01, 0]
     #higher_PV_bounds =          [peak_maximum*1.1, peak_interval[1], 0.3, 1]
-    lower_PV_bounds =           [0, Q_to_twotheta(Q=2.42,wavelength=wavelength), 0.015, 0]
-    higher_PV_bounds =          [peak_maximum*1.1, Q_to_twotheta(Q=2.445,wavelength=wavelength), 0.2, 0.75]
+    #lower_PV_bounds =           [0, Q_to_twotheta(Q=2.42,wavelength=wavelength), 0.015, 0]
+    #higher_PV_bounds =          [peak_maximum*1.1, Q_to_twotheta(Q=2.445,wavelength=wavelength), 0.2, 0.75]
     try: #attempts to fit a PV
         if options['BG_poly_degree'] == 1:
             #lower_poly_bounds = [-np.inf, -np.inf]
