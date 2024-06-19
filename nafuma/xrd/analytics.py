@@ -1964,6 +1964,7 @@ def twotheta_to_Q(twotheta,wavelength_original):
 
 def Q_to_twotheta(Q, wavelength):
     twotheta = 2 * np.arcsin(Q * (wavelength / (4 * np.pi))) * 180 / np.pi
+    print("halvor")
     return twotheta
 
 '''
