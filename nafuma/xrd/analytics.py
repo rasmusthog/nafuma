@@ -2642,7 +2642,7 @@ def finding_instrumental_peak_broadening(data,options):
             
         else:
             set_options['plot_fit']=False
-            set_options['plot_all_background_fits']: False
+            set_options['plot_all_background_fits'] = False
 
         output = background_subtracted_peak(data=data,options=set_options)
         df_peak=output[1]
