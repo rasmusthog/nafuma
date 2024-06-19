@@ -6060,7 +6060,7 @@ def poly2_with_PV(x, a, b, c, amplitude_pv, mean_pv, sigma_pv, fraction_pv):
     
     return a * x**2 + b * x + c + pv
     
-def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
+def fitting_superstructure_peaks_with_poly_and_PV_v3(data,options,peak):
     #v2: Adding a way out in case fitting of PV fails
     
     #####       
