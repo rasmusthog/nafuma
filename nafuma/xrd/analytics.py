@@ -6082,7 +6082,7 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
     if peak == "310":
         default_options['region_of_interest'] = [2.28,        2.405, 2.456,        2.495] #Provide an interval [x1,x2]
     if peak == "410":
-        default_options['region_of_interest'] = [3.115,         3.145,3.205,         3.225]
+        default_options['region_of_interest'] = [3.115,         3.145,3.205,         3.235]
 
 
     options = aux.update_options(options=options, default_options=default_options)
@@ -6178,12 +6178,13 @@ def fitting_superstructure_peaks_with_poly_and_PV_v2(data,options,peak):
     #####################################################################################################################################
     #============================ Step 1: Fitting a polynomial to the left shoulder for good starting values in the fit ========================
     ###################################################################################################################################
+    print("before")
     if peak == "410":
         d_poly = np.polyfit(background_right_shoulder_x, background_right_shoulder_y,options['BG_poly_degree'])
     if peak == "310":
         d_poly = np.polyfit(background_left_shoulder_x, background_left_shoulder_y,options['BG_poly_degree'])
     function_background_poly = np.poly1d(d_poly) #Using the values of the background to make a backgroudn (2. deg polynomial)
-    
+    print("after")
     #Applying the fitted function to the twotheta-values of the whole 2-theta region of relevance
     background_y_poly=function_background_poly(background_full_x)
     if options['plot_pre_fitting']:
@@ -8408,7 +8409,7 @@ def scherrer_domain_size_general(fwhm, Q, wavelength, path, detector_position = 
         if np.isnan(domain_size):
             return 0
         else:
-            return np.float(domain_size)
+            return np.float64(domain_size)
     except ZeroDivisionError:
         return 0
 
