@@ -159,18 +159,18 @@ def plot_gc(data, options=None):
 
 		# FIXME To begin, the default is that y-values correspond to x-values. This should probably be implemented in more logical and consistent manner in the future.
 		if options['x_vals'] in ['coulombic_efficiency', 'energy_efficiency']:
-			data['cycles'].loc[mask].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][1], kind='scatter', s=plt.rcParams['lines.markersize']*10,  marker=markers[0], edgecolor=plt.rcParams['lines.markeredgecolor'])
+			data['cycles'].loc[mask].plot(x='cycle', y=options['x_vals'], ax=ax, color=colours[0][1], kind='scatter', s=plt.rcParams['lines.markersize']*10,  marker=markers[0])#, edgecolor=plt.rcParams['lines.markeredgecolor'])
 			if options['limit']:
 				ax.axhline(y=options['limit'], ls='--', c='black')
 
 		else:
 			if options['charge']:
 				yval = 'charge_' + options['x_vals']
-				data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][0], kind='scatter', s=plt.rcParams['lines.markersize']*10, marker=markers[0], edgecolor=plt.rcParams['lines.markeredgecolor'])
+				data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][0], kind='scatter', s=plt.rcParams['lines.markersize']*10, marker=markers[0])#, edgecolor=plt.rcParams['lines.markeredgecolor'])
 			
 			if options['discharge']:
 				yval = 'discharge_' + options['x_vals']
-				data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][1], kind='scatter', s=plt.rcParams['lines.markersize']*10, marker=markers[1], edgecolor=plt.rcParams['lines.markeredgecolor'])
+				data['cycles'].loc[mask].plot(x='cycle', y=yval, ax=ax, color=colours[0][1], kind='scatter', s=plt.rcParams['lines.markersize']*10, marker=markers[1])#, edgecolor=plt.rcParams['lines.markeredgecolor'])
 
 
 			if options['limit']:
@@ -599,11 +599,6 @@ def prettify_labels(label):
 
 
 
-
-
-
-
-
 def generate_colours(options):
 
 	default_options = {
@@ -618,9 +613,9 @@ def generate_colours(options):
 		discharge_colour = options['colours'][1]
 
 		if isinstance(charge_colour, tuple):
-			charge_colour = [charge_colour]
+			charge_colour = list(charge_colour)
 		if isinstance(discharge_colour, tuple):
-			discharge_colour = [discharge_colour]
+			discharge_colour = list(discharge_colour)
 	
 	else:
 		charge_colour = [(40/255, 70/255, 75/255)] # Dark Slate Gray #28464B, coolors.co
@@ -687,3 +682,66 @@ def generate_markers(options):
 		markers = [options['markers'][0], options['markers'][1]]
 
 	return markers
+
+
+
+def get_tickmarks(df: pd.DataFrame, ticks: list, value: str, exclude=None):
+
+
+	min_val = df[value].min()
+	max_val = df[value].max()
+
+
+	# Get major ticks
+	major_ticks = [np.round((min_val + ticks[0]*i),2) for i in range(int(np.floor((max_val-min_val)/ticks[0]))+1)]
+	major_ticks.append(np.round(max_val, 2))
+
+	major_ticks = aux.get_unique(major_ticks)
+
+	major_ticklabels = [i*ticks[0] for i in range(len(major_ticks)-1)]
+	major_ticklabels.append(np.round((max_val-min_val),1))
+
+	if exclude:
+		for i, tick in enumerate(major_ticklabels):
+			if tick in exclude:
+				del major_ticks[i]
+				del major_ticklabels[i]
+
+
+	# Get minor ticks
+	minor_ticks = [np.round((min_val + ticks[1]*i),2) for i in range(int(np.floor((max_val-min_val)/ticks[1]))+1) if np.round((min_val + ticks[1]*i),2) not in major_ticks]
+	minor_ticklabels = [np.round(tick - min_val, 2) for tick in minor_ticks]
+
+	return major_ticks, major_ticklabels, minor_ticks, minor_ticklabels
+
+
+
+def assign_tickmarks(dfs: list, options, fig, ax, exclude=None):
+
+	major_ticks, major_ticklabels, minor_ticks = [], [], []
+	
+	if not exclude:
+		exclude = [[None, None] for i in range(len(options['which_cycles']))]
+
+	for i, cycle in enumerate(options['which_cycles']):
+		#Get ticks from charge cycle
+		major_tick, major_ticklabel, minor_tick, minor_ticklabel = ec.plot.get_tickmarks(dfs[cycle][0], ticks=options['x_tick_locators'], value=options['x_vals'], exclude=exclude[i][0])
+		major_ticks += major_tick
+		major_ticklabels += major_ticklabel
+		minor_ticks += minor_tick
+
+		# Get ticks from discharge cycle
+		major_tick, major_ticklabel, minor_tick, minor_ticklabel = ec.plot.get_tickmarks(dfs[cycle][1], ticks=options['x_tick_locators'], value='ions', exclude=exclude[i][1])
+		major_ticks += major_tick
+		major_ticklabels += major_ticklabel
+		minor_ticks += minor_tick
+
+
+	ax.set_xticks(major_ticks, minor=False)
+	ax.set_xticklabels(major_ticklabels)
+	ax.set_xticks(minor_ticks, minor=True)
+
+
+
+
+	return fig, ax
