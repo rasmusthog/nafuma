@@ -2,7 +2,7 @@ import pandas as pd
 import numpy as np
 import matplotlib.pyplot as plt
 import os
-
+from datetime import datetime
 import nafuma.auxillary as aux
 from sympy import re
 
@@ -60,32 +60,100 @@ def read_neware(path, options={}):
 	return df
 
 
-def read_batsmall(path):
-	''' Reads BATSMALL-data into a DataFrame.
+#def read_batsmall(path):
+	#''' Reads BATSMALL-data into a DataFrame.
 
-	Input:
-	path (required): string with path to datafile
+	#Input:
+	#path (required): string with path to datafile
 
-	Output:
-	df: pandas DataFrame containing the data as-is, but without additional NaN-columns.'''
+	#Output:
+	#df: pandas DataFrame containing the data as-is, but without additional NaN-columns.'''
 
 
 	# Determine if decimal point is . or ,
-	with open(path, 'r') as f:
-		for i, line in enumerate(f):
-			if i == 10:
-				values = line.split()
-				if len(values[1].split('.')) == 2:
-					decimal_point = '.'
-				elif len(values[1].split(',')) == 2:
-					decimal_point = ','
+	#with open(path, 'r') as f:
+	#	for i, line in enumerate(f):
+	#		if i == 10:
+	#			values = line.split()
+	#			if len(values[1].split('.')) == 2:
+	#				decimal_point = '.'
+	#			elif len(values[1].split(',')) == 2:
+	#				decimal_point = ','
 				
 
 
-	df = pd.read_csv(path, skiprows=2, sep='\t', decimal=decimal_point)
-	df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+	#df = pd.read_csv(path, skiprows=2, sep='\t', decimal=decimal_point)
+	#df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+	#print(df)
+	#return df
 
-	return df
+def read_batsmall(path):
+    with open(path, 'r') as f:
+        for i, line in enumerate(f):
+            if i == 10:
+                values = line.split()
+                if len(values[1].split('.')) == 2:
+                    decimal_point = '.'
+                elif len(values[1].split(',')) == 2:
+                    decimal_point = ','
+
+    df = pd.read_csv(path, skiprows=2, sep='\t', decimal=decimal_point)
+    df = df.loc[:, ~df.columns.str.contains('^Unnamed')]
+
+    base_time = None
+
+    def get_timestamp(comment):
+        try:
+            timestamp_str = comment.split('[')[-1].split(']')[0]
+            return datetime.strptime(timestamp_str, '%d.%b %y %H:%M:%S')
+        except Exception as e:
+            print(f"Failed to parse timestamp from comment: {comment}, Error: {e}")
+            return None
+
+    for index, row in df.iterrows():
+        comment = row['Comment']
+        if pd.notna(comment) and 'program' in comment.lower():
+            timestamp = get_timestamp(comment)
+            if timestamp is not None:
+                base_time = timestamp
+                break
+
+    if base_time is None:
+        print("No valid starting timestamp found!")
+        return df
+
+    total_time_adjustment = 0
+
+    for index, row in df.iterrows():
+        comment = row['Comment']
+        if pd.notna(comment) and 'program' in comment.lower():
+            timestamp = get_timestamp(comment)
+            if timestamp is not None:
+                time_diff = (timestamp - base_time).total_seconds() / 3600.0
+                time_adjustment = time_diff - row['TT [h]']
+                df.at[index, 'TT [h]'] = time_diff
+                total_time_adjustment = time_adjustment
+                
+                # Juster etterfølgende rader frem til neste "program" kommentar
+                for subsequent_index in range(index + 1, len(df)):
+                    subsequent_comment = df.at[subsequent_index, 'Comment']
+                    if pd.notna(subsequent_comment) and 'program' in subsequent_comment.lower():
+                        break
+                    df.at[subsequent_index, 'TT [h]'] += total_time_adjustment
+
+    # Fjern rader med "restarted" i Comment-kolonnen
+    df = df[~df['Comment'].str.contains('restarted|Break', case=False, na=False)]
+	
+
+    df.to_csv("C:/Users/halvorhv/Downloads/test.csv", index=False)
+    
+    print(df.head())
+
+    return df
+
+# Example usage:
+# df = read_batsmall_with_restarts('path_to_your_file')
+
 
 
 def read_biologic(path):
@@ -126,17 +194,18 @@ def process_batsmall_data(df, options=None):
 	Output:
 	cycles: A list with 
 	'''
-
-	required_options = ['splice_cycles', 'molecular_weight', 'reverse_discharge', 'units']
 	
 	default_options = {
-		'splice_cycles': False, 
+		'splice_cycles': False,  
+		'append': False, # Add max of ions and specific_capacity of previous run #TODO Generalise
+		'append_gap': 0, # Add a gap between cyclces - only used if append == True.
 		'molecular_weight': None, 
 		'reverse_discharge': False, 
-		'units': None}
+		'units': None,
+		}
 
 
-	aux.update_options(options=options, required_options=required_options, default_options=default_options)
+	aux.update_options(options=options, default_options=default_options)
 	options['kind'] = 'batsmall'
 
 	# Complete set of new units and get the units used in the dataset, and convert values in the DataFrame from old to new.
@@ -171,6 +240,9 @@ def process_batsmall_data(df, options=None):
 
 		sub_df.loc[dchg_mask, 'current']  *= -1
 		sub_df.loc[dchg_mask, 'specific_capacity'] *= -1
+		sub_df.loc[dchg_mask, 'ions'] *= -1
+
+
 
 		chg_df = sub_df.loc[chg_mask]
 		dchg_df = sub_df.loc[dchg_mask]
@@ -179,8 +251,11 @@ def process_batsmall_data(df, options=None):
 		if chg_df.empty and dchg_df.empty:
 			continue
 
-		chg_df['reaction_coordinate'] = chg_df['time'] * np.abs(chg_df['current'].mean())
-		dchg_df['reaction_coordinate'] = dchg_df['time'] * np.abs(dchg_df['current'].mean())
+		if options['append']: 
+			if cycles: 
+				chg_df.loc[chg_mask, 'ions'] += cycles[-1][1]['ions'].max() + options['append_gap']
+			
+			dchg_df.loc[dchg_mask, 'ions'] += chg_df['ions'].max() + options['append_gap']
 
 		if options['reverse_discharge']:
 			max_capacity = dchg_df['capacity'].max() 
@@ -535,9 +610,10 @@ def add_columns(df, options):
 
 	if options['kind'] == 'batsmall':
 		if options['active_material_weight']:
-
+			
 
 			active_material_weight = options['active_material_weight'] * unit_tables.mass()['mg'].loc[options['units']['mass']]
+			print(options['old_units'])
 			capacity = options['old_units']['capacity']
 
 			df[f'Capacity [{options["old_units"]["capacity"]}]'] = df[f'C [{options["old_units"]["capacity"]}/{options["old_units"]["mass"]}]'] * active_material_weight
@@ -547,7 +623,8 @@ def add_columns(df, options):
 				seconds_per_hour = 3600 # s h^-1
 				f = faradays_constant / seconds_per_hour * 1000.0 # [f] = mAh mol^-1
 
-				molecular_weight = options['molecular_weight'] * unit_tables.mass()['g'].loc[options['units']['mass']]
+				molecular_weight = options['molecular_weight'] * unit_tables.mass()['g'].loc[options['old_units']['mass']]
+
 				df["IonsExtracted"] = (df[f'C [{options["old_units"]["capacity"]}/{options["old_units"]["mass"]}]'] * molecular_weight)/f
 
 
@@ -855,9 +932,3 @@ def convert_datetime_string(datetime_string, reference, ref_time, unit='s'):
 	time = s * factors[unit] + ref_time
 
 	return time
-
-
-
-
-
-
