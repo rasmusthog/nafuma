@@ -147,8 +147,6 @@ def read_batsmall(path):
 
     df.to_csv("C:/Users/halvorhv/Downloads/test.csv", index=False)
     
-    print(df.head())
-
     return df
 
 # Example usage:
