@@ -197,7 +197,7 @@ def split_scan_data(data: dict, options={}) -> list:
 
 
 
-def save_data(data: dict, options={}) -> None:
+def save_data_simple(data: dict, options={}) -> None:
 
     required_options = ['save_folder', 'overwrite', 'log', 'logfile', 'filename']
 
@@ -257,7 +257,63 @@ def save_data(data: dict, options={}) -> None:
 
 
     #data['xanes_data'].to_csv(os.path.join(options['save_folder'], options['filename']), sep='\t', index=False)
+def save_data_simple(data: dict, options={}) -> None:
 
+    required_options = ['save_folder', 'overwrite', 'log', 'logfile', 'filename']
+
+    default_options = {
+        'log': False,
+        'logfile': f'{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_save_files.log',
+        'save_folder': 'saved_scans',
+        'overwrite': False,
+        'filename': f'{datetime.datetime.now().strftime("%Y-%m-%d-%H-%M-%S")}_exported_data.dat',
+        }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+
+    # Check if there is any data to be saved
+    if not 'xanes_data' in data.keys():
+        if options['log']:
+             aux.write_log(message=f'There is not saved scan data in data. Exiting without saving...', options=options)
+
+        return None
+    
+    if not isinstance(data['xanes_data'], pd.DataFrame):
+        if options['log']:
+             aux.write_log(message=f'data["xanes_data"] has an invalid format. Exiting without saving...', options=options)
+
+        return None
+
+
+    # Make folder(s) if it/they do(es)n't exist
+    if not os.path.exists(options['save_folder']):
+        if options['log']:
+             aux.write_log(message=f'Destination folder does not exist. Creating folder...', options=options)
+
+        os.makedirs(options['save_folder'])
+
+
+
+    if os.path.exists(os.path.join('save_folder', options['filename'])):
+        if not options['overwrite']:
+            if options['log']:
+                aux.write_log(message=f'File already exists and overwrite disabled. Exiting without saving...', options=options)
+            return None
+        
+    with open(os.path.join(options['save_folder'], options['filename']), 'w') as f:
+
+        if 'e0_simple' in data.keys():
+            f.write(f'# Number of header lines: {len(data["path"])+1} \n')
+
+            for i, (path, e0) in enumerate(data['e0_simple'].items()):
+                f.write(f'# Scan_{i} \t {e0} \n')
+       
+        else:
+            f.write(f'# Number of header lines: {1}')
+        
+
+        data['xanes_data'].to_csv(f, sep='\t', index=False)
 
 
 def load_data(path: str) -> dict:
@@ -290,6 +346,36 @@ def load_data(path: str) -> dict:
     
 
     return data
+def load_data_simple(path: str) -> dict:
+    # FIXME Let this function be called by read_data() if some criterium is passed
+
+    data = {}
+
+
+    with open(path, 'r') as f:
+        line = f.readline()
+        header_lines = int(line.split()[-1])
+
+        if header_lines > 1:
+            edge_positions = []
+            line = f.readline()
+            while line[0] == '#':
+                edge_positions.append(line.split()[-1])
+                line = f.readline()
+
+    data['xanes_data'] = pd.read_csv(path, sep='\t', skiprows=header_lines)
+    data['path'] = data['xanes_data'].columns.to_list()
+    data['path'].remove('ZapEnergy')
+
+    if header_lines > 1:
+        data['e0_simple'] = {}
+
+        for path, edge_position in zip(data['path'], edge_positions):
+            data['e0_simple'][path] = float(edge_position)
+
+    
+
+    return data
 
 
 def read_data(data: dict, options={}) -> pd.DataFrame:
@@ -301,7 +387,8 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
     required_options = ['adjust', 'mode']
     default_options = {
         'adjust': 0,
-        'mode': 'fluoresence'
+        'mode': 'fluoresence',
+        'active_roi': None
     }
 
     options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
@@ -320,7 +407,7 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
         columns.append(filename)
 
         scan_data = pd.read_csv(filename, skiprows=1)
-        print(filename)
+
         if options['mode'] == 'fluoresence':
             if not options['active_roi']:
                 scan_data = scan_data[[determine_active_roi(scan_data)]]
@@ -328,7 +415,7 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
                 scan_data = scan_data[options['active_roi']]
 
         elif options['mode'] == 'transmission':
-            scan_data = scan_data['MonEx'] / scan_data['Ion2']
+            scan_data = scan_data['MonEx'] / scan_data['Ion1']
 
         xanes_data = pd.concat([xanes_data, scan_data], axis=1)
 
@@ -338,7 +425,139 @@ def read_data(data: dict, options={}) -> pd.DataFrame:
 
     return xanes_data
 
+'''
+def read_metadata(data: dict, options={}) -> dict:
 
+    required_options = ['get_temperature', 'get_timestamp', 'adjust_time', 'convert_time', 'time_unit', 'reference_time']
+
+    default_options = {
+        'get_temperature': True,
+        'get_timestamp': True,
+        'adjust_time': False,
+        'convert_time': False,
+        'reference_time': None,
+        'time_unit': 's'
+    }
+
+    options = aux.update_options(options=options, required_options=required_options, default_options=default_options)
+
+
+    temperatures = []
+    timestamps = []
+
+    for filename in data['path']:
+        scan_data = pd.read_csv(filename, skiprows=1)
+
+        if options['get_temperature']:
+            temperatures.append(scan_data['ZBlower2'].mean())
+
+        if options['get_timestamp']:
+
+            with open(filename, 'r') as f:
+                #time = f.readline().strip('# Time: ') #<-- Previous code
+                time = f.readline().split('# Time:  ')[-1] #Hope this does not fuck you up, Rasmus - but I needed another space here
+                split_operator=time[-9] #This should be the operator that splits hours, minutes and seconds
+                if split_operator == ".":
+                    time = datetime.datetime.strptime(time, "%a %b %d %H.%M.%S %Y ")
+                if split_operator == ":":
+                    time = datetime.datetime.strptime(time, "%a %b %d %H:%M:%S %Y ")
+                #print("time: ",time)
+            if options['adjust_time']:
+                time_elapsed = scan_data['Htime'].iloc[-1] - scan_data['Htime'].iloc[0]
+
+                time += datetime.timedelta(microseconds=time_elapsed)/2
+
+            #print(filename,' with timestamp: ',time)
+            timestamps.append(time)
+
+
+    if options['reference_time'] and options['convert_time']:
+        from . import unit_tables
+        new_times = []
+
+        if isinstance(options['reference_time'], str):
+            options['reference_time'] = datetime.datetime.strptime(options['reference_time'], "%d.%b %y %H.%M.%S")
+        
+        for time in timestamps:
+            new_time = (time.timestamp() - options['reference_time'].timestamp()) * unit_tables.time()['s'].loc[options['time_unit']]        
+
+            new_times.append(new_time)
+
+        #print("new_times: ",new_times)
+        timestamps = new_times
+
+
+    metadata = {'time': timestamps, 'temperature': temperatures}
+
+    # Match timestamps against electrochemistry-data
+    # TODO This could be generalised to match up against any other dataset with timestamps.
+    if 'cycles' in data.keys():
+        ions, specific_capacity = [], []
+        i = 0
+        #print("data['cycles']: ", data['cycles'])
+        #print("specific_capacity: ",specific_capacity)
+        for timestamp in timestamps:
+            if timestamp < 0:
+                ions.append(0)
+            
+            else:
+                #print("timestamp: ",timestamp)
+                closest_chg = aux.find_neighbours(value=timestamp, df=data['cycles'][i][0], colname='time')
+                #print("for timestamp (",timestamp," the closest_chg is ",closest_chg)
+                closest_dchg = aux.find_neighbours(value=timestamp, df=data['cycles'][i][1], colname='time')
+
+                if not isinstance(closest_chg, list):
+                    closest_chg = [closest_chg, closest_chg]
+                if not isinstance(closest_dchg, list):
+                    closest_dchg = [closest_dchg, closest_dchg]
+                
+
+                if all([x==x for x in closest_chg]):
+                    ions.append(                np.mean([data['cycles'][i][0]['ions'].loc[              data['cycles'][i][0].index == closest_chg[0]], data['cycles'][i][0]['ions'].loc[                data['cycles'][i][0].index == closest_chg[1]]]))
+                    specific_capacity.append(   np.mean([data['cycles'][i][0]['specific_capacity'].loc[ data['cycles'][i][0].index == closest_chg[0]], data['cycles'][i][0]['specific_capacity'].loc[   data['cycles'][i][0].index == closest_chg[1]]]))
+                    continue
+
+                elif all([x==x for x in closest_dchg]):
+                    ions.append(                np.mean([data['cycles'][i][1]['ions'].loc[              data['cycles'][i][1].index == closest_dchg[0]], data['cycles'][i][1]['ions'].loc[               data['cycles'][i][1].index == closest_dchg[1]]]))
+                    specific_capacity.append(   np.mean([data['cycles'][i][1]['specific_capacity'].loc[ data['cycles'][i][1].index == closest_dchg[0]], data['cycles'][i][1]['specific_capacity'].loc[  data['cycles'][i][1].index == closest_dchg[1]]]))
+                    continue
+
+                elif aux.isnan(closest_chg[1]) and aux.isnan(closest_dchg[0]):
+                    ions.append(np.nan)
+                    specific_capacity.append(np.nan)
+                    continue
+                else:
+                    ions.append(np.nan)
+                    specific_capacity.append(np.nan)
+                    i += 1
+
+                    if i > len(data['cycles'])-1:
+                        break
+        
+        print("HALVOR: len(ions) = ",len(ions)," and len(specific_capacity) = ",len('specific_capacity'))
+
+        for i, (ion, cap) in enumerate(zip(ions, specific_capacity)):
+            if aux.isnan(ion): # if a resting step, assign a meaningful value
+                if i < len(ions)-1: # if resting step in the middle of the run, take the mean between the last of previous and first of next run
+                    ions[i] = np.mean([ions[i-1], ions[i+1]])
+
+                else: # If last element, set to last values plus the delta between the last two previous measurements
+                    ions[i] = ions[i-1] + (ions[i-1]-ions[i-2]) 
+
+            if aux.isnan(cap) and i < len(specific_capacity)-1: # do same thing for specific capacity
+                if i < len(specific_capacity)-1: 
+                    specific_capacity[i] = np.mean([specific_capacity[i-1], specific_capacity[i+1]])
+
+                else: 
+                    specific_capacity[i] = specific_capacity[i-1] + (specific_capacity[i-1]-specific_capacity[i-2]) 
+
+
+        metadata['ions'] = ions
+        metadata['specific_capacity'] = specific_capacity
+        print("HALVOR: len(metadata['ions'] = ",len(metadata['ions'])," and len(metadata['specific_capacity'] = ",len(metadata['specific_capacity']))
+
+    return metadata
+'''
 def read_metadata(data: dict, options={}) -> dict:
 
     required_options = ['get_temperature', 'get_timestamp', 'adjust_time', 'convert_time', 'time_unit', 'reference_time']
@@ -400,12 +619,86 @@ def read_metadata(data: dict, options={}) -> dict:
         timestamps = new_times
 
 
-
-
     metadata = {'time': timestamps, 'temperature': temperatures}
+    #print("data['cycles']: ",data['cycles'])
+    # Match timestamps against electrochemistry-data
+    # TODO This could be generalised to match up against any other dataset with timestamps.
+    print("length of timestamps: ",len(timestamps))
+    
+    if 'cycles' in data.keys():
+        ions, specific_capacity = [], []
+        i = 0
+        
+        for timestamp in timestamps:
+            if timestamp < 0:
+                ions.append(0)
+            
+            else:
+                closest_chg = aux.find_neighbours(value=timestamp, df=data['cycles'][i][0], colname='time')
+                closest_dchg = aux.find_neighbours(value=timestamp, df=data['cycles'][i][1], colname='time')
+                
+                if not isinstance(closest_chg, list):
+                    closest_chg = [closest_chg, closest_chg]
+                if not isinstance(closest_dchg, list):
+                    closest_dchg = [closest_dchg, closest_dchg]
+                
+
+                if all([x==x for x in closest_chg]): #meaning if this time stamp lays in between two data points within the same charge cycle
+                    ions.append(np.mean([data['cycles'][i][0]['ions'].loc[data['cycles'][i][0].index == closest_chg[0]], data['cycles'][i][0]['ions'].loc[data['cycles'][i][0].index == closest_chg[1]]]))
+                    specific_capacity.append(np.mean([data['cycles'][i][0]['specific_capacity'].loc[data['cycles'][i][0].index == closest_chg[0]], data['cycles'][i][0]['specific_capacity'].loc[data['cycles'][i][0].index == closest_chg[1]]]))
+                    continue
+
+                elif all([x==x for x in closest_dchg]): #meaning if this time stamp lays in between two data points within the same discharge cycle
+                    ions.append(np.mean([data['cycles'][i][1]['ions'].loc[data['cycles'][i][1].index == closest_dchg[0]], data['cycles'][i][1]['ions'].loc[data['cycles'][i][1].index == closest_dchg[1]]]))
+                    specific_capacity.append(np.mean([data['cycles'][i][1]['specific_capacity'].loc[data['cycles'][i][1].index == closest_dchg[0]], data['cycles'][i][1]['specific_capacity'].loc[data['cycles'][i][1].index == closest_dchg[1]]]))
+                    continue
+
+                elif aux.isnan(closest_chg[1]) and aux.isnan(closest_dchg[0]): # typically the case for a rest step, laying outside the charge/discharge ranges.
+                    ions.append(np.nan)
+                    specific_capacity.append(np.nan)
+                    #print("REST STEP: closest_chg,closest_dchg: ",closest_chg,closest_dchg)
+                    continue
+                ###### Adding this for the special case of having two measurements during the same rest step, so that it does not fuck up and think that it has been another cycl
+                #'''
+                #elif aux.isnan(closest_chg[0]) and aux.isnan(closest_dchg[0]): 
+                #    ions.append(np.nan)
+                #    specific_capacity.append(np.nan)
+                #    #print("REST STEP: closest_chg,closest_dchg: ",closest_chg,closest_dchg)
+                #    continue
+                #'''
+                #################################################
+                else: 
+                    #print("last point of "+str(i)+"th cycle:")
+                    #print("closest_chg,closest_dchg: ",closest_chg,closest_dchg)
+                    ions.append(np.nan)
+                    specific_capacity.append(np.nan)
+                    i += 1
+                    
+                    if i > len(data['cycles'])-1:
+                        break
+        for i, (ion, cap) in enumerate(zip(ions, specific_capacity)):
+            
+            if aux.isnan(ion): # if a resting step, assign a meaningful value
+                if i < len(ions)-1: # if resting step in the middle of the run, take the mean between the last of previous and first of next run
+                    ions[i] = np.mean([ions[i-1], ions[i+1]])
+                    print("NB: i < len(ions)-1 and ions["+str(i)+"] = "+str(ions[i]))
+                    print("this is measured after "+str(metadata['time'][i]))
+                else: # If last element, set to last values plus the delta between the last two previous measurements
+                    ions[i] = ions[i-1] + (ions[i-1]-ions[i-2]) 
+
+            if aux.isnan(cap) and i < len(specific_capacity)-1: # do same thing for specific capacity
+                if i < len(specific_capacity)-1: 
+                    specific_capacity[i] = np.mean([specific_capacity[i-1], specific_capacity[i+1]])
+
+                else: 
+                    specific_capacity[i] = specific_capacity[i-1] + (specific_capacity[i-1]-specific_capacity[i-2]) 
+
+        #print(ions)
+        metadata['ions'] = ions
+        metadata['specific_capacity'] = specific_capacity
+    
 
     return metadata
-
 
 
 
@@ -461,3 +754,16 @@ def write_data(data: dict, options={}):
 
 
     print(options['save_filenames'])
+
+# Function to extract datetime from the first line of the file
+def extract_datetime(file_path):
+    with open(file_path, 'r') as file:
+        first_line = file.readline().strip()
+        # Extract the date and time from the first line
+        datetime_str = first_line.replace("# Time:", "").strip()
+        # Convert to datetime object
+        return datetime.datetime.strptime(datetime_str, "%a %b %d %H:%M:%S %Y")
+
+# Function to parse datetime from cycle_overview
+def parse_cycle_time(time_str):
+    return datetime.datetime.strptime(time_str, "%d.%b %y %H:%M:%S")
