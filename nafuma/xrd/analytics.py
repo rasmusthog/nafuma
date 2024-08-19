@@ -2695,7 +2695,8 @@ def from_beamtime_to_wavelength(beamtime_name):
     # Check if any of the beamtime names match and return the corresponding wavelength
     for name in beamtime_name:
         if name == 'bm01021231':
-            return 0.6390294679861723
+            #return 0.6390294679861723 #PC-corrected
+            return 0.6390512
         if name == 'bm01021239':
             return 0.6223090396947831#0.6222677255993116
         if name == 'bm01021257':
@@ -9090,9 +9091,43 @@ def add_error_to_value_v2(value, error,multiplyer=False):
     else:
         if multiplyer:
             error = multiplyer * error
-        if error >= value:
-            decimals = 2
+        if abs(error) >= abs(value):
+            
+            if float(value) == 0:
+                decimals = 0
+            elif "e" in str(value) and not "." in str(value):
+                decimals = 0
+            elif value > 1:
+                decimals = 0
+            elif value > 0.1:
+                decimals = 1
+            elif value > 0.01:
+                decimals = 2
+            elif value > 0.001:
+                decimals = 3
+            elif value > 0.0001:
+                decimals = 4
+            elif value > 0.00001:
+                decimals = 5
+            elif value > 0.000001:
+                decimals = 6
+            elif value < 0.000001:
+                decimals = 7
+            elif value < 0.0000001:
+                decimals = 8
+            elif value < 0.00000001:
+                decimals = 9
+            elif value < 0.000000001:
+                decimals = 10
+            elif value < 0.0000000001:
+                decimals = 11
+                print("NB: value ("+value+") is lower  than 1e-10, so might need to add one decimal for this to be meaningful")
+            else:
+                print("NB: value ("+value+") is equal to 1e-10, so might need to add one decimal for this to be meaningful")
+                
+            print("value: ",value, " and error: ",error," and decimal: ",decimals)
             formatted_value = "{:.{}f}".format(value, decimals)
+            print("formatted_value: ",formatted_value)
             value_with_error = "{}(**)".format(formatted_value)
         else:
             error_scientific = scientific_notation(error, precision=0)
