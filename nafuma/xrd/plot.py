@@ -1319,13 +1319,13 @@ def plot_refinement_with_single_phases_halvor(data, options={}):
     }
 
     color_dict = {
-        'ord'   : 'g',
-        'dis'   : 'b',
-        'dis2'  : 'c',
-        'Layered': 'm',
-        'layered': 'm',
-        'Nlayered': 'm',
-        'RS'    : 'y'
+        'ord'   : 'olivedrab',
+        'dis'   : 'navy',
+        'dis2'  : 'firebrick',
+        'Layered': 'mediumpurple',
+        'layered': 'mediumpurple',
+        'Nlayered': 'mediumpurple',
+        'RS'    : 'darkorange'
     }
     options = aux.update_options(options=options, default_options=default_options, required_options=required_options)
     df = pd.read_csv(data['path'], delim_whitespace=True)#, header=False)
