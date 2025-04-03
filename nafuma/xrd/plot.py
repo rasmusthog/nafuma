@@ -1,6 +1,7 @@
 import seaborn as sns
 import matplotlib.pyplot as plt
 from matplotlib.ticker import MultipleLocator
+import matplotlib.ticker as ticker
 
 import pandas as pd
 import numpy as np
@@ -365,7 +366,7 @@ def plot_diffractogram(data, options={}):
         update_widgets(data=data, options=options)
 
 
-
+    print(fig.get_size_inches())
     return data['diffractogram'], fig, ax
 
 
@@ -1286,7 +1287,74 @@ def plot_refinement_halvor(data, options={}):
         # Plot each reflection table in the relevant axis
         for reflections_params, axis in zip(options['reflections_data'], ref_axes):
             plot_reflection_table(data=data, reflections_params=reflections_params, ax=axis, options=options)
+'''
+def phase_name_dict(phase_name):
+    
+    phase_name_dict = {
+        'ord'   : 'o-LMNO',
+        'dis'   : 'd-LMNO',
+        'dis2'  : 'a-LMNO',
+        'Layered': 'N-layered',
+        'layered': 'N-layered',
+        'Nlayered': 'N-layered',
+        'Mlayered': 'M-layered',
+        'RS'    : 'RS'
+    }
 
+    return phase_name_dict[phase_name]
+
+def rename_phases(phases_list):
+    phase_name_dict = {
+        'ord': 'o-LMNO',
+        'dis': 'd-LMNO',
+        'dis2': 'a-LMNO',
+        'Layered': 'N-layered',
+        'layered': 'N-layered',
+        'Nlayered': 'N-layered',
+        'Mlayered': 'M-layered',
+        'RS': 'RS'
+    }
+    
+    return [phase_name_dict.get(phase, phase) for phase in phases_list]
+'''
+
+def rename_phase(phase):
+    phase_name_dict = {
+        'ord': 'o-LMNO',
+        'dis': 'd-LMNO',
+        'dis2': 'a-LMNO',
+        'Layered': 'N-layered',
+        'layered': 'N-layered',
+        'Nlayered': 'N-layered',
+        'Mlayered': 'M-layered',
+        'RS': 'RS'
+    }
+
+    if isinstance(phase, list):
+        return [phase_name_dict.get(p, p) for p in phase]
+    return phase_name_dict.get(phase, phase)
+
+def color_dict(phase_name):
+    
+    color_dict = {
+        'ord'   : 'olivedrab',
+        'dis'   : 'navy',
+        'dis2'  : 'teal',#'firebrick',
+        'Layered': 'mediumpurple',
+        'layered': 'mediumpurple',
+        'Nlayered': 'mediumpurple',
+        'Mlayered': 'black',
+        'RS'    : 'darkorange',
+
+        'o-LMNO'   : 'olivedrab',
+        'd-LMNO'   : 'navy',
+        'a-LMNO'  : 'teal',#'firebrick',
+        'N-layered': 'mediumpurple',
+        'RS'    : 'darkorange'
+    }
+
+    return color_dict[phase_name]
+'''
 def plot_refinement_with_single_phases_halvor(data, options={}):
 
 
@@ -1317,7 +1385,7 @@ def plot_refinement_with_single_phases_halvor(data, options={}):
         'plot_in_Q': False,
         'plot_diff': True
     }
-
+    
     color_dict = {
         'ord'   : 'olivedrab',
         'dis'   : 'navy',
@@ -1325,8 +1393,448 @@ def plot_refinement_with_single_phases_halvor(data, options={}):
         'Layered': 'mediumpurple',
         'layered': 'mediumpurple',
         'Nlayered': 'mediumpurple',
+        'Mlayered': 'black',
         'RS'    : 'darkorange'
     }
+    
+    options = aux.update_options(options=options, default_options=default_options, required_options=required_options)
+    df = pd.read_csv(data['path'], delim_whitespace=True)#, header=False)
+    #df.columns = ['2th', 'Yobs', 'Ycalc', 'diff']
+    
+    #############################
+    number_of_single_phases=len(df.columns)-4
+    print("there are " + str(number_of_single_phases) + " single phases:",df.columns)
+
+    df['diff'] = df['diff'] - options['diff_offset']*(df['Yobs'].max() - df['Yobs'].min())
+    
+    columns_to_transform = df.columns[1:3].tolist() + df.columns[4:].tolist() #picking out Yobs and Ycalc in addition to the single phases added
+
+    if options['log_y']:
+        for col in columns_to_transform:
+            df[col + '_log'] = np.log10(df[col])
+        #df['Yobs_log']=np.log10(df['Yobs'])
+        #df['Ycalc_log']=np.log10(df['Ycalc'])
+        df['diff_log']= df['Yobs_log']-df['Ycalc_log']
+    if options['ln_y']:
+        for col in columns_to_transform:
+            df[col + '_log'] = np.log(df[col])
+        #df['Yobs_log']=np.log10(df['Yobs'])
+        #df['Ycalc_log']=np.log10(df['Ycalc'])
+        df['diff_log']= df['Yobs_log']-df['Ycalc_log']
+    if options['cbrt_y']:
+        df['Yobs_cbrt']=np.cbrt(df['Yobs'])
+        df['Ycalc_cbrt']=np.cbrt(df['Ycalc'])
+        df['diff_cbrt']=df['Yobs_cbrt']-df['Ycalc_cbrt']
+    
+    if options['plot_in_Q']:
+        Q_values = analyze.twotheta_to_Q(df["2th"],data['wavelength'])
+        df["2th"]=Q_values
+
+    
+    if not isinstance(data['results'], list):
+        data['results'] = [data['results']]
+
+    results = {
+        'vol': [],
+        'mass': [],
+        'wp': [],
+        'a': [],
+        'b': [],
+        'c': [],
+        'alpha': [],
+        'beta': [],
+        'gamma': []
+    }
+
+    for result in data['results']:
+        print(result)
+        result = xrd.refinement.read_results(path=result)
+
+        r_wp = result['r_wp'].iloc[options['index']]
+        r_exp = result['r_exp'].iloc[options['index']]
+
+        for attr in results.keys():
+            results[attr].append(result[attr].iloc[options['index']])
+    
+    # CREATE AND ASSIGN AXES
+
+    # Makes a list out of reflections_data if it only passed as a dict, as it will be looped through later
+    if options['reflections_data']:
+        if not isinstance(options['reflections_data'], list):
+            options['reflections_data'] = [options['reflections_data']]
+    
+    
+    # Determine the grid layout based on how many sets of reflections data has been passed
+    if options['reflections_data'] and len(options['reflections_data']) >= 1:
+        options = determine_grid_layout(options=options)
+
+    # Create the Figure and Axes objects
+    fig, ax = btp.prepare_plot(options=options)
+
+    # Assign the correct axes to the indicies, reflections and figure itself
+    if options['reflections_plot'] or options['reflections_indices']:
+        
+        if options['reflections_indices']:
+            indices_ax = ax[0]
+
+            if options['reflections_plot']:
+                ref_axes = [axx for axx in ax[range(1,len(options['reflections_data'])+1)]]
+
+        else:
+            ref_axes = [axx for axx in ax[range(0,len(options['reflections_data']))]]
+
+        ax = ax[-1]
+
+    if options['log_y'] or options['ln_y']:
+        df.plot.scatter(x='2th', y='Yobs_log', ax=ax, c='gray', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*1)
+        df.plot(x='2th', y='Ycalc_log', ax=ax, c='red',linestyle="--",linewidth=plt.rcParams['lines.linewidth']/2) #to make this line thinner than the rest
+            ######
+        #print("df.columns: ",df.columns)
+        for col in df.columns[4:]:
+            if col.startswith('Ycalc_') and col.endswith('_log') and col != "Ycalc_log":
+                # Extract the middle part of the column name
+                #print(col)
+                phase_name = col[len('Ycalc_'):-len('_log')]
+                #print("halvor: ",phase_name)
+                #print("color: ",color_dict[phase_name])
+                df.plot(x='2th', y=col, ax=ax, c=color_dict(phase_name))
+
+        if options['plot_diff']:
+            df.plot(x='2th', y='diff_log', ax=ax)
+    elif options['cbrt_y']:
+        df.plot.scatter(x='2th', y='Yobs_cbrt', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*10)
+        df.plot(x='2th', y='Ycalc_cbrt', ax=ax)#, c='red')
+        if options['plot_diff']:
+            df.plot(x='2th', y='diff_cbrt', ax=ax)
+    else:
+        df.plot.scatter(x='2th', y='Yobs', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*10)
+        df.plot(x='2th', y='Ycalc', ax=ax)#, c='red')
+        if options['plot_diff']:
+            df.plot(x='2th', y='diff', ax=ax)
+    
+
+    #FIXME implement whatever parameters is useful in the plot (e.g. r_wp and r_exp)
+    
+    if options['sample']:
+        options['text'].append([options['sample'], [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+    
+    if options['wavelength']:
+        options['text'].append([f'$\lambda$ = {options["wavelength"]} Å', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+    
+    if options['wp']:
+        for i, (result, label) in enumerate(zip(data['results'], options['labels'])):
+            options['text'].append([f'{label}: {np.round(float(results["wp"][i]), 1)}%', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+            
+            
+            #ax.text(x=0.7*df['2th'].max(), y=ypos*df['Yobs'].max(), s=f'{label}: {np.round(float(results["wp"][i]), 2)}%', fontsize=20)
+            options['text_pos'][0] += options['text_pos_increments'][0]
+            options['text_pos'][1] += options['text_pos_increments'][1]
+
+    if options['r_wp']:
+        options['text'].append(['R$_{wp}$ = '+f'{np.round(r_wp, 2)}', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+        #ax.text(x=0.7*df['2th'].max(), y=0.7*df['Yobs'].max(), s='R$_{wp}$ = '+f'{r_wp}')
+    
+    if options['r_exp']:
+        options['text'].append(['R$_{exp}$ = '+f'{np.round(r_exp, 2)}', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+        #ax.text(x=0.70*df['2th'].max(), y=0.60*df['Yobs'].max(), s='R$_{exp}$ = '+f'{r_exp}')
+
+    
+    if 'xlim' not in options.keys() or options['xlim'] == None:
+        options['xlim'] = [df['2th'].min(), df['2th'].max()]
+
+    if 'ylim' not in options.keys() or options['ylim'] == None:
+        filtered_df = df[df['2th']>options['xlim'][0]]
+        filtered_df = filtered_df[filtered_df['2th']<options['xlim'][-1]]
+        if options['log_y'] or options['ln_y']:
+            options['ylim'] = [filtered_df['Yobs_log'].min()-options['y_space'], filtered_df['Yobs_log'].max()+options['y_space']]
+        else:
+            options['ylim'] = [filtered_df['Yobs'].min()-options['y_space'], filtered_df['Yobs'].max()+options['y_space']]
+
+    fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
+
+    # PLOT REFLECTION TABLES
+    if options['reflections_plot'] and options['reflections_data']:
+        options['xlim'] = ax.get_xlim()
+        options['to_wavelength'] = options['wavelength'] # By default, the wavelength of the first diffractogram will be used for these.
+        
+        # Plot each reflection table in the relevant axis
+        for reflections_params, axis in zip(options['reflections_data'], ref_axes):
+            plot_reflection_table(data=data, reflections_params=reflections_params, ax=axis, options=options)
+
+
+
+
+def plot_refinement_with_single_phases_halvor_fillbetween(data, options={}):
+
+
+    required_options = ['diff_offset', 'index', 'title', 'xlim', 'r_wp', 'r_exp', 'wp']
+
+    default_options = {
+        'diff_offset': .10,
+        'index': -1,
+        'title': None,
+        'xlim': None,
+        'ylim': None,
+        'y_space': 0.1,
+        'r_wp': True,
+        'r_exp': False,
+        'wp': False,
+        'wavelength': None,
+        'xlabel': '2$\\theta$', 'xunit': '$^{\circ}$',
+        'ylabel': 'Intensity', 'yunit': 'arb. u.',
+        'text': [],
+        'text_pos': [0.7, 0.9],
+        'text_pos_increments': [0, -0.1],
+        'reflections_plot': False, # whether to plot reflections as a plot
+        'reflections_indices': False, # whether to plot the reflection indices
+        'reflections_data': None, # Should be passed as a list of dictionaries on the form {path: rel_path, reflection_indices: number of indices, colour: [r,g,b], min_alpha: 0-1]
+        'log_y': False,
+        'ln_y': False,
+        'cbrt_y': False,
+        'plot_in_Q': False,
+        'plot_diff': True
+    }
+    
+    color_dict = {
+        'ord'   : 'olivedrab',
+        'dis'   : 'navy',
+        'dis2'  : 'firebrick',
+        'Layered': 'mediumpurple',
+        'layered': 'mediumpurple',
+        'Nlayered': 'mediumpurple',
+        'Mlayered': 'black',
+        'RS'    : 'darkorange'
+    }
+    
+    options = aux.update_options(options=options, default_options=default_options, required_options=required_options)
+    df = pd.read_csv(data['path'], delim_whitespace=True)#, header=False)
+    #df.columns = ['2th', 'Yobs', 'Ycalc', 'diff']
+    
+    #############################
+    number_of_single_phases=len(df.columns)-4
+    print("there are " + str(number_of_single_phases) + " single phases:",df.columns)
+
+    df['diff'] = df['diff'] - options['diff_offset']*(df['Yobs'].max() - df['Yobs'].min())
+    
+    columns_to_transform = df.columns[1:3].tolist() + df.columns[4:].tolist() #picking out Yobs and Ycalc in addition to the single phases added
+
+    if options['log_y']:
+        for col in columns_to_transform:
+            df[col + '_log'] = np.log10(df[col])
+        #df['Yobs_log']=np.log10(df['Yobs'])
+        #df['Ycalc_log']=np.log10(df['Ycalc'])
+        df['diff_log']= df['Yobs_log']-df['Ycalc_log']
+    if options['ln_y']:
+        for col in columns_to_transform:
+            df[col + '_log'] = np.log(df[col])
+        #df['Yobs_log']=np.log10(df['Yobs'])
+        #df['Ycalc_log']=np.log10(df['Ycalc'])
+        df['diff_log']= df['Yobs_log']-df['Ycalc_log']
+    if options['cbrt_y']:
+        df['Yobs_cbrt']=np.cbrt(df['Yobs'])
+        df['Ycalc_cbrt']=np.cbrt(df['Ycalc'])
+        df['diff_cbrt']=df['Yobs_cbrt']-df['Ycalc_cbrt']
+    
+    if options['plot_in_Q']:
+        Q_values = analyze.twotheta_to_Q(df["2th"],data['wavelength'])
+        df["2th"]=Q_values
+
+    
+    if not isinstance(data['results'], list):
+        data['results'] = [data['results']]
+
+    results = {
+        'vol': [],
+        'mass': [],
+        'wp': [],
+        'a': [],
+        'b': [],
+        'c': [],
+        'alpha': [],
+        'beta': [],
+        'gamma': []
+    }
+
+    for result in data['results']:
+        print(result)
+        result = xrd.refinement.read_results(path=result)
+
+        r_wp = result['r_wp'].iloc[options['index']]
+        r_exp = result['r_exp'].iloc[options['index']]
+
+        for attr in results.keys():
+            results[attr].append(result[attr].iloc[options['index']])
+    
+    # CREATE AND ASSIGN AXES
+
+    # Makes a list out of reflections_data if it only passed as a dict, as it will be looped through later
+    if options['reflections_data']:
+        if not isinstance(options['reflections_data'], list):
+            options['reflections_data'] = [options['reflections_data']]
+    
+    
+    # Determine the grid layout based on how many sets of reflections data has been passed
+    if options['reflections_data'] and len(options['reflections_data']) >= 1:
+        options = determine_grid_layout(options=options)
+
+    # Create the Figure and Axes objects
+    fig, ax = btp.prepare_plot(options=options)
+
+    # Assign the correct axes to the indicies, reflections and figure itself
+    if options['reflections_plot'] or options['reflections_indices']:
+        
+        if options['reflections_indices']:
+            indices_ax = ax[0]
+
+            if options['reflections_plot']:
+                ref_axes = [axx for axx in ax[range(1,len(options['reflections_data'])+1)]]
+
+        else:
+            ref_axes = [axx for axx in ax[range(0,len(options['reflections_data']))]]
+
+        ax = ax[-1]
+
+    if options['log_y'] or options['ln_y']:
+        df.plot.scatter(x='2th', y='Yobs_log', ax=ax, c='gray', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*1)
+        df.plot(x='2th', y='Ycalc_log', ax=ax, c='red',linestyle="--",linewidth=plt.rcParams['lines.linewidth']/2) #to make this line thinner than the rest
+            ######
+        #print("df.columns: ",df.columns)
+        for col in df.columns[4:]:
+            if col.startswith('Ycalc_') and col.endswith('_log') and col != "Ycalc_log":
+                # Extract the middle part of the column name
+                phase_name = col[len('Ycalc_'):-len('_log')]
+                ax.fill_between(df['2th'], df[col], color=color_dict(phase_name), alpha=0.4)  # Fill under the peak
+                df.plot(x='2th', y=col, ax=ax, c=color_dict(phase_name))
+        
+        for col in df.columns[4:]:
+            if col.startswith('Ycalc_') and col.endswith('_log') and col != "Ycalc_log":
+                # Extract the middle part of the column name
+                phase_name = col[len('Ycalc_'):-len('_log')]
+            
+
+        if options['plot_diff']:
+            df.plot(x='2th', y='diff_log', ax=ax)
+    elif options['cbrt_y']:
+        df.plot.scatter(x='2th', y='Yobs_cbrt', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*10)
+        df.plot(x='2th', y='Ycalc_cbrt', ax=ax)#, c='red')
+        if options['plot_diff']:
+            df.plot(x='2th', y='diff_cbrt', ax=ax)
+    else:
+        df.plot.scatter(x='2th', y='Yobs', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*10)
+        df.plot(x='2th', y='Ycalc', ax=ax)#, c='red')
+        if options['plot_diff']:
+            df.plot(x='2th', y='diff', ax=ax)
+    
+
+    #FIXME implement whatever parameters is useful in the plot (e.g. r_wp and r_exp)
+    
+    if options['sample']:
+        options['text'].append([options['sample'], [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+    
+    if options['wavelength']:
+        options['text'].append([f'$\lambda$ = {options["wavelength"]} Å', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+    
+    if options['wp']:
+        for i, (result, label) in enumerate(zip(data['results'], options['labels'])):
+            options['text'].append([f'{label}: {np.round(float(results["wp"][i]), 1)}%', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+            
+            
+            #ax.text(x=0.7*df['2th'].max(), y=ypos*df['Yobs'].max(), s=f'{label}: {np.round(float(results["wp"][i]), 2)}%', fontsize=20)
+            options['text_pos'][0] += options['text_pos_increments'][0]
+            options['text_pos'][1] += options['text_pos_increments'][1]
+
+    if options['r_wp']:
+        options['text'].append(['R$_{wp}$ = '+f'{np.round(r_wp, 2)}', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+        #ax.text(x=0.7*df['2th'].max(), y=0.7*df['Yobs'].max(), s='R$_{wp}$ = '+f'{r_wp}')
+    
+    if options['r_exp']:
+        options['text'].append(['R$_{exp}$ = '+f'{np.round(r_exp, 2)}', [options['text_pos'][0]*df['2th'].max(), options['text_pos'][1]*df['Yobs'].max()]])
+        options['text_pos'][0] += options['text_pos_increments'][0]
+        options['text_pos'][1] += options['text_pos_increments'][1]
+        #ax.text(x=0.70*df['2th'].max(), y=0.60*df['Yobs'].max(), s='R$_{exp}$ = '+f'{r_exp}')
+
+    
+    if 'xlim' not in options.keys() or options['xlim'] == None:
+        options['xlim'] = [df['2th'].min(), df['2th'].max()]
+
+    if 'ylim' not in options.keys() or options['ylim'] == None:
+        filtered_df = df[df['2th']>options['xlim'][0]]
+        filtered_df = filtered_df[filtered_df['2th']<options['xlim'][-1]]
+        if options['log_y'] or options['ln_y']:
+            options['ylim'] = [filtered_df['Yobs_log'].min()-options['y_space'], filtered_df['Yobs_log'].max()+options['y_space']]
+        else:
+            options['ylim'] = [filtered_df['Yobs'].min()-options['y_space'], filtered_df['Yobs'].max()+options['y_space']]
+
+    fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
+
+    # PLOT REFLECTION TABLES
+    if options['reflections_plot'] and options['reflections_data']:
+        options['xlim'] = ax.get_xlim()
+        options['to_wavelength'] = options['wavelength'] # By default, the wavelength of the first diffractogram will be used for these.
+        
+        # Plot each reflection table in the relevant axis
+        for reflections_params, axis in zip(options['reflections_data'], ref_axes):
+            plot_reflection_table(data=data, reflections_params=reflections_params, ax=axis, options=options)
+'''
+
+def plot_refinement_with_single_phases_halvor_fillbetween_pickthephases(data, options={}):
+
+
+    required_options = ['diff_offset', 'index', 'title', 'xlim', 'r_wp', 'r_exp', 'wp']
+
+    default_options = {
+        'diff_offset': .10,
+        'index': -1,
+        'title': None,
+        'xlim': None,
+        'ylim': None,
+        'y_space': 0.1,
+        'r_wp': True,
+        'r_exp': False,
+        'wp': False,
+        'wavelength': None,
+        'xlabel': '2$\\theta$', 'xunit': '$^{\circ}$',
+        'ylabel': 'Intensity', 'yunit': 'arb. u.',
+        'text': [],
+        'text_pos': [0.7, 0.9],
+        'text_pos_increments': [0, -0.1],
+        'reflections_plot': False, # whether to plot reflections as a plot
+        'reflections_indices': False, # whether to plot the reflection indices
+        'reflections_data': None, # Should be passed as a list of dictionaries on the form {path: rel_path, reflection_indices: number of indices, colour: [r,g,b], min_alpha: 0-1]
+        'log_y': False,
+        'ln_y': False,
+        'cbrt_y': False,
+        'plot_in_Q': False,
+        'plot_diff': True,
+        'pick_phases': False,
+        'fill_peaks': False,
+    }
+    '''
+    color_dict = {
+        'ord'   : 'olivedrab',
+        'dis'   : 'navy',
+        'dis2'  : 'firebrick',
+        'Layered': 'mediumpurple',
+        'layered': 'mediumpurple',
+        'Nlayered': 'mediumpurple',
+        'Mlayered': 'black',
+        'RS'    : 'darkorange'
+    }
+    '''
     options = aux.update_options(options=options, default_options=default_options, required_options=required_options)
     df = pd.read_csv(data['path'], delim_whitespace=True)#, header=False)
     #df.columns = ['2th', 'Yobs', 'Ycalc', 'diff']
@@ -1416,18 +1924,38 @@ def plot_refinement_with_single_phases_halvor(data, options={}):
         ax = ax[-1]
 
     if options['log_y'] or options['ln_y']:
-        df.plot.scatter(x='2th', y='Yobs_log', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*10)
-        df.plot(x='2th', y='Ycalc_log', ax=ax, c='red')
+        df.plot.scatter(x='2th', y='Yobs_log', ax=ax, c='gray', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*1)
+        df.plot(x='2th', y='Ycalc_log', ax=ax, c='red',linestyle="--",linewidth=plt.rcParams['lines.linewidth']/2) #to make this line thinner than the rest
             ######
         #print("df.columns: ",df.columns)
         for col in df.columns[4:]:
             if col.startswith('Ycalc_') and col.endswith('_log') and col != "Ycalc_log":
                 # Extract the middle part of the column name
-                #print(col)
                 phase_name = col[len('Ycalc_'):-len('_log')]
-                #print("halvor: ",phase_name)
-                #print("color: ",color_dict[phase_name])
-                df.plot(x='2th', y=col, ax=ax, c=color_dict[phase_name])
+                if options['pick_phases']:
+                    if phase_name in options['pick_phases']:
+                        if options['fill_peaks']:
+                            ax.fill_between(df['2th'], df[col], color=color_dict(phase_name), alpha=0.4)  # Fill under the peak
+                        df.plot(x='2th', y=col, ax=ax, c=color_dict(phase_name))
+                else:
+                    if options['fill_peaks']:
+                        ax.fill_between(df['2th'], df[col], color=color_dict(phase_name), alpha=0.4)  # Fill under the peak
+                    df.plot(x='2th', y=col, ax=ax, c=color_dict(phase_name))
+        
+        print("HALVOR, not sure about the set_yscale when plotting log plots - check this out ...")
+        ax.set_yscale('log')  # Keep linear scale since data is already in ln???
+        ###############################
+        ax.yaxis.set_major_locator(ticker.MultipleLocator(base=1))  # Major ticks at integer values (ln scale)
+        
+        if options['log_y']:
+            ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f"$10^{{{int(x)}}}$"))
+            print("NB: Don't think the code is built for plotting log10, so adjustments are needed - or go for ln instead")
+        elif options['ln_y']:
+            # Format major ticks as e^x (e^7, e^8, e^9)
+            ax.yaxis.set_major_formatter(ticker.FuncFormatter(lambda x, _: f"$e^{{{int(x)}}}$"))
+
+        ax.yaxis.set_minor_locator(ticker.NullLocator())  # 🔹 Remove minor ticks
+        ax.tick_params(axis='y', which='both', direction='in', right=True)
 
         if options['plot_diff']:
             df.plot(x='2th', y='diff_log', ax=ax)
@@ -1498,10 +2026,6 @@ def plot_refinement_with_single_phases_halvor(data, options={}):
         # Plot each reflection table in the relevant axis
         for reflections_params, axis in zip(options['reflections_data'], ref_axes):
             plot_reflection_table(data=data, reflections_params=reflections_params, ax=axis, options=options)
-
-
-
-
 
 def determine_grid_layout(options):
 
