@@ -6,6 +6,6 @@ setup(name='nafuma',
       url='https://github.com/rasmusthog/nafuma',
       author='Rasmus Vester Thøgersen, Halvor Høen Hval',
       author_email='code@rasmusthog.me',
-      license='MIT',
+      license='GPLv3',
       packages=find_packages(),
       zip_safe=False)
