@@ -1956,11 +1956,10 @@ def WL_translate(twotheta_original,wavelength_original,wavelength_new):
     twotheta_new=2*np.arcsin((wavelength_new/wavelength_original)*np.sin(twotheta_original/2 * np.pi/180))*180/np.pi
     return twotheta_new
 
-def twotheta_to_Q(twotheta,wavelength_original):
-    #new_peak= 2*np.arcsin(reference_wavelength/data["wavelength"][0]) * 180/np.pi
-    #only including peaks that are actually in the data set
-    Q= (4 * np.pi / wavelength_original ) * np.sin(twotheta/2 * np.pi/180)
-    return Q
+def twotheta_to_Q(twotheta, wavelength_original):
+    if wavelength_original is None:
+        raise ValueError("Error: Wavelength is None. Ensure 'data[wavelength]' is properly defined.")
+    return (4 * np.pi / wavelength_original) * np.sin(twotheta / 2 * np.pi / 180)
 
 def Q_to_twotheta(Q, wavelength):
     twotheta = 2 * np.arcsin(Q * (wavelength / (4 * np.pi))) * 180 / np.pi
@@ -8884,7 +8883,7 @@ def set_refined_as_startval_v3(s, parameter_name):
             #if the for-loop above gets to "else" every time:
             print("check spaces before the "+parameter_name+" parameter")
             detected_string = "NaN"
-        print("detected_string: ",detected_string)
+        #print("detected_string: ",detected_string)
         # checking if there are more than one match for detected string
         string = s.rsplit(detected_string)[-1]
         
@@ -8892,7 +8891,7 @@ def set_refined_as_startval_v3(s, parameter_name):
         #refined_val=string.split(';:')[1].split('min')[0].split("`")[0]
         refined_val = string.split(';:')[1].split("`_")[0].replace("=","")
         #print("string ",string)
-        print("refined_val: ",refined_val)
+        #print("refined_val: ",refined_val)
         #print("string: ",string)
         if "=" in detected_string:
             s = s.replace(detected_string, detected_string+refined_val+";: 0'")
@@ -8917,6 +8916,12 @@ def set_refined_as_startval_v2(s, parameter_name):
         #refined_val=string.split(';:')[1].split('min')[0].split("`")[0]
         refined_val = string.split(';:')[1].split("`_")[0]
         s = s.replace(detected_string, detected_string+refined_val+";: 0'")
+    return s
+
+def replace_section_between_strings(s, string1,instance1,string2,new_string):
+    string_after_string1 = s.rsplit(string1)[instance1]
+    string = string_after_string1.split(string2)[0]
+    s = s.replace(string, new_string,1)
     return s
 
 def set_start_value_to_zero(s,parameter):
@@ -9084,6 +9089,96 @@ def supscript(number):
     return number_as_supscript
 
 def add_error_to_value_v2(value, error,multiplyer=False):
+    if float(error) == 0: #this goes for alues that are locked (not refining), getting a (*) rather than a value
+        decimals = 2
+        formatted_value = "{:.{}f}".format(value, decimals)
+        value_with_error = "{}(*)".format(formatted_value)
+    else:
+        if multiplyer:
+            error = multiplyer * error
+        if abs(error) >= abs(value):
+            
+            if float(value) == 0:
+                decimals = 0
+            elif "e" in str(value) and not "." in str(value):
+                decimals = 0
+            elif value > 1:
+                decimals = 0
+            elif value > 0.1:
+                decimals = 1
+            elif value > 0.01:
+                decimals = 2
+            elif value > 0.001:
+                decimals = 3
+            elif value > 0.0001:
+                decimals = 4
+            elif value > 0.00001:
+                decimals = 5
+            elif value > 0.000001:
+                decimals = 6
+            elif value < 0.000001:
+                decimals = 7
+            elif value < 0.0000001:
+                decimals = 8
+            elif value < 0.00000001:
+                decimals = 9
+            elif value < 0.000000001:
+                decimals = 10
+            elif value < 0.0000000001:
+                decimals = 11
+                print("NB: value ("+value+") is lower  than 1e-10, so might need to add one decimal for this to be meaningful")
+            else:
+                print("NB: value ("+value+") is equal to 1e-10, so might need to add one decimal for this to be meaningful")
+                
+            print("value: ",value, " and error: ",error," and decimal: ",decimals)
+            formatted_value = "{:.{}f}".format(value, decimals)
+            print("formatted_value: ",formatted_value)
+            value_with_error = "{}(**)".format(formatted_value)
+        else:
+            error_scientific = scientific_notation(error, precision=0)
+            error_value = error_scientific.split("e")[0]
+            error_digit = int(float(error_scientific.split("e")[-1]))
+
+            if error_digit < 0:
+                decimals = -error_digit
+                formatted_value = "{:.{}f}".format(value, decimals)
+                value_with_error = "{}({})".format(formatted_value, error_value)
+                
+            elif error_digit < 1:
+                #this is for the ase of an error between 10^0 and 10^1, meaning from 1-9, in which case it is a simple process:
+                formatted_value = "{:.{}f}".format(value, error_digit)
+                value_with_error = "{}({})".format(formatted_value, error_value)
+            else:
+                #picking out digits before the dot
+                digits_error = len(str(error).split(".")[0])
+                digits_value = len(str(value).split(".")[0])
+                
+                #finding the difference, as this will be indicating how many decimals of the value should be used
+                decimals = digits_value - digits_error
+                #Rewriting to scientific notation, keeping all digits for now (subtracting 1, as the first digit is not a decimal)
+                error_scientific = scientific_notation(error, precision=len(str(error))-1)
+
+                #Same for the value, only also subtracting "decimals" to obtain the correct amount of significant digits
+                #value_scientific = scientific_notation(value, precision=len(str(value))-1-decimals)
+                value_scientific = scientific_notation(value, precision=decimals)
+                error_value = int(round(float(error_scientific.split("e")[0]),0))
+                #error_digit = int(float(error_scientific.split("e")[-1]))
+                #value_exponent = int(float(value_scientific.split("e")[-1]))
+                formatted_value = value_scientific.split("e")[0]
+                value_exponent = int(float(value_scientific.split("e")[-1]))
+                #value_with_error = formatted_value + "("+error_value+")"+"10$^{}".format(value_exponent)
+                #value_with_error = "{}({})".format(formatted_value, error_value) + "10^{}".format(value_exponent)
+                
+                #superscript_digits = str.maketrans("0123456789", "⁰¹²³⁴⁵⁶⁷⁸⁹")
+                #value_with_error = "{}({})".format(formatted_value, error_value) + " x 10{}".format(str(value_exponent).translate(superscript_digits))
+                value_with_error = "{}({})".format(formatted_value, error_value) + " x 10"+supscript(value_exponent)
+
+
+
+            #print("{} +/- {} has been rewritten into {}".format(value, error, value_with_error))
+    return value_with_error
+
+def add_error_to_value_v3(value, error,multiplyer=False):
     if float(error) == 0: #this goes for alues that are locked (not refining), getting a (*) rather than a value
         decimals = 2
         formatted_value = "{:.{}f}".format(value, decimals)
