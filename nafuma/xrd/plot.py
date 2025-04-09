@@ -1293,7 +1293,7 @@ def phase_name_dict(phase_name):
     phase_name_dict = {
         'ord'   : 'o-LMNO',
         'dis'   : 'd-LMNO',
-        'dis2'  : 'a-LMNO',
+        'dis2'  : 'e-LMNO',
         'Layered': 'N-layered',
         'layered': 'N-layered',
         'Nlayered': 'N-layered',
@@ -1307,7 +1307,7 @@ def rename_phases(phases_list):
     phase_name_dict = {
         'ord': 'o-LMNO',
         'dis': 'd-LMNO',
-        'dis2': 'a-LMNO',
+        'dis2': 'e-LMNO',
         'Layered': 'N-layered',
         'layered': 'N-layered',
         'Nlayered': 'N-layered',
@@ -1322,7 +1322,7 @@ def rename_phase(phase):
     phase_name_dict = {
         'ord': 'o-LMNO',
         'dis': 'd-LMNO',
-        'dis2': 'a-LMNO',
+        'dis2': 'e-LMNO',
         'Layered': 'N-layered',
         'layered': 'N-layered',
         'Nlayered': 'N-layered',
@@ -1334,26 +1334,39 @@ def rename_phase(phase):
         return [phase_name_dict.get(p, p) for p in phase]
     return phase_name_dict.get(phase, phase)
 
-def color_dict(phase_name):
-    
-    color_dict = {
-        'ord'   : 'olivedrab',
-        'dis'   : 'navy',
-        'dis2'  : 'teal',#'firebrick',
-        'Layered': 'mediumpurple',
-        'layered': 'mediumpurple',
-        'Nlayered': 'mediumpurple',
+color_dict = {
+        'ord'   : '#009E73',  # Green (Color-blind friendly),#'olivedrab',
+        'dis'   : '#0072B2',  # Blue (Darker than Navy),#'navy',
+        'dis2'  : '#D55E00',  # Orange-red (High contrast),#'teal',#'firebrick',
+        'Layered': '#CC79A7',  # Magenta (More distinct from blue),#'mediumpurple',
+        'layered': '#CC79A7',  # Magenta (More distinct from blue),#'mediumpurple',
+        'Nlayered': '#CC79A7',  # Magenta (More distinct from blue),#'mediumpurple',
         'Mlayered': 'black',
-        'RS'    : 'darkorange',
+        'RS'    : '#F0E442',   # Yellow (Well-distinguished),#'darkorange',
 
-        'o-LMNO'   : 'olivedrab',
-        'd-LMNO'   : 'navy',
-        'a-LMNO'  : 'teal',#'firebrick',
-        'N-layered': 'mediumpurple',
-        'RS'    : 'darkorange'
-    }
+        'o-LMNO'   : '#009E73',  # Green (Color-blind friendly),#'olivedrab',
+        'd-LMNO'   : '#0072B2',  # Blue (Darker than Navy),#'navy',
+        'e-LMNO'  : '#D55E00',  # Orange-red (High contrast),#'teal',#'firebrick',
+        'N-layered': '#CC79A7',  # Magenta (More distinct from blue),#'mediumpurple',
+        'RS'    : '#F0E442'   # Yellow (Well-distinguished),#'darkorange'
+        }
 
-    return color_dict[phase_name]
+color_dict = {
+    'ord'     : '#E69F00',  # Darker Yellow-Orange (Distinct from 'dis')
+    'dis'     : '#56B4E9',  # Light Blue (More contrast with 'ord')
+    'dis2'    : '#8D3C96',  # Orange-red (High contrast)
+    'Nlayered': '#F0E442',  # Bright Yellow (Less bright, but still visible)
+    'Mlayered': 'black',    # Black (Contrasts well with all colors)
+    'RS'      : '#9EBC59',  # Darker Green-Yellow (Easier to distinguish from white background)
+    'o-LMNO'  : '#E69F00',  # Same as 'ord' (Darker Yellow-Orange)
+    'd-LMNO'  : '#56B4E9',  # Same as 'dis' (Light Blue)
+    'layered' : '#F0E442',  # Same as 'Nlayered'
+    'Layered' : '#F0E442',  # Same as 'Nlayered'
+    'N-layered': '#F0E442', # Same as 'Nlayered'
+    'e-LMNO'  : '#8D3C96',  # Purple (Distinguishable from 'o-LMNO')
+}
+
+
 '''
 def plot_refinement_with_single_phases_halvor(data, options={}):
 
@@ -1924,7 +1937,7 @@ def plot_refinement_with_single_phases_halvor_fillbetween_pickthephases(data, op
         ax = ax[-1]
 
     if options['log_y'] or options['ln_y']:
-        df.plot.scatter(x='2th', y='Yobs_log', ax=ax, c='gray', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*1)
+        df.plot.scatter(x='2th', y='Yobs_log', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*1)
         df.plot(x='2th', y='Ycalc_log', ax=ax, c='red',linestyle="--",linewidth=plt.rcParams['lines.linewidth']/2) #to make this line thinner than the rest
             ######
         #print("df.columns: ",df.columns)
@@ -1935,12 +1948,12 @@ def plot_refinement_with_single_phases_halvor_fillbetween_pickthephases(data, op
                 if options['pick_phases']:
                     if phase_name in options['pick_phases']:
                         if options['fill_peaks']:
-                            ax.fill_between(df['2th'], df[col], color=color_dict(phase_name), alpha=0.4)  # Fill under the peak
-                        df.plot(x='2th', y=col, ax=ax, c=color_dict(phase_name))
+                            ax.fill_between(df['2th'], df[col], color=color_dict[phase_name], alpha=0.4)  # Fill under the peak
+                        df.plot(x='2th', y=col, ax=ax, c=color_dict[phase_name])
                 else:
                     if options['fill_peaks']:
-                        ax.fill_between(df['2th'], df[col], color=color_dict(phase_name), alpha=0.4)  # Fill under the peak
-                    df.plot(x='2th', y=col, ax=ax, c=color_dict(phase_name))
+                        ax.fill_between(df['2th'], df[col], color=color_dict[phase_name], alpha=0.4)  # Fill under the peak
+                    df.plot(x='2th', y=col, ax=ax, c=color_dict[phase_name])
         
         print("HALVOR, not sure about the set_yscale when plotting log plots - check this out ...")
         ax.set_yscale('log')  # Keep linear scale since data is already in ln???
@@ -2026,6 +2039,8 @@ def plot_refinement_with_single_phases_halvor_fillbetween_pickthephases(data, op
         # Plot each reflection table in the relevant axis
         for reflections_params, axis in zip(options['reflections_data'], ref_axes):
             plot_reflection_table(data=data, reflections_params=reflections_params, ax=axis, options=options)
+
+
 
 def determine_grid_layout(options):
 
