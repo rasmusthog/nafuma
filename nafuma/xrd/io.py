@@ -762,14 +762,17 @@ def adjust_intensities(diffractogram, wavelength, index, options):
 
     #Apply offset along y-axis
     diffractogram['I'] = diffractogram['I_org'] # Reset intensities
-
+    #print(diffractogram['I'])
     if options['normalise']:
         diffractogram['I'] = diffractogram['I'] / diffractogram['I'].max()
-        diffractogram['I'] = diffractogram['I'] * options['multiply']
-
+        if options['multiply']:
+            diffractogram['I'] = diffractogram['I'] * options['multiply']
+        else:
+            diffractogram['I'] = diffractogram['I'] * 1
+    
     if options['drawdown']:
         diffractogram['I'] = diffractogram['I'] - diffractogram['I'].mean()
-
+    
     diffractogram['I'] = diffractogram['I'] + index*options['offset_y']
 
     # Apply offset along x-axis
@@ -779,6 +782,44 @@ def adjust_intensities(diffractogram, wavelength, index, options):
 
 
     return diffractogram
+'''
+def adjust_intensities(diffractogram, wavelength, index, options): #NEW VERSION FROM CHAT GPT due to issues with normalization in different versions of python/pandas
+    # Ensure float dtype (critical for normalisation)
+    
+    
+    if 'current_offset_y' not in options:
+        options['current_offset_y'] = options['offset_y']
+    else:
+        if options['current_offset_y'] != options['offset_y']:
+            options['offset_change'] = True
+        options['current_offset_y'] = options['offset_y']
+
+    options['current_offset_x'] = options['offset_x']
+
+    # Reset intensities safely
+    diffractogram['I'] = diffractogram['I_org'].copy()
+    
+    # Normalisation (avoid division by zero)
+    if options.get('normalise', False):
+        Imax = diffractogram['I'].max()
+        if Imax and Imax > 0:
+            diffractogram['I'] = diffractogram['I'] / Imax
+            diffractogram['I'] = diffractogram['I'] * options.get('multiply', 1.0)
+
+    # Drawdown — center intensity if requested
+    if options.get('drawdown', False):
+        diffractogram['I'] = diffractogram['I'] - diffractogram['I'].mean()
+    print(diffractogram['I'])
+    # Apply vertical offset
+    diffractogram['I'] = diffractogram['I'] + index * options.get('offset_y', 0)
+    
+    # Apply x-offset (account for wavelength)
+    relative_shift = (wavelength / 1.54059) * options.get('offset_x', 0)
+    diffractogram['2th'] = diffractogram['2th_org'].copy()
+    diffractogram['2th'] = diffractogram['2th'] + index * relative_shift
+    
+    return diffractogram
+'''
 
 def revert_offset(diffractogram,which=None):
 
