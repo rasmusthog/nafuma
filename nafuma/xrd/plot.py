@@ -369,6 +369,363 @@ def plot_diffractogram(data, options={}):
     print(fig.get_size_inches())
     return data['diffractogram'], fig, ax
 
+def plot_diffractogram_enabling_ax(data, options={}, ax=None, fig=None):
+    #making this to make it easier to plot in a subplot
+    ''' Plots a diffractogram.
+    
+    Input:
+    data (dict): Must include path = string to diffractogram data, and plot_kind = (recx, beamline, image)'''
+
+    default_options = {
+        'x_vals': '2th', 'y_vals': 'I',
+        'xlabel': '2$\\theta$', 'ylabel': None, 
+        'xunit': '$^{\circ}$', 'yunit': None,
+        'xlim': None, 'ylim': None, 
+        'normalise': True,
+        'exclude': None,
+        'multiply': 1, # Factor to multiply the normalised data - only used if normalising.
+        'drawdown': False,
+        'offset': True,
+        'offset_x': 0,
+        'offset_y': 1,
+        'offset_change': False,
+        'line': True, # whether or not to plot diffractogram as a line plot
+        'scatter': False, # whether or not to plot individual data points
+        'reflections_plot': False, # whether to plot reflections as a plot
+        'reflections_indices': False, # whether to plot the reflection indices
+        'reflections_data': None, # Should be passed as a list of dictionaries on the form {path: rel_path, reflection_indices: number of indices, colour: [r,g,b], min_alpha: 0-1]
+        'heatmap': False,
+        'heatmap_reverse': False,
+        'cmap': 'viridis',
+        'plot_kind': None,
+        'palettes': [('qualitative', 'Dark2_8')],
+        'highlight': None,
+        'highlight_colours': ['red'],
+        'interactive': False,
+        'interactive_session_active': False,
+        'rc_params': {},
+        'format_params': {},
+        'plot_diff': False,
+        #'plot_in_Q': False, not needed! only put 'x_vals': 'q'
+        'log_y': False,
+        }
+
+    if 'offset_y' not in options.keys():
+        if len(data['path']) > 10:
+            default_options['offset_y'] = 0.05
+
+    options = aux.update_options(options=options, default_options=default_options)
+    #options['current_offset_y'] = options['offset_y']
+
+    # Convert data['path'] to list to allow iteration over this to accommodate both single and multiple diffractograms
+    if not isinstance(data['path'], list):
+        data['path'] = [data['path']]
+
+
+    ############################################################################################################################################################
+    ##### LOADING DATA #########################################################################################################################################
+    ############################################################################################################################################################
+    
+    # Check if there is some data stored already, load in data if not. This speeds up replotting in interactive mode.
+    if not 'diffractogram' in data.keys():
+
+        # This is to set the default values of the diffractogram y-label and -unit so that the actual yunit and ylable can switch back and forth between these and the heatmap values
+        if options['log_y']:
+            options['diff.yunit'] = 'a.u.'
+            options['diff.ylabel'] = 'log(Intensity)'
+        else:
+            options['diff.yunit'] = 'a.u.'
+            options['diff.ylabel'] = 'Intensity'
+
+        # Initialise empty list for diffractograms and wavelengths. If wavelength is not manually passed it should be automatically gathered from the .xy-file
+        data['diffractogram'] = [None for _ in range(len(data['path']))]
+
+        if 'wavelength' not in data.keys():
+            data['wavelength'] = [None for _ in range(len(data['path']))]
+        else:
+            # If only a single value is passed it should be set to be the same for all diffractograms passed
+            if not isinstance(data['wavelength'], list):
+                data['wavelength'] = [data['wavelength'] for _ in range(len(data['path']))] 
+
+        
+        
+        
+        # LOAD DIFFRACTOGRAMS
+        
+        if 'htxrd' in data.keys() and data['htxrd']:
+            data['diffractogram'], data['wavelength'] = xrd.io.read_htxrd(data=data, options=options, index=0)
+        
+        else:
+            for index in range(len(data['path'])):
+                diffractogram, wavelength = xrd.io.read_data(data=data, options=options, index=index)
+
+
+                data['diffractogram'][index] = diffractogram
+                data['wavelength'][index] = wavelength
+
+
+                # FIXME This is a quick fix as the image is not reloaded when passing multiple beamline datasets. Should probably be handled in io?
+                data['image'] = None
+
+        # Sets the xlim if this has not been specified
+        if not options['xlim']:
+            options['xlim'] = [data['diffractogram'][0][options['x_vals']].min(), data['diffractogram'][0][options['x_vals']].max()]
+        # GENERATE HEATMAP DATA
+        data['heatmap'], data['heatmap_xticks'], data['heatmap_xticklabels'], data['heatmap_yticks'], data['heatmap_yticklabels'] = generate_heatmap(data=data, options=options)
+        options['heatmap_loaded'] = True
+
+        if options['heatmap']:
+            xlim_start_frac, xlim_end_frac = options['xlim'][0] / data['diffractogram'][0][options['x_vals']].max(), options['xlim'][1] / data['diffractogram'][0][options['x_vals']].max()
+            options['xlim'] = [options['heatmap_xlim'][0]*xlim_start_frac, options['heatmap_xlim'][1]*xlim_end_frac]
+
+        if options['heatmap_reverse']:
+            data['heatmap'] = data['heatmap'].iloc[::-1]
+            data['heatmap_yticklabels'] = data['heatmap_yticklabels'][::-1]
+
+    # If data was already loaded, only do a check to see if the data is in a list or not, and if not, put it in one. This is because it will be looped over later.
+    else:
+        if not isinstance(data['diffractogram'], list):
+            data['diffractogram'] = [data['diffractogram']]
+            data['wavelength'] = [data['wavelength']]
+    
+
+    
+    ############################################################################################################################################################
+    ##### INTERACTIVE SESSION ##################################################################################################################################
+    ############################################################################################################################################################
+
+
+
+    # START INTERACTIVE SESSION
+    # Start inteactive session with ipywidgets. Disables options['interactive'] in order for the interactive loop to not recursively start new interactive sessions
+    if options['interactive']:
+        options['interactive'] = False
+        options['interactive_session_active'] = True
+        plot_diffractogram_interactive(data=data, options=options)
+        return
+    
+    
+    # If interactive mode is already enabled, update the offsets. 
+    if options['interactive_session_active']:
+        if options['offset']:
+            if (options['offset_x'] != options['current_offset_x']) or (options['offset_y'] != options['current_offset_y']):
+                for i, (diff, wl) in enumerate(zip(data['diffractogram'], data['wavelength'])):
+                    xrd.io.apply_offset(diff, wl, i, options)
+
+    
+
+
+    ############################################################################################################################################################
+    ##### PREPARE THE PLOT AND COLOURS #########################################################################################################################
+    ############################################################################################################################################################
+    
+    # CREATE AND ASSIGN AXES
+
+    # Makes a list out of reflections_data if it only passed as a dict, as it will be looped through later
+    if options['reflections_data']:
+        if not isinstance(options['reflections_data'], list):
+            options['reflections_data'] = [options['reflections_data']]
+    
+    
+    # Determine the grid layout based on how many sets of reflections data has been passed
+    if options['reflections_data'] and len(options['reflections_data']) >= 1:
+        options = determine_grid_layout(options=options)
+
+    # Create the Figure and Axes objects
+
+    # Use provided axis/figure if available; otherwise create new ones
+    if ax is not None:
+        # use existing axis, but still return it as usual
+        fig = ax.figure if fig is None else fig
+    else:
+        fig, ax = btp.prepare_plot(options=options)
+
+    # Assign the correct axes to the indicies, reflections and figure itself
+    if options['reflections_plot'] or options['reflections_indices']:
+        
+        if options['reflections_indices']:
+            indices_ax = ax[0]
+
+            if options['reflections_plot']:
+                ref_axes = [axx for axx in ax[range(1,len(options['reflections_data'])+1)]]
+
+        else:
+            ref_axes = [axx for axx in ax[range(0,len(options['reflections_data']))]]
+
+        ax = ax[-1]
+
+    
+    # GENERATE COLOURS
+    
+    # Limit for when it is assumed that each diffractogram should have its own colour - after 8, the default colour palette is used up and starts a new.
+    # FIXME Should probably allow for more than 8 if wanted - not a priority now
+    if len(data['path']) <= 8:
+        if 'colours' in options.keys():
+            colours = btp.generate_colours(options['colours'], kind='single')
+
+        else:
+            colours = btp.generate_colours(options['palettes'])
+    
+
+    # Generates the colours of a list of scans to highlight is passed. options['highlight'] and options['highlight_colour'] must be of equal length. Entries in highlight can either be a list or a single number,
+    # if the latter it will be turned into a list with the same number as element 1 and 2. 
+    elif options['highlight']:
+        # Make sure that options['highlight'] is a list
+        if not isinstance(options['highlight'], list):
+            options['highlight'] = [[options['highlight'], options['highlight']]]
+        
+        # Make sure that options['highlight_colours] is a list
+        if not isinstance(options['highlight_colours'], list):
+            options['highlight_colours'] = [options['highlight_colours']]
+
+        colours = []
+    
+        # Loop through each scan - assign the correct colour to each of the scan intervals in options['highlight']
+        for i in range(len(data['path'])):
+            assigned = False
+            for j, highlight in enumerate(options['highlight']):
+                
+                # If one of the elements in options['highlight'] is a single number (i.e. only one scan should be highlighted), this is converted into the suitable format to be handled below
+                if not isinstance(highlight, list):
+                    highlight = [highlight, highlight]
+
+                # Assigns the j-th colour if scan number (i) is within the j-th highlight-interval
+                if i >= highlight[0] and i <= highlight[1]:
+                    colours.append(options['highlight_colours'][j])
+                    assigned = True
+            
+            # Only assign black to i if not already been given a colour
+            if not assigned:
+                colours.append('black')
+
+            # Reset the 'assigned' value for the next iteration
+            assigned = False
+
+        # Make a itertools cycle out of the colours
+        colours = btp.generate_colours(colours, kind='single')
+
+
+    # If there are many scans and no highlight-options have been passed, all scans will be black
+    else:
+        colours = btp.generate_colours(['black'], kind='single')
+
+
+
+    ############################################################################################################################################################
+    ##### PLOT THE DATA ########################################################################################################################################
+    ############################################################################################################################################################
+
+
+    # PLOT HEATMAP
+    if options['heatmap']:
+
+        # Add locators for y-axis - otherwise it will tend to break (too many ticks) when switching between diffractograms and heatmap in interactive mode. These values will be updated later anyway, and is only 
+        # to allow the initial call to Seaborn to have values that are sensible.
+        # FIXME A more elegant solution to this?
+        ax.yaxis.set_major_locator(MultipleLocator(100))
+        ax.yaxis.set_minor_locator(MultipleLocator(50))
+
+        # Call Seaborn to plot the data
+        sns.heatmap(data['heatmap'], cmap=options['cmap'], cbar=False, ax=ax)
+     
+        
+        # Set the ticks and ticklabels to match the data point number with 2th values 
+        ax.set_xticks(data['heatmap_xticks'][options['x_vals']])
+        ax.set_xticklabels(data['heatmap_xticklabels'][options['x_vals']])
+        ax.set_yticks(data['heatmap_yticks'])
+        ax.set_yticklabels(data['heatmap_yticklabels'])
+
+        # Set the labels to the relevant values for heatmap plot
+        if not options['ylabel'] or options['ylabel'] == options['diff.ylabel']:
+            options['ylabel'] = options['heatmap.ylabel']
+        if not options['yunit'] or options['yunit'] == options['diff.yunit']:
+            options['yunit'] = options['heatmap.yunit']
+        
+        
+
+        ax.tick_params(axis='x', which='minor', bottom=False, top=False)
+        ax.tick_params(axis='y', which='minor', left=False, right=False)
+
+        options['hide_y_ticklabels'] = False
+        options['hide_y_ticks'] = False
+
+
+        # Toggle on the frame around the heatmap - this makes it look better together with axes ticks
+        for _, spine in ax.spines.items():
+            spine.set_visible(True)
+
+
+        if options['highlight']:
+            for i, highlight in enumerate(options['highlight']):
+                if i < len(options['highlight']) or len(options['highlight']) == 1: 
+                    ax.axhline(y=highlight[1], c=options['highlight_colours'][i], ls='--', lw=0.5)
+
+
+    # PLOT DIFFRACTOGRAM
+    else:
+        for diffractogram in data['diffractogram']:
+
+            # Plot data as line plot
+            if options['line']:
+                diffractogram.plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=next(colours), zorder=1)
+        
+            # Plot data as scatter plot
+            if options['scatter']:
+                ax.scatter(x=diffractogram[options['x_vals']], y = diffractogram[options['y_vals']], c=[(1,1,1,0)], edgecolors=[next(colours)], linewidths=plt.rcParams['lines.markeredgewidth'], zorder=2) #, edgecolors=np.array([next(colours)]))
+
+
+        # Set the labels to the relevant values for diffractogram plot
+        if not options['ylabel'] or options['ylabel'] == options['heatmap.ylabel']:
+            options['ylabel'] = options['diff.ylabel']
+        if not options['yunit'] or options['yunit'] == options['heatmap.yunit']:
+            options['yunit'] = options['diff.yunit']
+
+
+        options['hide_y_ticklabels'] = True
+        options['hide_y_ticks'] = True
+
+    
+        if options['plot_diff'] and len(data['path']) == 2:
+            diff = data['diffractogram'][0]
+            diff['I'] = diff['I'] - data['diffractogram'][1]['I']
+            diff['I'] = diff['I'] - 0.75
+
+            diff.plot(x=options['x_vals'], y=options['y_vals'], ax=ax, c=next(colours))
+
+
+    # Adjust the plot to make it prettier
+    fig, ax = btp.adjust_plot(fig=fig, ax=ax, options=options)
+ 
+
+    # PLOT REFLECTION TABLES
+    if options['reflections_plot'] and options['reflections_data']:
+        options['xlim'] = ax.get_xlim()
+        options['to_wavelength'] = data['wavelength'][0] # By default, the wavelength of the first diffractogram will be used for these.
+        
+        # Plot each reflection table in the relevant axis
+        for reflections_params, axis in zip(options['reflections_data'], ref_axes):
+            plot_reflection_table(data=data, reflections_params=reflections_params, ax=axis, options=options)
+
+    # Print the reflection indices. 
+    if options['reflections_indices'] and options['reflections_data']:
+        options['xlim'] = ax.get_xlim()
+        options['to_wavelength'] = data['wavelength'][0] # By default, the wavelength of the first diffractogram will be used for this.
+
+        for reflections_params in options['reflections_data']:
+            plot_reflection_indices(data=data, reflections_params=reflections_params, ax=indices_ax, options=options)
+
+
+    ############################################################################################################################################################
+    ##### UPDATE WIDGET ########################################################################################################################################
+    ############################################################################################################################################################  
+    
+    if options['interactive_session_active']:
+        options['current_y_offset'] = options['widget'].kwargs['offset_y']
+        update_widgets(data=data, options=options)
+
+
+    print(fig.get_size_inches())
+    return data['diffractogram'], fig, ax
 
 
 def generate_heatmap(data, options={}):
@@ -1327,13 +1684,13 @@ def rename_phase(phase):
         'layered': 'N-layered',
         'Nlayered': 'N-layered',
         'Mlayered': 'M-layered',
-        'RS': 'RS'
+        'RS': 'o-RS'
     }
 
     if isinstance(phase, list):
         return [phase_name_dict.get(p, p) for p in phase]
     return phase_name_dict.get(phase, phase)
-
+'''
 color_dict = {
         'ord'   : '#009E73',  # Green (Color-blind friendly),#'olivedrab',
         'dis'   : '#0072B2',  # Blue (Darker than Navy),#'navy',
@@ -1351,7 +1708,8 @@ color_dict = {
         'RS'    : '#F0E442'   # Yellow (Well-distinguished),#'darkorange'
         }
 
-color_dict = {
+
+color_dict = { #PROBLEM OF TOO BRIGHT N-LAYERED, AND POSSIBLY TOO DARK e-LMNO
     'ord'     : '#E69F00',  # Darker Yellow-Orange (Distinct from 'dis')
     'dis'     : '#56B4E9',  # Light Blue (More contrast with 'ord')
     'dis2'    : '#8D3C96',  # Orange-red (High contrast)
@@ -1365,7 +1723,31 @@ color_dict = {
     'N-layered': '#F0E442', # Same as 'Nlayered'
     'e-LMNO'  : '#8D3C96',  # Purple (Distinguishable from 'o-LMNO')
 }
+'''
 
+color_dict = {
+    'ord'      : '#E69F00',  # Darker Yellow-Orange (Distinct from 'dis')
+    'dis'      : '#56B4E9',  # Light Blue (More contrast with 'ord')
+    'dis2'     : '#8D3C96',  # Orange-red / Purple (High contrast)
+    'Nlayered' : '#EE7CA6',  # a medium rose pink
+    'Mlayered' : '#7A7A7A',    # #7A7A7A gray
+    'M-layered' : '#7A7A7A',    # #7A7A7A gray
+    'RS'       : '#9EBC59',  # Green-Yellow (Easier to distinguish from white)
+    'o-RS'       : '#9EBC59',  # Green-Yellow (Easier to distinguish from white)
+    'o-LMNO'   : '#E69F00',  # Same as 'ord'
+    'd-LMNO'   : '#56B4E9',  # Same as 'dis'
+    'layered'  : '#EE7CA6',  # Same as 'Nlayered'
+    'Layered'  : '#EE7CA6',  # Same as 'Nlayered'
+    'N-layered': '#EE7CA6',  # Same as 'Nlayered'
+    'e-LMNO'   : '#B84DC4',  # Brighter Magenta-Purple (Better contrast with black)
+    'li2mno'   : '#A6611A',  # Testing 
+    'li2mno2': '#5C4033'
+
+}
+
+#def color_dict_function(phase):
+#    color = color_dict[phase]
+#    return color
 
 '''
 def plot_refinement_with_single_phases_halvor(data, options={}):
@@ -1585,7 +1967,7 @@ def plot_refinement_with_single_phases_halvor(data, options={}):
 
 
 
-def plot_refinement_with_single_phases_halvor_fillbetween(data, options={}):
+def plot_refinement_with_single_phases_halvor(data, options={}):
 
 
     required_options = ['diff_offset', 'index', 'title', 'xlim', 'r_wp', 'r_exp', 'wp']
@@ -1802,8 +2184,8 @@ def plot_refinement_with_single_phases_halvor_fillbetween(data, options={}):
         # Plot each reflection table in the relevant axis
         for reflections_params, axis in zip(options['reflections_data'], ref_axes):
             plot_reflection_table(data=data, reflections_params=reflections_params, ax=axis, options=options)
-'''
 
+'''
 def plot_refinement_with_single_phases_halvor_fillbetween_pickthephases(data, options={}):
 
 
@@ -1835,6 +2217,7 @@ def plot_refinement_with_single_phases_halvor_fillbetween_pickthephases(data, op
         'plot_diff': True,
         'pick_phases': False,
         'fill_peaks': False,
+        "plot_full_refinement": True,
     }
     '''
     color_dict = {
@@ -1849,13 +2232,18 @@ def plot_refinement_with_single_phases_halvor_fillbetween_pickthephases(data, op
     }
     '''
     options = aux.update_options(options=options, default_options=default_options, required_options=required_options)
-    df = pd.read_csv(data['path'], delim_whitespace=True)#, header=False)
-    #df.columns = ['2th', 'Yobs', 'Ycalc', 'diff']
-    
+    #df = pd.read_csv(data['path'], delim_whitespace=True)#, header=False)
+    ### Adding this to make it more robust in case diff is not in the riet-file
+    df = pd.read_csv(data['path'], delim_whitespace=True)
+
+    if 'diff' not in df.columns:
+        df.columns = ['2th','Yobs','Ycalc','diff']
+    ###################
+    print("df.columns(): ",df.columns)
+    print("df: ",df)
     #############################
     number_of_single_phases=len(df.columns)-4
     print("there are " + str(number_of_single_phases) + " single phases:",df.columns)
-
     df['diff'] = df['diff'] - options['diff_offset']*(df['Yobs'].max() - df['Yobs'].min())
     
     columns_to_transform = df.columns[1:3].tolist() + df.columns[4:].tolist() #picking out Yobs and Ycalc in addition to the single phases added
@@ -1937,24 +2325,66 @@ def plot_refinement_with_single_phases_halvor_fillbetween_pickthephases(data, op
         ax = ax[-1]
 
     if options['log_y'] or options['ln_y']:
-        df.plot.scatter(x='2th', y='Yobs_log', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*1)
-        df.plot(x='2th', y='Ycalc_log', ax=ax, c='red',linestyle="--",linewidth=plt.rcParams['lines.linewidth']/2) #to make this line thinner than the rest
+        df.plot.scatter(x='2th', y='Yobs_log', ax=ax, c='black', marker='o', s=plt.rcParams['lines.markersize']*0.1)
+        if options["plot_full_refinement"]:
+            df.plot(x='2th', y='Ycalc_log', ax=ax, c='red',linestyle="--",linewidth=plt.rcParams['lines.linewidth']/3) #to make this line thinner than the rest
             ######
         #print("df.columns: ",df.columns)
         for col in df.columns[4:]:
             if col.startswith('Ycalc_') and col.endswith('_log') and col != "Ycalc_log":
                 # Extract the middle part of the column name
                 phase_name = col[len('Ycalc_'):-len('_log')]
+                '''
                 if options['pick_phases']:
                     if phase_name in options['pick_phases']:
                         if options['fill_peaks']:
                             ax.fill_between(df['2th'], df[col], color=color_dict[phase_name], alpha=0.4)  # Fill under the peak
-                        df.plot(x='2th', y=col, ax=ax, c=color_dict[phase_name])
+                        df.plot(x='2th', y=col, ax=ax, c=color_dict[phase_name],linewidth=plt.rcParams['lines.linewidth']/2)
                 else:
                     if options['fill_peaks']:
                         ax.fill_between(df['2th'], df[col], color=color_dict[phase_name], alpha=0.4)  # Fill under the peak
-                    df.plot(x='2th', y=col, ax=ax, c=color_dict[phase_name])
-        
+                    df.plot(x='2th', y=col, ax=ax, c=color_dict[phase_name],linewidth=plt.rcParams['lines.linewidth']/2)
+                '''
+                #Replacing the above code with the following, after tips from AI 13th March 2026
+                '''
+                if options['pick_phases'] and phase_name in options['pick_phases']:
+                    if options['fill_peaks']:
+                        ax.fill_between(df['2th'], df[col], color=color_dict[phase_name], alpha=0.4)
+
+                    df.plot(
+                        x='2th',
+                        y=col,
+                        ax=ax,
+                        c=color_dict[phase_name],
+                        linewidth=plt.rcParams['lines.linewidth']/2
+                    )
+                '''
+                # Replacing also the segment above, due to problems when pick_phases = False, where it is supposed to plot all phases:
+                if options['pick_phases']:
+                    if phase_name in options['pick_phases']:
+                        if options['fill_peaks']:
+                            ax.fill_between(df['2th'], df[col], color=color_dict[phase_name], alpha=0.4)
+
+                        df.plot(
+                            x='2th',
+                            y=col,
+                            ax=ax,
+                            c=color_dict[phase_name],
+                            linewidth=plt.rcParams['lines.linewidth']/2
+                        )
+                else:
+                    # plot ALL phases
+                    if options['fill_peaks']:
+                        ax.fill_between(df['2th'], df[col], color=color_dict[phase_name], alpha=0.4)
+
+                    df.plot(
+                        x='2th',
+                        y=col,
+                        ax=ax,
+                        c=color_dict[phase_name],
+                        linewidth=plt.rcParams['lines.linewidth']/2
+                    )
+                ###
         print("HALVOR, not sure about the set_yscale when plotting log plots - check this out ...")
         ax.set_yscale('log')  # Keep linear scale since data is already in ln???
         ###############################
@@ -1973,13 +2403,14 @@ def plot_refinement_with_single_phases_halvor_fillbetween_pickthephases(data, op
         if options['plot_diff']:
             df.plot(x='2th', y='diff_log', ax=ax)
     elif options['cbrt_y']:
-        df.plot.scatter(x='2th', y='Yobs_cbrt', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*10)
+        df.plot.scatter(x='2th', y='Yobs_cbrt', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*0.25)
         df.plot(x='2th', y='Ycalc_cbrt', ax=ax)#, c='red')
         if options['plot_diff']:
             df.plot(x='2th', y='diff_cbrt', ax=ax)
     else:
-        df.plot.scatter(x='2th', y='Yobs', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*10)
-        df.plot(x='2th', y='Ycalc', ax=ax)#, c='red')
+        df.plot.scatter(x='2th', y='Yobs', ax=ax, c='black', marker='$\u25EF$', s=plt.rcParams['lines.markersize']*0.25)
+        if options["plot_full_refinement"]:
+            df.plot(x='2th', y='Ycalc', ax=ax)#, c='red')
         if options['plot_diff']:
             df.plot(x='2th', y='diff', ax=ax)
     
