@@ -88,7 +88,7 @@ def prepare_plot(options={}):
             format_params['grid_ratio_height'] = [1 for i in range(format_params['nrows'])]
 
         if not format_params['grid_ratio_width']:
-            format_params['grid-ratio_width'] = [1 for i in range(format_params['ncols'])]
+            format_params['grid_ratio_width'] = [1 for i in range(format_params['ncols'])]
 
         fig, axes = plt.subplots(nrows=format_params['nrows'], ncols=format_params['ncols'], figsize=(format_params['width'],format_params['height']), 
         gridspec_kw={'height_ratios': format_params['grid_ratio_height'], 'width_ratios': format_params['grid_ratio_width']}, 
